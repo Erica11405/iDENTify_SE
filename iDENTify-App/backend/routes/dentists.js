@@ -1,66 +1,128 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const db = require("../db");
+const db = require('../db'); 
 
-// Get all dentists
-router.get("/", async (req, res) => {
+// GET ALL DENTISTS
+router.get('/', async (req, res) => {
+  
   try {
-    const [rows] = await db.query("SELECT * FROM dentists");
+    const [rows] = await db.query('SELECT * FROM dentists');
     
-    // Transform DB rows to match Frontend expectation
-    const enhancedRows = rows.map(d => {
-        // Parse the JSON schedule column
-        const schedule = typeof d.schedule === 'string' ? JSON.parse(d.schedule) : (d.schedule || {});
-        
-        return {
-            id: d.id,
-            name: d.name,
-            shortName: d.name, // Frontend uses shortName as key sometimes
-            specialization: d.specialty, // Map 'specialty' column to 'specialization' prop
-            status: d.status || 'Available',
-            // Default schedule structure if null
-            days: schedule.days || [1, 2, 3, 4, 5], 
-            operatingHours: schedule.operatingHours || { start: "09:00", end: "17:00" },
-            lunch: schedule.lunch || { start: "12:00", end: "13:00" },
-            breaks: schedule.breaks || [],
-            leaveDays: schedule.leaveDays || [],
-            assignedPatientsToday: [] // This requires complex join, leaving empty for now
-        };
-    });
-    res.json(enhancedRows);
+    const formattedDentists = rows.map(d => ({
+      ...d,
+      // Check if data is string before parsing to prevent double-parsing crashes
+      days: typeof d.schedule_days === 'string' ? JSON.parse(d.schedule_days) : (d.schedule_days || []),
+      operatingHours: typeof d.operating_hours === 'string' ? JSON.parse(d.operating_hours) : (d.operating_hours || { start: '09:00', end: '17:00' }),
+      breaks: typeof d.breaks === 'string' ? JSON.parse(d.breaks) : (d.breaks || []),
+      leaveDays: typeof d.leave_days === 'string' ? JSON.parse(d.leave_days) : (d.leave_days || []),
+      name: d.name || `${d.first_name} ${d.last_name}`
+    }));
+
+    res.json(formattedDentists);
   } catch (err) {
+    console.error("Error fetching dentists:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Update dentist (Status, Schedule, Leave, etc.)
-router.put("/:id", async (req, res) => {
-  const { id } = req.params;
-  const { status, days, operatingHours, lunch, breaks, leaveDays } = req.body;
-
-  // Construct the schedule JSON object
-  const scheduleObj = {
-    days,
-    operatingHours,
-    lunch,
-    breaks,
-    leaveDays
-  };
-
-  const scheduleJson = JSON.stringify(scheduleObj);
+// ADD NEW DENTIST
+router.post('/', async (req, res) => {
+  const { 
+    first_name, last_name, specialization, phone, email, 
+    days, operatingHours, breaks, leaveDays, status 
+  } = req.body;
 
   try {
-    await db.query(
-      "UPDATE dentists SET status = ?, schedule = ? WHERE id = ?",
-      [status, scheduleJson, id]
-    );
+    // NOTE: We do NOT insert 'name' here. MySQL generates it automatically.
+    const sql = `
+      INSERT INTO dentists 
+      (first_name, last_name, specialization, phone, email, schedule_days, operating_hours, breaks, leave_days, status) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
 
-    // Return the data so frontend store can update
-    res.json({ id: Number(id), ...req.body });
-  } catch (error) {
-    console.error("Error updating dentist:", error);
-    res.status(500).json({ message: "Database error" });
+    const values = [
+      first_name,
+      last_name,
+      specialization,
+      phone,
+      email,
+      JSON.stringify(days || []),           
+      JSON.stringify(operatingHours || {}), 
+      JSON.stringify(breaks || []),
+      JSON.stringify(leaveDays || []),
+      status || 'Available'
+    ];
+
+    const [result] = await db.query(sql, values);
+    res.status(201).json({ id: result.insertId, message: 'Dentist added successfully' });
+  } catch (err) {
+    console.error("Error adding dentist:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
+// UPDATE DENTIST
+router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { 
+    first_name, 
+    last_name, 
+    specialization, 
+    phone, 
+    email, 
+    days, 
+    operatingHours, 
+    breaks, 
+    leaveDays, 
+    status 
+  } = req.body;
+
+  try {
+    // Sync the 'name' column by combining first and last names
+    const fullName = `${first_name} ${last_name}`;
+
+    const sql = `
+      UPDATE dentists 
+      SET 
+        first_name = ?, 
+        last_name = ?, 
+        name = ?,
+        specialization = ?, 
+        phone = ?, 
+        email = ?, 
+        schedule_days = ?, 
+        operating_hours = ?, 
+        breaks = ?, 
+        leave_days = ?, 
+        status = ?
+      WHERE id = ?
+    `;
+
+    const values = [
+      first_name,
+      last_name,
+      fullName,
+      specialization,
+      phone,
+      email,
+      JSON.stringify(days || []),
+      JSON.stringify(operatingHours || {}),
+      JSON.stringify(breaks || []),
+      JSON.stringify(leaveDays || []),
+      status || 'Available',
+      id
+    ];
+
+    const [result] = await db.query(sql, values);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Dentist not found' });
+    }
+
+    res.json({ message: 'Dentist updated successfully' });
+  } catch (err) {
+    console.error("Error updating dentist:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 module.exports = router;

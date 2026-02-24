@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import api from '../api/apiClient';
 import useAppStore from '../store/useAppStore';
 
@@ -163,64 +163,14 @@ export default function useApi() {
 
   const createPatient = useCallback(async (payload) => {
     const created = await api.createPatient(payload);
-    const mapServerToFrontend = (p) => {
-      const birthdate = p.birthdate || p.birthday || null;
-      let age = null;
-      if (birthdate) {
-         const b = new Date(birthdate);
-         const now = new Date();
-         let a = now.getFullYear() - b.getFullYear();
-         const m = now.getMonth() - b.getMonth();
-         if (m < 0 || (m === 0 && now.getDate() < b.getDate())) a -= 1;
-         age = a;
-      } else {
-         age = p.vitals?.age || p.age || null;
-      }
-
-      return {
-        id: p.id,
-        name: p.full_name || p.name || "",
-        age: age,
-        sex: p.gender || p.sex || "",
-        contact: p.contact_number || p.contact || "",
-        email: p.email || "",
-        address: p.address || "",
-        birthday: birthdate,
-        medicalAlerts: p.medical_alerts || [],
-        vitals: p.vitals || {},
-      };
-    };
-
-    if (created?.id) addPatient(mapServerToFrontend(created));
+    if (created?.id) addPatient(created);
     return created;
   }, [addPatient]);
 
   const updatePatient = useCallback(async (id, updates) => {
     const updated = await api.updatePatient(id, updates);
     if (updated && updated.id) {
-       const birthdate = updated.birthdate || updated.birthday || null;
-       let age = null;
-       if (birthdate) {
-          const b = new Date(birthdate);
-          const now = new Date();
-          age = now.getFullYear() - b.getFullYear();
-       } else {
-          age = updated.vitals?.age || updated.age || null;
-       }
-       
-       const mapped = {
-         id: updated.id,
-         name: updated.full_name || updated.name,
-         age: age,
-         sex: updated.gender || updated.sex,
-         contact: updated.contact_number || updated.contact,
-         email: updated.email,
-         address: updated.address,
-         birthday: birthdate,
-         medicalAlerts: updated.medical_alerts || [],
-         vitals: updated.vitals || {}
-       };
-       updatePatientStore(updated.id, mapped);
+       updatePatientStore(updated.id, updated);
     }
     return updated;
   }, [updatePatientStore]);
@@ -230,13 +180,7 @@ export default function useApi() {
     if (created?.id) {
       const apptDate = new Date(created.appointment_datetime);
       const timeStart = apptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-
-      const transformed = {
-        ...created,
-        timeStart,
-        patient: created.full_name,
-      };
-      addAppointment(transformed);
+      addAppointment({ ...created, timeStart, patient: created.full_name });
     }
     return created;
   }, [addAppointment]);
@@ -244,15 +188,7 @@ export default function useApi() {
   const updateAppointment = useCallback(async (id, updates) => {
     const updated = await api.updateAppointment(id, updates);
     if (updated && updated.id) {
-      const apptDate = new Date(updated.appointment_datetime);
-      const timeStart = apptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-      
-      const transformed = {
-        ...updated,
-        timeStart,
-        patient: updated.full_name,
-      };
-      updateAppointmentStore(transformed);
+      updateAppointmentStore(updated);
     }
     return updated;
   }, [updateAppointmentStore]);
@@ -269,34 +205,6 @@ export default function useApi() {
     return created;
   }, [addQueueItem]);
 
-  const updateQueue = useCallback(async (id, updates) => {
-    const updated = await api.updateQueueItem(id, updates);
-    if (updates?.status) {
-      useAppStore.getState().updateQueueStatus(id, updates.status);
-    }
-    return updated;
-  }, []);
-
-  const deleteQueue = useCallback(async (id) => {
-    await api.deleteQueueItem(id);
-    useAppStore.setState((state) => ({ queue: state.queue.filter((q) => q.id !== id) }));
-    return id;
-  }, []);
-
-  const getPatientById = useCallback(async (id) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const patient = await api.getPatientById(id);
-      return patient;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const getToothConditions = useCallback(async (patientId, year) => api.getToothConditions(patientId, year), []);
   const upsertToothCondition = useCallback(async (payload) => api.upsertToothCondition(payload), []);
   const getTreatmentTimeline = useCallback(async (patientId, year) => api.getTreatmentTimeline(patientId, year), []);
@@ -309,7 +217,8 @@ export default function useApi() {
   const getAnnualRecord = useCallback(async (patientId, year) => api.getAnnualRecord(patientId, year), []);
   const saveAnnualRecord = useCallback(async (payload) => api.saveAnnualRecord(payload), []);
 
-  return {
+  // THE KEY FIX: Stabilize the return object
+  return useMemo(() => ({
     loading,
     error,
     loadPatients,
@@ -320,13 +229,10 @@ export default function useApi() {
     loadReports,
     createPatient,
     updatePatient,
-    getPatientById,
     createAppointment,
     updateAppointment,
     removeAppointment,
     addQueue,
-    updateQueue,
-    deleteQueue,
     getToothConditions,
     upsertToothCondition,
     getTreatmentTimeline,
@@ -338,5 +244,12 @@ export default function useApi() {
     updateDentist,
     getAnnualRecord,
     saveAnnualRecord,
-  };
+  }), [
+    loading, error, loadPatients, loadAppointments, loadQueue, loadDentists,
+    loadTreatments, loadReports, createPatient, updatePatient,
+    createAppointment, updateAppointment, removeAppointment, addQueue,
+    getToothConditions, upsertToothCondition, getTreatmentTimeline,
+    addTreatmentTimelineEntry, deleteTreatmentTimelineEntry, getMedications,
+    addMedication, deleteMedication, updateDentist, getAnnualRecord, saveAnnualRecord
+  ]);
 }

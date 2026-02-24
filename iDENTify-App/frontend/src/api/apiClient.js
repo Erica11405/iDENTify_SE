@@ -30,12 +30,10 @@ export async function getPatients() {
     return handleResponse(res);
 }
 
-// --- NEW SEARCH FUNCTION ---
 export async function searchPatients(query) {
     const res = await fetch(`${API_BASE}/patients?search=${encodeURIComponent(query)}`);
     return handleResponse(res);
 }
-// ---------------------------
 
 export async function getPatientById(id) {
     const res = await fetch(`${API_BASE}/patients/${id}/`);
@@ -127,6 +125,17 @@ export async function getDentists() {
     const res = await fetch(`${API_BASE}/dentists`);
     return handleResponse(res);
 }
+
+// FIX: Added createDentist to handle the POST request correctly
+export async function createDentist(payload) {
+    const res = await fetch(`${API_BASE}/dentists`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+}
+
 export async function updateDentist(id, updates) {
     const res = await fetch(`${API_BASE}/dentists/${id}`, {
         method: 'PUT',
@@ -225,7 +234,7 @@ export async function saveAnnualRecord(payload) {
 
 export default {
     getPatients,
-    searchPatients, // Added here
+    searchPatients,
     getPatientById,
     createPatient,
     updatePatient,
@@ -241,6 +250,7 @@ export default {
     updateQueueItem,
     deleteQueueItem,
     getDentists,
+    createDentist, // FIX: Added here
     updateDentist,
     getToothConditions,
     upsertToothCondition,

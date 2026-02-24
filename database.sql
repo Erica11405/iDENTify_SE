@@ -5,10 +5,17 @@ USE `identify_app`;
 -- DENTISTS TABLE
 CREATE TABLE IF NOT EXISTS `dentists` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(255) NOT NULL,
-  `specialty` VARCHAR(255),
+  `first_name` VARCHAR(100),
+  `last_name` VARCHAR(100),
+  `name` VARCHAR(255), -- We will store "First Last" here for easy display
+  `specialization` VARCHAR(255),
+  `phone` VARCHAR(20),
+  `email` VARCHAR(100),
   `status` VARCHAR(50) DEFAULT 'Available',
-  `schedule` JSON
+  `schedule_days` JSON DEFAULT NULL,
+  `operating_hours` JSON DEFAULT NULL,
+  `breaks` JSON DEFAULT NULL,
+  `leave_days` JSON DEFAULT NULL
 );
 
 -- PATIENTS TABLE

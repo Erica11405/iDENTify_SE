@@ -1,217 +1,260 @@
+/* --- PAGE LAYOUT --- */
 .dentists-page {
   padding: 2rem;
+  height: 100%;
+  overflow-y: auto;
+  background-color: #f0f4f8;
 }
 
-.dentists-header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
 }
 
-.dentists-title {
+.header-title h1 {
   font-size: 2rem;
-  font-weight: bold;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
 }
 
-.dentist-calendar-row {
+.schedule-date-container {
   display: flex;
-  align-items: center;
-  gap: 1rem;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
-.small-label {
-  font-size: 0.9rem;
-  color: #6c757d;
-  margin-bottom: 0.5rem;
+.schedule-date-container label {
+  font-size: 0.8rem;
+  color: #888;
+  margin-bottom: 4px;
 }
 
 .datepicker-input {
-  padding: 0.8rem;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
   border-radius: 8px;
-  border: 1px solid #dee2e6;
+  width: 140px;
 }
 
-.dentist-filter-bar {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  background-color: #f8f9fa;
-  padding: 1.5rem;
-  border-radius: 12px;
-  margin-bottom: 2rem;
+/* --- FILTERS & DROPDOWN BUTTON --- */
+.filter-row {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2.5rem;
 }
 
 .filter-group {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  flex: 1;
 }
 
 .filter-group label {
-  font-weight: bold;
-  margin-bottom: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #444;
 }
 
 .filter-group select {
-  padding: 0.8rem;
+  padding: 10px;
+  border: 1px solid #ddd;
   border-radius: 8px;
-  border: 1px solid #dee2e6;
+  background: white;
 }
 
-.dentist-grid {
+.dropdown-with-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dropdown-with-btn select {
+  flex: 1;
+}
+
+/* THE BLUE ADD BUTTON BESIDE AVAILABILITY */
+.add-btn-dropdown {
+  background-color: #3b82f6;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.add-btn-dropdown:hover {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+}
+
+/* --- DENTIST CARDS --- */
+.dentists-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 2rem;
 }
 
 .dentist-card {
-  background-color: #fff;
-  padding: 2rem;
+  background: white;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 1.8rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+  border: 1px solid #f0f0f0;
 }
 
-.dentist-card__header {
+.card-header-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1.5rem;
-}
-
-.dentist-specialization {
-  font-size: 0.9rem;
-  color: #6c757d;
+  align-items: center;
   margin-bottom: 0.5rem;
 }
 
-.dentist-card h3 {
+.specialization-text {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.status-badge {
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.status-badge.available { background: #e6f7ef; color: #10b981; }
+.status-badge.busy { background: #fff7ed; color: #f59e0b; }
+.status-badge.off { background: #f1f5f9; color: #64748b; }
+
+.dentist-name {
   font-size: 1.5rem;
-  font-weight: bold;
+  font-weight: 700;
+  color: #0f172a;
   margin: 0;
 }
 
-.muted-text {
-  color: #adb5bd;
-}
-
-.status-pill {
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-weight: bold;
-  font-size: 0.9rem;
-  border: none;
-  cursor: pointer;
-}
-
-.status-available {
-  background-color: #e6fcf5;
-  color: #2f9e44;
-}
-
-.status-busy {
-  background-color: #fff9db;
-  color: #f59f00;
-}
-
-.status-off {
-  background-color: #f8f9fa;
-  color: #868e96;
-}
-
-/* NEW: Days Selector Styles */
-.days-selector {
-  display: flex;
-  gap: 8px;
-}
-
-.day-toggle {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid #dee2e6;
-  background-color: #f8f9fa;
-  color: #adb5bd;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.day-toggle:hover {
-  border-color: #007bff;
-  color: #007bff;
-}
-
-.day-toggle.active {
-  background-color: #007bff;
-  color: white;
-  border-color: #007bff;
-}
-
-/* --- End New Styles --- */
-
-.busy-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  background-color: #fff3cd;
-  color: #664d03;
-  padding: 1rem;
-  border-radius: 8px;
+.patient-stat {
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 0.85rem;
   margin-bottom: 1.5rem;
 }
 
-.schedule-grid {
-  display: grid;
-  gap: 1.5rem;
+.section-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-bottom: 10px;
+  display: block;
 }
 
-.schedule-row {
+.days-container {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.day-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-}
-
-.schedule-row input {
-  padding: 0.5rem;
-  border-radius: 8px;
-  border: 1px solid #dee2e6;
-}
-
-.time-separator {
-  font-weight: bold;
-}
-
-.pill-btn {
-  background-color: #007bff;
-  color: #fff;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-weight: bold;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: #cbd5e1;
+  background: white;
   cursor: pointer;
-  transition: background-color 0.3s;
 }
 
-.pill-btn:hover {
-  background-color: #0056b3;
+.day-circle.active {
+  background-color: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
 }
 
-.break-list,
-.leave-list {
+.time-config-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 1.2rem;
+}
+
+.time-input-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.time-input-box input {
+  border: none;
+  background: transparent;
+  width: 90px;
+}
+
+.time-sep { color: #64748b; }
+
+.chips-display {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
-.break-chip,
-.leave-chip {
-  background-color: #f1f3f5;
-  color: #495057;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
+.mini-chip {
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mini-chip.red { background: #fee2e2; color: #ef4444; }
+
+.mini-chip button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.btn-blue-add {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-wide-add {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.leave-days-input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
 }
