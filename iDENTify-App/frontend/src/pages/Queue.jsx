@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
 import "../styles/pages/Queue.css";
 import AddWalkInModal from "../components/AddWalkInModal";
 import StatusBadge from "../components/StatusBadge";
@@ -18,10 +17,10 @@ const dentistAvailabilityMinutes = {
 function Queue() {
   const navigate = useNavigate();
   const api = useApi();
-  const queue = useAppStore((state) => state.queue);
-  const patients = useAppStore((state) => state.patients);
-  const dentists = useAppStore((state) => state.dentists);
-  const appointments = useAppStore((state) => state.appointments); // Ensure appointments are loaded for context
+  const queue = useAppStore((state) => state.queue || []);
+  const patients = useAppStore((state) => state.patients || []);
+  const dentists = useAppStore((state) => state.dentists || []);
+  const appointments = useAppStore((state) => state.appointments || []);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -61,20 +60,33 @@ function Queue() {
 
       const dentistObj = dentists.find(d => d.name === patientData.assignedDentist);
 
+      const now = new Date();
+      const pad = (n) => (n < 10 ? '0' + n : n);
+      const mysqlDateTime = now.getFullYear() + '-' +
+             pad(now.getMonth() + 1) + '-' +
+             pad(now.getDate()) + ' ' +
+             pad(now.getHours()) + ':' +
+             pad(now.getMinutes()) + ':' +
+             pad(now.getSeconds());
+
+      // STRICT PAYLOAD - matching DB perfectly
       await api.addQueue({
         patient_id: patientId,
-        dentist_id: dentistObj?.id,
+        appointment_id: null,
+        dentist_id: dentistObj ? dentistObj.id : null,
         source: "walk-in",
         status: "Checked-In",
-        notes: patientData.notes,
-        checkedInTime: new Date().toISOString(),
+        notes: patientData.notes || "",
+        time_added: mysqlDateTime,
       });
 
-      toast.success("Walk-in patient added to queue.");
+      alert("Walk-in patient added to queue.");
       setIsModalOpen(false);
+      await api.loadQueue(); // ensure UI updates
+
     } catch (err) {
       console.error('Failed to add walk-in', err);
-      toast.error('Failed to add walk-in');
+      alert("Failed to add walk-in.");
     }
   };
 
@@ -85,28 +97,31 @@ function Queue() {
   };
 
   const handleAction = (queueItem) => {
-    const fullPatientData = patients.find(p => p.id === queueItem.patient_id);
+    const fullPatientData = patients.find(p => String(p.id) === String(queueItem.patient_id));
 
-    // LOGIC: Resolve Procedure Name
-    // If appointment exists, use its reason. If walk-in, use queue notes.
     let procedureInfo = queueItem.notes;
     if (queueItem.appointment_id) {
-      const linkedAppt = appointments.find(a => a.id === queueItem.appointment_id);
+      const linkedAppt = appointments.find(a => String(a.id) === String(queueItem.appointment_id));
       if (linkedAppt && linkedAppt.reason) {
         procedureInfo = linkedAppt.reason;
       }
     }
 
+    const dentistObj = dentists.find(d => String(d.id) === String(queueItem.dentist_id));
+    const finalDentistId = dentistObj ? dentistObj.id : queueItem.dentist_id;
+    const assignedDentistName = dentistObj ? dentistObj.name : "Unassigned";
+
     const appointmentPayload = {
       ...queueItem,
-      dentist_id: queueItem.dentist_id,
-      procedure: procedureInfo, // Pass correct procedure name
+      dentist_id: finalDentistId,
+      procedure: procedureInfo,
       timeStart: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
     navigate(`/app/patient/${queueItem.patient_id}/`, {
       state: {
-        dentistId: queueItem.dentist_id,
+        dentistId: finalDentistId,
+        assignedDentistName: assignedDentistName,
         status: queueItem.status,
         patientData: fullPatientData,
         appointment: appointmentPayload
@@ -116,13 +131,9 @@ function Queue() {
 
   const handleStatusChange = async (id, status) => {
     try {
-      await api.updateQueue(id, { status });
-      if (status === "Done") {
-        toast.success("Patient moved to History.");
-      }
+      await api.updateQueueItem(id, { status });
     } catch (err) {
       console.error('Failed to update queue status', err);
-      toast.error('Failed to update status');
     }
   };
 
@@ -135,10 +146,8 @@ function Queue() {
     if (!itemToDelete) return;
     try {
       await api.deleteQueue(itemToDelete.id);
-      toast.success("Removed from queue");
     } catch (err) {
       console.error("Failed to delete queue item", err);
-      toast.error("Failed to delete");
     } finally {
       setIsDeleteModalOpen(false);
       setItemToDelete(null);
@@ -149,11 +158,14 @@ function Queue() {
   const handleDragOver = (e) => e.preventDefault();
   const handleDrop = () => { };
 
-  const calculateWaitingTimeSince = (checkedInTime) => {
-    if (!checkedInTime) return "--";
-    const now = new Date();
-    const checkedIn = new Date(checkedInTime);
-    const diff = now - checkedIn;
+  const calculateWaitingTimeSince = (timeAdded) => {
+    if (!timeAdded) return "--";
+    // Replace space with T to make it safely parseable across all browsers
+    const safeTime = String(timeAdded).replace(' ', 'T');
+    const checkedIn = new Date(safeTime);
+    if (isNaN(checkedIn.getTime())) return "--";
+    
+    const diff = new Date() - checkedIn;
     const minutes = Math.floor(diff / 60000);
     if (minutes < 1) return "Just now";
     return `${minutes} min ago`;
@@ -161,31 +173,30 @@ function Queue() {
 
   const queueWithDetails = useMemo(
     () => {
-      // 1. Calculate persistent Ticket Numbers based on Time Added
-      // Include 'Done' but exclude 'Cancelled' to match logical flow
       const sortedForNumbering = [...queue]
         .filter(q => q.status !== 'Cancelled')
-        .sort((a, b) => new Date(a.time_added) - new Date(b.time_added));
+        .sort((a, b) => {
+            const timeA = a.time_added ? new Date(String(a.time_added).replace(' ', 'T')).getTime() : 0;
+            const timeB = b.time_added ? new Date(String(b.time_added).replace(' ', 'T')).getTime() : 0;
+            return timeA - timeB;
+        });
 
       const ticketMap = new Map();
       sortedForNumbering.forEach((item, index) => {
         ticketMap.set(item.id, index + 1);
       });
 
-      // 2. Filter and Map for Display
       return queue
-        // Filter out Done items (they go to History)
         .filter((item) => item.status !== "Done")
         .map((item, index) => {
-          const patient = patients.find((p) => p.id === item.patient_id);
+          const patient = patients.find((p) => String(p.id) === String(item.patient_id));
           const patientName = patient ? (patient.name || patient.full_name) : (item.full_name || "Unknown");
 
-          const dentist = dentists.find((d) => d.id === item.dentist_id);
-          const dentistName = dentist ? dentist.name : (item.dentist_name || "Unassigned");
+          const dentist = dentists.find((d) => String(d.id) === String(item.dentist_id));
+          const dentistName = dentist ? dentist.name : "Unassigned";
 
           return {
             ...item,
-            // Use the persistent number map. Fallback to index if not found (e.g. Cancelled items if viewed)
             number: ticketMap.get(item.id) || (index + 1),
             name: patientName,
             assignedDentist: dentistName,
@@ -278,7 +289,7 @@ function Queue() {
                   </td>
                   <td>{q.assignedDentist}</td>
                   <td><span className="wait-chip">{q.waitingTime}</span></td>
-                  <td>Checked in: {calculateWaitingTimeSince(q.time_added || q.checkedInTime)}</td>
+                  <td>Checked in: {calculateWaitingTimeSince(q.time_added)}</td>
                   <td>
                     <div className="staff-note">{q.notes || '-'}</div>
                   </td>

@@ -1,3 +1,271 @@
+// const API_BASE = import.meta.env.VITE_API_BASE;
+
+// async function handleResponse(res) {
+//     if (!res.ok) {
+//         let body = null;
+//         try {
+//             const text = await res.text();
+//             try {
+//                 body = JSON.parse(text);
+//             } catch (e) {
+//                 body = { message: res.statusText || `Server Error (${res.status})` };
+//             }
+//         } catch (e) {
+//             body = null;
+//         }
+
+//         const message = body?.message || res.statusText || 'API Error';
+//         const error = new Error(message);
+//         error.status = res.status;
+//         error.body = body;
+//         throw error;
+//     }
+//     if (res.status === 204) return null;
+//     return res.json();
+// }
+
+// /* Patients */
+// export async function getPatients() {
+//     const res = await fetch(`${API_BASE}/patients/`);
+//     return handleResponse(res);
+// }
+
+// export async function searchPatients(query) {
+//     const res = await fetch(`${API_BASE}/patients?search=${encodeURIComponent(query)}`);
+//     return handleResponse(res);
+// }
+
+// export async function getPatientById(id) {
+//     const res = await fetch(`${API_BASE}/patients/${id}/`);
+//     return handleResponse(res);
+// }
+// export async function createPatient(patientData) {
+//     const res = await fetch(`${API_BASE}/patients/`, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(patientData),
+//     });
+//     return handleResponse(res);
+// }
+// export async function updatePatient(id, updates) {
+//     const res = await fetch(`${API_BASE}/patients/${id}`, {
+//         method: 'PUT',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(updates),
+//     });
+//     return handleResponse(res);
+// }
+// export async function deletePatient(id) {
+//     const res = await fetch(`${API_BASE}/patients/${id}/`, { method: 'DELETE' });
+//     return handleResponse(res);
+// }
+
+// /* Appointments */
+// export async function getAppointments() {
+//     const res = await fetch(`${API_BASE}/appointments`);
+//     return handleResponse(res);
+// }
+// export async function getAppointmentById(id) {
+//     const res = await fetch(`${API_BASE}/appointments/${id}`);
+//     return handleResponse(res);
+// }
+// export async function checkAppointmentLimit(dentistId, date) {
+//     const res = await fetch(`${API_BASE}/appointments/check-limit?dentist_id=${dentistId}&date=${date}`);
+//     return handleResponse(res);
+// }
+// export async function createAppointment(payload) {
+//     const res = await fetch(`${API_BASE}/appointments`, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(payload),
+//     });
+//     return handleResponse(res);
+// }
+// export async function updateAppointment(id, updates) {
+//     const res = await fetch(`${API_BASE}/appointments/${id}`, {
+//         method: 'PUT',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(updates),
+//     });
+//     return handleResponse(res);
+// }
+// export async function deleteAppointment(id) {
+//     const res = await fetch(`${API_BASE}/appointments/${id}`, { method: 'DELETE' });
+//     return handleResponse(res);
+// }
+
+// /* Queue */
+// export async function getQueue() {
+//     const res = await fetch(`${API_BASE}/queue`);
+//     return handleResponse(res);
+// }
+// export async function addQueueItem(payload) {
+//     const res = await fetch(`${API_BASE}/queue`, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(payload),
+//     });
+//     return handleResponse(res);
+// }
+// export async function updateQueueItem(id, updates) {
+//     const res = await fetch(`${API_BASE}/queue/${id}`, {
+//         method: 'PUT',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(updates),
+//     });
+//     return handleResponse(res);
+// }
+// export async function deleteQueueItem(id) {
+//     const res = await fetch(`${API_BASE}/queue/${id}`, { method: 'DELETE' });
+//     return handleResponse(res);
+// }
+
+// /* Dentists */
+// export async function getDentists() {
+//     const res = await fetch(`${API_BASE}/dentists`);
+//     return handleResponse(res);
+// }
+
+// // FIX: Added createDentist to handle the POST request correctly
+// export async function createDentist(payload) {
+//     const res = await fetch(`${API_BASE}/dentists`, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(payload),
+//     });
+//     return handleResponse(res);
+// }
+
+// export async function updateDentist(id, updates) {
+//     const res = await fetch(`${API_BASE}/dentists/${id}`, {
+//         method: 'PUT',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(updates),
+//     });
+//     return handleResponse(res);
+// }
+
+// /* Tooth Conditions */
+// export async function getToothConditions(patientId, year) {
+//     let url = `${API_BASE}/tooth-conditions/${patientId}`;
+//     if (year) url += `?year=${year}`;
+//     const res = await fetch(url);
+//     return handleResponse(res);
+// }
+// export async function upsertToothCondition(payload) {
+//     const res = await fetch(`${API_BASE}/tooth-conditions`, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(payload),
+//     });
+//     return handleResponse(res);
+// }
+
+// /* Treatment Timeline */
+// export async function getTreatmentTimeline(patientId, year) {
+//     let url = `${API_BASE}/treatment-timeline/${patientId}`;
+//     if (year) url += `?year=${year}`;
+//     const res = await fetch(url);
+//     return handleResponse(res);
+// }
+// export async function addTreatmentTimelineEntry(payload) {
+//     const res = await fetch(`${API_BASE}/treatment-timeline`, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(payload),
+//     });
+//     return handleResponse(res);
+// }
+// export async function deleteTreatmentTimelineEntry(id) {
+//     const res = await fetch(`${API_BASE}/treatment-timeline/${id}`, { method: 'DELETE' });
+//     return handleResponse(res);
+// }
+
+// /* Medications */
+// export async function getMedications(patientId, year) {
+//     let url = `${API_BASE}/medications/${patientId}`;
+//     if (year) url += `?year=${year}`;
+//     const res = await fetch(url);
+//     return handleResponse(res);
+// }
+// export async function addMedication(payload) {
+//     const res = await fetch(`${API_BASE}/medications`, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(payload),
+//     });
+//     return handleResponse(res);
+// }
+// export async function deleteMedication(id) {
+//     const res = await fetch(`${API_BASE}/medications/${id}`, { method: 'DELETE' });
+//     return handleResponse(res);
+// }
+
+// /* Treatments */
+// export async function getTreatments() {
+//     const res = await fetch(`${API_BASE}/treatments`);
+//     return handleResponse(res);
+// }
+
+// /* Reports */
+// export async function getReports(date) {
+//     let url = `${API_BASE}/reports`;
+//     if (date) {
+//         url += `?date=${date}`;
+//     }
+//     const res = await fetch(url);
+//     return handleResponse(res);
+// }
+
+// /* Annual Records */
+// export async function getAnnualRecord(patientId, year) {
+//     const res = await fetch(`${API_BASE}/annual-records/${patientId}/${year}`);
+//     return handleResponse(res);
+// }
+
+// export async function saveAnnualRecord(payload) {
+//     const res = await fetch(`${API_BASE}/annual-records`, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(payload),
+//     });
+//     return handleResponse(res);
+// }
+
+// export default {
+//     getPatients,
+//     searchPatients,
+//     getPatientById,
+//     createPatient,
+//     updatePatient,
+//     deletePatient,
+//     getAppointments,
+//     getAppointmentById,
+//     checkAppointmentLimit,
+//     createAppointment,
+//     updateAppointment,
+//     deleteAppointment,
+//     getQueue,
+//     addQueueItem,
+//     updateQueueItem,
+//     deleteQueueItem,
+//     getDentists,
+//     createDentist, // FIX: Added here
+//     updateDentist,
+//     getToothConditions,
+//     upsertToothCondition,
+//     getTreatmentTimeline,
+//     addTreatmentTimelineEntry,
+//     deleteTreatmentTimelineEntry,
+//     getMedications,
+//     addMedication,
+//     deleteMedication,
+//     getTreatments,
+//     getReports,
+//     getAnnualRecord,
+//     saveAnnualRecord,
+// };
+
 const API_BASE = import.meta.env.VITE_API_BASE;
 
 async function handleResponse(res) {
@@ -30,6 +298,7 @@ export async function getPatients() {
     return handleResponse(res);
 }
 
+// Added Search Function from src1
 export async function searchPatients(query) {
     const res = await fetch(`${API_BASE}/patients?search=${encodeURIComponent(query)}`);
     return handleResponse(res);
@@ -39,6 +308,7 @@ export async function getPatientById(id) {
     const res = await fetch(`${API_BASE}/patients/${id}/`);
     return handleResponse(res);
 }
+
 export async function createPatient(patientData) {
     const res = await fetch(`${API_BASE}/patients/`, {
         method: 'POST',
@@ -47,6 +317,7 @@ export async function createPatient(patientData) {
     });
     return handleResponse(res);
 }
+
 export async function updatePatient(id, updates) {
     const res = await fetch(`${API_BASE}/patients/${id}`, {
         method: 'PUT',
@@ -55,6 +326,7 @@ export async function updatePatient(id, updates) {
     });
     return handleResponse(res);
 }
+
 export async function deletePatient(id) {
     const res = await fetch(`${API_BASE}/patients/${id}/`, { method: 'DELETE' });
     return handleResponse(res);
@@ -65,14 +337,17 @@ export async function getAppointments() {
     const res = await fetch(`${API_BASE}/appointments`);
     return handleResponse(res);
 }
+
 export async function getAppointmentById(id) {
     const res = await fetch(`${API_BASE}/appointments/${id}`);
     return handleResponse(res);
 }
+
 export async function checkAppointmentLimit(dentistId, date) {
     const res = await fetch(`${API_BASE}/appointments/check-limit?dentist_id=${dentistId}&date=${date}`);
     return handleResponse(res);
 }
+
 export async function createAppointment(payload) {
     const res = await fetch(`${API_BASE}/appointments`, {
         method: 'POST',
@@ -81,6 +356,7 @@ export async function createAppointment(payload) {
     });
     return handleResponse(res);
 }
+
 export async function updateAppointment(id, updates) {
     const res = await fetch(`${API_BASE}/appointments/${id}`, {
         method: 'PUT',
@@ -89,6 +365,7 @@ export async function updateAppointment(id, updates) {
     });
     return handleResponse(res);
 }
+
 export async function deleteAppointment(id) {
     const res = await fetch(`${API_BASE}/appointments/${id}`, { method: 'DELETE' });
     return handleResponse(res);
@@ -99,6 +376,13 @@ export async function getQueue() {
     const res = await fetch(`${API_BASE}/queue`);
     return handleResponse(res);
 }
+
+// Added Queue History from src1
+export async function getQueueHistory() {
+    const res = await fetch(`${API_BASE}/queue/history`);
+    return handleResponse(res);
+}
+
 export async function addQueueItem(payload) {
     const res = await fetch(`${API_BASE}/queue`, {
         method: 'POST',
@@ -107,6 +391,7 @@ export async function addQueueItem(payload) {
     });
     return handleResponse(res);
 }
+
 export async function updateQueueItem(id, updates) {
     const res = await fetch(`${API_BASE}/queue/${id}`, {
         method: 'PUT',
@@ -115,6 +400,7 @@ export async function updateQueueItem(id, updates) {
     });
     return handleResponse(res);
 }
+
 export async function deleteQueueItem(id) {
     const res = await fetch(`${API_BASE}/queue/${id}`, { method: 'DELETE' });
     return handleResponse(res);
@@ -126,7 +412,6 @@ export async function getDentists() {
     return handleResponse(res);
 }
 
-// FIX: Added createDentist to handle the POST request correctly
 export async function createDentist(payload) {
     const res = await fetch(`${API_BASE}/dentists`, {
         method: 'POST',
@@ -152,6 +437,7 @@ export async function getToothConditions(patientId, year) {
     const res = await fetch(url);
     return handleResponse(res);
 }
+
 export async function upsertToothCondition(payload) {
     const res = await fetch(`${API_BASE}/tooth-conditions`, {
         method: 'POST',
@@ -168,6 +454,7 @@ export async function getTreatmentTimeline(patientId, year) {
     const res = await fetch(url);
     return handleResponse(res);
 }
+
 export async function addTreatmentTimelineEntry(payload) {
     const res = await fetch(`${API_BASE}/treatment-timeline`, {
         method: 'POST',
@@ -176,6 +463,7 @@ export async function addTreatmentTimelineEntry(payload) {
     });
     return handleResponse(res);
 }
+
 export async function deleteTreatmentTimelineEntry(id) {
     const res = await fetch(`${API_BASE}/treatment-timeline/${id}`, { method: 'DELETE' });
     return handleResponse(res);
@@ -188,6 +476,7 @@ export async function getMedications(patientId, year) {
     const res = await fetch(url);
     return handleResponse(res);
 }
+
 export async function addMedication(payload) {
     const res = await fetch(`${API_BASE}/medications`, {
         method: 'POST',
@@ -196,6 +485,7 @@ export async function addMedication(payload) {
     });
     return handleResponse(res);
 }
+
 export async function deleteMedication(id) {
     const res = await fetch(`${API_BASE}/medications/${id}`, { method: 'DELETE' });
     return handleResponse(res);
@@ -210,9 +500,15 @@ export async function getTreatments() {
 /* Reports */
 export async function getReports(date) {
     let url = `${API_BASE}/reports`;
-    if (date) {
-        url += `?date=${date}`;
-    }
+    if (date) url += `?date=${date}`;
+    const res = await fetch(url);
+    return handleResponse(res);
+}
+
+// Added Dentist Patient List for Reports from src1
+export async function getDentistPatientsForReport(dentistId, date) {
+    let url = `${API_BASE}/reports/dentist/${dentistId}/patients`;
+    if (date) url += `?date=${date}`;
     const res = await fetch(url);
     return handleResponse(res);
 }
@@ -246,11 +542,12 @@ export default {
     updateAppointment,
     deleteAppointment,
     getQueue,
+    getQueueHistory,
     addQueueItem,
     updateQueueItem,
     deleteQueueItem,
     getDentists,
-    createDentist, // FIX: Added here
+    createDentist,
     updateDentist,
     getToothConditions,
     upsertToothCondition,
@@ -262,6 +559,7 @@ export default {
     deleteMedication,
     getTreatments,
     getReports,
+    getDentistPatientsForReport,
     getAnnualRecord,
     saveAnnualRecord,
 };

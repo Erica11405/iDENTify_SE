@@ -159,3 +159,32 @@ button {
   margin-top: 4px;
   width: 100%;
 }
+
+/* Action Button Utilities */
+.action-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.update-btn {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.update-btn:hover {
+  background-color: #bae6fd;
+}
+
+.delete-btn {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.delete-btn:hover {
+  background-color: #fecaca;
+}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import apiClient from "../api/apiClient";
 import useApi from "../hooks/useApi";
 import useAppStore from "../store/useAppStore";
 import "../styles/pages/Reports.css";
@@ -11,186 +12,102 @@ function Reports() {
   const { dailySummary, dentistPerformance } = reports || {};
   const [selectedDate, setSelectedDate] = useState(new Date());
 
+  // Modal and Patient Data States
+  const [patientsModalOpen, setPatientsModalOpen] = useState(false);
+  const [selectedDentist, setSelectedDentist] = useState(null);
+  const [dentistPatients, setDentistPatients] = useState([]);
+  const [patientsLoading, setPatientsLoading] = useState(false);
+  const [patientsError, setPatientsError] = useState(null);
+
   useEffect(() => {
-    // Convert to YYYY-MM-DD for backend
     const dateStr = selectedDate.toISOString().split('T')[0];
     api.loadReports(dateStr).catch(err => console.error("Load reports failed", err));
-  }, [selectedDate]);
+  }, [selectedDate, api]);
 
   const hasData = dailySummary && dentistPerformance;
 
-  const exportToPDF = async () => {
-    if (!hasData) return;
-    const jsPDF = (await import("jspdf")).default;
-    const autoTable = (await import("jspdf-autotable")).default;
-
-    const doc = new jsPDF();
-    const dateStr = selectedDate.toLocaleDateString();
-
-    doc.setFontSize(18);
-    doc.text(`Clinic Report - ${dateStr}`, 14, 15);
-
-    doc.setFontSize(14);
-    doc.text("Daily Summary", 14, 25);
-
-    autoTable(doc, {
-      startY: 30,
-      head: [['Metric', 'Value']],
-      body: [
-        ['Patients Seen', dailySummary.patientsSeen],
-        ['Procedures Done', dailySummary.proceduresDone],
-        ['New Patients', dailySummary.newPatients],
-        ['Avg. Treatment Duration', dailySummary.avgTreatmentDuration],
-      ],
-    });
-
-    const finalY = (doc).lastAutoTable.finalY || 40;
-
-    doc.text("Dentist Performance", 14, finalY + 15);
-
-    const performanceBody = dentistPerformance.map(d => {
-      const distributionStr = Object.entries(d.treatmentDistribution || {})
-        .map(([k, v]) => `${k}: ${v}`)
-        .join(", ");
-
-      return [
-        d.name,
-        d.patientsHandled,
-        distributionStr || "None",
-        `${Math.round(d.avgTimePerPatient || 0)} min`
-      ];
-    });
-
-    autoTable(doc, {
-      startY: finalY + 20,
-      head: [['Dentist', 'Patients', 'Procedures', 'Avg Time']],
-      body: performanceBody,
-    });
-
-    doc.save(`clinic_report_${selectedDate.toISOString().slice(0, 10)}.pdf`);
+  const formatApptTime = (value) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
 
-  const exportToExcel = async () => {
-    if (!hasData) return;
-    const XLSX = await import("xlsx");
+  const openDentistPatients = async (dentist) => {
+    setSelectedDentist(dentist);
+    setPatientsModalOpen(true);
+    setPatientsLoading(true);
+    setPatientsError(null);
+    setDentistPatients([]);
 
-    const summaryData = [
-      { Metric: "Date", Value: selectedDate.toLocaleDateString() },
-      { Metric: "Patients Seen", Value: dailySummary.patientsSeen },
-      { Metric: "Procedures Done", Value: dailySummary.proceduresDone },
-      { Metric: "New Patients", Value: dailySummary.newPatients },
-      { Metric: "Avg Duration", Value: dailySummary.avgTreatmentDuration },
-    ];
-    const dailySummaryWs = XLSX.utils.json_to_sheet(summaryData);
+    const dateStr = selectedDate.toISOString().split('T')[0];
+    try {
+      const data = await apiClient.getDentistPatientsForReport(dentist.id, dateStr);
+      setDentistPatients(data?.patients || []);
+    } catch (err) {
+      setPatientsError("Failed to load records.");
+    } finally {
+      setPatientsLoading(false);
+    }
+  };
 
-    const performanceData = dentistPerformance.map(d => ({
-      Dentist: d.name,
-      Patients_Handled: d.patientsHandled,
-      Avg_Time_Per_Patient: `${Math.round(d.avgTimePerPatient || 0)} min`,
-      Treatment_Distribution: Object.entries(d.treatmentDistribution || {})
-        .map(([k, v]) => `${k}: ${v}`)
-        .join(", ")
-    }));
-
-    const dentistPerformanceWs = XLSX.utils.json_to_sheet(performanceData);
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, dailySummaryWs, "Daily Summary");
-    XLSX.utils.book_append_sheet(wb, dentistPerformanceWs, "Dentist Performance");
-
-    XLSX.writeFile(wb, `clinic_report_${selectedDate.toISOString().slice(0, 10)}.xlsx`);
+  const closePatientsModal = () => {
+    setPatientsModalOpen(false);
+    setSelectedDentist(null);
+    setDentistPatients([]);
   };
 
   return (
     <div className="reports-page">
       <div className="reports-header">
         <h2 className="reports-title">Reports</h2>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span className="small-label">Select Date</span>
-            <DatePicker
-              selected={selectedDate}
-              onChange={date => setSelectedDate(date)}
-              className="datepicker-input"
-              dateFormat="MMMM d, yyyy"
-            />
-          </div>
-          <div className="export-buttons" style={{ marginTop: '1.5rem' }}>
-            <button onClick={exportToPDF} className="export-btn pdf" disabled={!hasData}>
-              Export PDF
-            </button>
-            <button onClick={exportToExcel} className="export-btn excel" disabled={!hasData}>
-              Export Excel
-            </button>
-          </div>
+        <div className="date-picker-container">
+          <span className="small-label">Select Date</span>
+          <DatePicker
+            selected={selectedDate}
+            onChange={date => setSelectedDate(date)}
+            className="datepicker-input"
+            dateFormat="MMMM d, yyyy"
+          />
         </div>
       </div>
-
-      {api.loading && <p>Loading reports...</p>}
-
-      {api.error && (
-        <div className="error-message" style={{ color: 'red', padding: '1rem', background: '#ffe3e3', borderRadius: '8px' }}>
-          <h3>Error loading reports</h3>
-          <p>Ensure database schema is updated.</p>
-        </div>
-      )}
 
       {!api.loading && hasData && (
         <>
           <div className="report-section">
             <h3 className="report-subtitle">Daily Summary ({selectedDate.toLocaleDateString()})</h3>
-            <table id="daily-summary-table">
+            <table className="report-table">
               <thead>
-                <tr>
-                  <th>Metric</th>
-                  <th>Value</th>
-                </tr>
+                <tr><th>Metric</th><th>Value</th></tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>Patients Seen (Done)</td>
-                  <td>{dailySummary.patientsSeen}</td>
-                </tr>
-                <tr>
-                  <td>Procedures Completed</td>
-                  <td>{dailySummary.proceduresDone}</td>
-                </tr>
-                <tr>
-                  <td>New Patients Registered Today</td>
-                  <td>{dailySummary.newPatients}</td>
-                </tr>
-                <tr>
-                  <td>Average Treatment Duration</td>
-                  <td>{dailySummary.avgTreatmentDuration}</td>
-                </tr>
+                <tr><td>Patients Seen (Done)</td><td>{dailySummary.patientsSeen}</td></tr>
+                <tr><td>Procedures Completed</td><td>{dailySummary.proceduresDone}</td></tr>
+                <tr><td>New Patients Registered</td><td>{dailySummary.newPatients}</td></tr>
+                <tr><td>Avg. Treatment Duration</td><td>{dailySummary.avgTreatmentDuration}</td></tr>
               </tbody>
             </table>
           </div>
 
           <div className="report-section">
             <h3 className="report-subtitle">Dentist Performance</h3>
-            <table id="dentist-performance-table">
+            <table className="report-table">
               <thead>
                 <tr>
                   <th>Dentist</th>
                   <th>Patients Handled</th>
-                  <th>Treatment Distribution</th>
-                  <th>Avg. Time per Patient</th>
+                  <th>Avg. Time</th>
                 </tr>
               </thead>
               <tbody>
-                {dentistPerformance.length === 0 && (
-                  <tr><td colSpan="4">No performance data recorded for this date.</td></tr>
-                )}
                 {dentistPerformance.map((dentist) => (
                   <tr key={dentist.id}>
-                    <td>{dentist.name}</td>
-                    <td>{dentist.patientsHandled}</td>
                     <td>
-                      {Object.entries(dentist.treatmentDistribution || {})
-                        .map(([key, value]) => `${key}: ${value}`)
-                        .join(", ") || "-"}
+                      <button type="button" className="dentist-link" onClick={() => openDentistPatients(dentist)}>
+                        {dentist.name}
+                      </button>
                     </td>
+                    <td>{dentist.patientsHandled}</td>
                     <td>{Math.round(dentist.avgTimePerPatient || 0)} min</td>
                   </tr>
                 ))}
@@ -198,6 +115,52 @@ function Reports() {
             </table>
           </div>
         </>
+      )}
+
+      {/* Redesigned Modal */}
+      {patientsModalOpen && (
+        <div className="modal-overlay" onClick={closePatientsModal}>
+          <div className="patient-list-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3>Patients handled by {selectedDentist?.name}</h3>
+                <p>{selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+              </div>
+              <button className="close-x" onClick={closePatientsModal}>&times;</button>
+            </div>
+
+            <div className="modal-body">
+              {patientsLoading ? (
+                <div className="modal-state">Loading patient records...</div>
+              ) : patientsError ? (
+                <div className="modal-state error">{patientsError}</div>
+              ) : dentistPatients.length === 0 ? (
+                <div className="modal-state">No patients recorded for this date.</div>
+              ) : (
+                <div className="patient-grid">
+                  <div className="grid-header">
+                    <span>Patient Name</span>
+                    <span>Time</span>
+                    <span>Reason</span>
+                  </div>
+                  <div className="grid-content">
+                    {dentistPatients.map((p, i) => (
+                      <div key={i} className="grid-row">
+                        <span className="p-name">{p.full_name}</span>
+                        <span className="p-time">{formatApptTime(p.appointment_datetime)}</span>
+                        <span className="p-reason">{p.reason || "Check-up"}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="modal-footer">
+              <button className="close-btn-simple" onClick={closePatientsModal}>Close</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

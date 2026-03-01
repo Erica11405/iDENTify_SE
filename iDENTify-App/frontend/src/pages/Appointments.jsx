@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
 import "../styles/pages/Appointments.css";
 import EditAppointmentModal from "../components/EditAppointmentModal";
 import AddAppointmentModal from "../components/AddAppointmentModal";
@@ -41,10 +40,10 @@ function Appointments() {
     loadData();
   }, []);
 
-  const appointments = useAppStore((state) => state.appointments);
-  const patients = useAppStore((state) => state.patients);
-  const dentists = useAppStore((state) => state.dentists);
-  const queue = useAppStore((state) => state.queue);
+  const appointments = useAppStore((state) => state.appointments || []);
+  const patients = useAppStore((state) => state.patients || []);
+  const dentists = useAppStore((state) => state.dentists || []);
+  const queue = useAppStore((state) => state.queue || []);
 
   const [search, setSearch] = useState("");
   const [activeContactId, setActiveContactId] = useState(null);
@@ -74,22 +73,16 @@ function Appointments() {
     }
 
     if (!fullPatientData && patientId) {
-      const loadingToast = toast.loading("Verifying patient details...");
       try {
         fullPatientData = await api.getPatientById(patientId);
-        toast.dismiss(loadingToast);
       } catch (error) {
-        toast.dismiss(loadingToast);
         console.error("Patient fetch error", error);
-        toast.error("Error: Could not verify patient details.");
+        alert("Failed to load patient data.");
         return;
       }
     }
 
-    if (!fullPatientData) {
-      toast.error("Error: Patient data not found.");
-      return;
-    }
+    if (!fullPatientData) return;
 
     const isAlreadyInQueue = queue.some((q) =>
       String(q.patient_id) === String(patientId) &&
@@ -98,30 +91,54 @@ function Appointments() {
     );
 
     if (isAlreadyInQueue) {
-      toast.error(`Patient is already in the active Queue.`);
-      return;
+        alert("Patient is already in the active Queue!");
+        return;
     }
 
     try {
       await api.updateAppointment(appointment.id, { status: 'Checked-In' });
 
+      let resolvedDentistId = appointment.dentist_id;
+
+      if (!resolvedDentistId && appointment.dentist) {
+        const cleanSearch = String(appointment.dentist).toLowerCase().replace(/^dr\.?\s*/i, "").trim();
+        const match = dentists.find(d => 
+            String(d.id) === String(appointment.dentist_id) || 
+            d.name.toLowerCase().replace(/^dr\.?\s*/i, "").trim().includes(cleanSearch)
+        );
+        if (match) resolvedDentistId = match.id;
+      }
+
+      // MySQL safe datetime
+      const now = new Date();
+      const pad = (n) => (n < 10 ? '0' + n : n);
+      const mysqlDateTime = now.getFullYear() + '-' +
+             pad(now.getMonth() + 1) + '-' +
+             pad(now.getDate()) + ' ' +
+             pad(now.getHours()) + ':' +
+             pad(now.getMinutes()) + ':' +
+             pad(now.getSeconds());
+
+      // Pass ONLY fields that exist in the database table
       await api.addQueue({
         patient_id: patientId,
-        dentist_id: appointment.dentist_id || dentists.find((d) => d.name === appointment.dentist)?.id,
         appointment_id: appointment.id,
+        dentist_id: resolvedDentistId || null,
         source: "appointment",
         status: "Checked-In",
-        notes: appointment.procedure || appointment.reason,
-        checkedInTime: new Date().toISOString(),
+        notes: appointment.procedure || appointment.reason || "",
+        time_added: mysqlDateTime,
       });
 
-      toast.success("Patient added to Queue successfully.");
-      api.loadAppointments();
-      api.loadQueue();
+      alert("Patient successfully added to the Queue.");
+      
+      // Reload both lists so the change is instantly reflected
+      await api.loadAppointments();
+      await api.loadQueue();
 
     } catch (err) {
       console.error('Failed to add to queue', err);
-      toast.error('Failed to process request. Check console.');
+      alert("Failed to add to queue. Please try again.");
     }
   };
 
@@ -196,7 +213,6 @@ function Appointments() {
 
       const existingPatient = patients.find(p => p.id === pid);
 
-      // UPDATED: Handle split names in edit
       if (updatedAppointment.first_name) updates.first_name = updatedAppointment.first_name;
       if (updatedAppointment.last_name) updates.last_name = updatedAppointment.last_name;
       if (updatedAppointment.middle_name) updates.middle_name = updatedAppointment.middle_name;
@@ -216,15 +232,12 @@ function Appointments() {
       }
 
       await api.updateAppointment(updatedAppointment.id, updatedAppointment);
-
-      toast.success("Appointment & Patient info updated");
+      alert("Appointment updated successfully.");
       handleCloseModal();
-
       api.loadPatients();
       api.loadAppointments();
     } catch (err) {
       console.error('Could not update appointment', err);
-      toast.error('Failed to update. Check console.');
     }
   };
 
@@ -232,11 +245,11 @@ function Appointments() {
     if (!selectedAppointment) return;
     try {
       await api.removeAppointment(selectedAppointment.id);
-      toast.success("Appointment deleted");
+      alert("Appointment deleted.");
       handleCloseModal();
       api.loadAppointments();
     } catch (err) {
-      toast.error('Failed to delete appointment');
+      console.error('Failed to delete appointment');
     }
   };
 
@@ -244,17 +257,16 @@ function Appointments() {
     try {
       let patientId = appointmentData.patient_id;
 
-      // UPDATED: Create Patient with Split Names if NEW
       if (appointmentData.isNewPatient) {
         const newPatient = await api.createPatient({
           full_name: appointmentData.patient_name,
-          first_name: appointmentData.first_name, // NEW
-          last_name: appointmentData.last_name,   // NEW
-          middle_name: appointmentData.middle_name, // NEW
+          first_name: appointmentData.first_name, 
+          last_name: appointmentData.last_name,   
+          middle_name: appointmentData.middle_name, 
           contact_number: appointmentData.contact_number,
           gender: appointmentData.sex,
           age: appointmentData.age,
-          birthdate: appointmentData.birthdate, // NEW
+          birthdate: appointmentData.birthdate, 
           vitals: { age: appointmentData.age }
         });
         patientId = newPatient.id;
@@ -266,13 +278,13 @@ function Appointments() {
       };
 
       await api.createAppointment(appointmentToCreate);
-      toast.success("Appointment added");
+      alert("Appointment added successfully.");
       setIsAddModalOpen(false);
       api.loadAppointments();
       api.loadPatients();
     } catch (err) {
       console.error(err);
-      toast.error('Failed to add appointment');
+      alert("Failed to add appointment.");
     }
   };
 

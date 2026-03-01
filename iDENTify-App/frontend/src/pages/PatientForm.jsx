@@ -5,11 +5,10 @@ import PatientHistorySidebar from "../components/PatientHistorySidebar";
 import XrayViewer from "../components/XrayViewer";
 import MedicalAlertBanner from "../components/MedicalAlertBanner";
 import useApi from "../hooks/useApi";
+import apiClient from "../api/apiClient"; // ADDED API CLIENT DIRECTLY
 import useAppStore from "../store/useAppStore";
-import toast from "react-hot-toast";
 import { dentalServices } from "../data/services";
 
-// --- CONSTANTS: COMMON MEDICINES ---
 const COMMON_MEDICINES = [
 	"Amoxicillin 500mg",
 	"Amoxicillin 250mg",
@@ -26,7 +25,6 @@ const COMMON_MEDICINES = [
 	"Benzydamine Hcl (Difflam)"
 ];
 
-// --- COMPONENT: SEARCHABLE INPUT ---
 const SearchableInput = ({ options, value, onChange, placeholder, disabled, renderOption }) => {
 	const [isOpen, setIsOpen] = useState(false);
 	const [search, setSearch] = useState(value || "");
@@ -60,7 +58,7 @@ const SearchableInput = ({ options, value, onChange, placeholder, disabled, rend
 		setIsOpen(true);
 	};
 
-	const filteredOptions = options.filter(item => {
+	const filteredOptions = (options || []).filter(item => {
 		const text = typeof item === 'object' ? item.name : item;
 		return text.toLowerCase().includes(search.toLowerCase());
 	});
@@ -88,7 +86,6 @@ const SearchableInput = ({ options, value, onChange, placeholder, disabled, rend
 	);
 };
 
-// --- COMPONENT: 5-SURFACE TOOTH (SVG) ---
 const Tooth5Surface = ({ toothNumber, segments, onSegmentClick }) => {
 	const getColor = (status) => {
 		switch (status) {
@@ -124,8 +121,8 @@ function PatientForm() {
 	const location = useLocation();
 	const api = useApi();
 
-	const queue = useAppStore((state) => state.queue);
-	const allAppointments = useAppStore((state) => state.appointments);
+	const queue = useAppStore((state) => state.queue || []);
+	const allAppointments = useAppStore((state) => state.appointments || []);
 
 	// --- GLOBAL PATIENT STATE ---
 	const [patient, setPatient] = useState(null);
@@ -133,11 +130,10 @@ function PatientForm() {
 	const [selectedDentistId, setSelectedDentistId] = useState("");
 
 	// --- ANNUAL RECORD STATE ---
-	const [yearsList, setYearsList] = useState([1, 2, 3, 4, 5]); // CHANGED: State for dynamic years
+	const [yearsList, setYearsList] = useState([1, 2, 3, 4, 5]); 
 	const [selectedYear, setSelectedYear] = useState(1);
-	const [isYearDone, setIsYearDone] = useState(false); // Controls Read-Only for the specific year
+	const [isYearDone, setIsYearDone] = useState(false); 
 
-	// Year-Specific Data
 	const [boxMarks, setBoxMarks] = useState(Array(64).fill(""));
 	const [toothSegments, setToothSegments] = useState({});
 	const [toothStatuses, setToothStatuses] = useState({});
@@ -149,7 +145,6 @@ function PatientForm() {
 
 	const [patientAppointments, setPatientAppointments] = useState([]);
 
-	// UI State
 	const [selected, setSelected] = useState({ kind: null, index: null, boxKind: null, cellKey: null });
 	const [isPanelOpen, setIsPanelOpen] = useState(false);
 	const [activeStatus, setActiveStatus] = useState("planned");
@@ -159,11 +154,9 @@ function PatientForm() {
 	const [isXrayViewerOpen, setIsXrayViewerOpen] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
 
-	// Medical Alert Input State
 	const [alertInput, setAlertInput] = useState("");
 	const [tempUnit, setTempUnit] = useState("C");
 
-	// Forms
 	const [timelineForm, setTimelineForm] = useState({
 		start_time: "",
 		end_time: "",
@@ -192,24 +185,22 @@ function PatientForm() {
 		return "N/A";
 	};
 
-	// NEW: Handler to add a new year dynamically
 	const handleAddYear = () => {
 		const maxYear = Math.max(...yearsList);
 		const newYear = maxYear + 1;
 		setYearsList([...yearsList, newYear]);
-		setSelectedYear(newYear); // Switch to the new year immediately
-		toast.success(`Started Year ${newYear}`);
+		setSelectedYear(newYear); 
+		alert(`Started Year ${newYear}`);
 	};
 
-	// --- 1. INITIAL LOAD (Patient Info & Dentists) ---
 	useEffect(() => {
 		const loadGlobalData = async () => {
 			if (!id) return;
 			try {
 				const dentistsData = await api.loadDentists();
-				setDentists(dentistsData);
+				setDentists(dentistsData || []);
 
-				const patientData = await api.getPatientById(id);
+				const patientData = await apiClient.getPatientById(id);
 				let alerts = [];
 				let relationshipLabel = "";
 
@@ -232,7 +223,6 @@ function PatientForm() {
 					displayAge: getDisplayAge(patientData)
 				});
 
-				// Set initial dentist selection
 				const linkedAppt = location.state?.appointment;
 				if (linkedAppt?.dentist_id) setSelectedDentistId(linkedAppt.dentist_id);
 				else if (patientData.vitals?.dentist_id) setSelectedDentistId(patientData.vitals.dentist_id);
@@ -247,12 +237,10 @@ function PatientForm() {
 		loadGlobalData();
 	}, [id, allAppointments]);
 
-	// --- 2. LOAD ANNUAL DATA WHEN YEAR CHANGES ---
 	useEffect(() => {
 		const loadAnnualData = async () => {
 			if (!id) return;
 
-			// Reset State for the new year
 			setBoxMarks(Array(64).fill(""));
 			setToothSegments({});
 			setToothStatuses({});
@@ -261,11 +249,10 @@ function PatientForm() {
 			setVitals({ bp: "", pulse: "", temp: "" });
 			setDentalHistory("");
 			setUploadedFiles([]);
-			setTempUnit("C"); // Reset temp unit to C by default on new load
+			setTempUnit("C"); 
 
 			try {
-				// A. Load Annual Record Metadata (Vitals, Xrays, Status, History)
-				const annualRecord = await api.getAnnualRecord(id, selectedYear);
+				const annualRecord = await apiClient.getAnnualRecord(id, selectedYear);
 
 				if (annualRecord) {
 					setVitals(annualRecord.vitals || { bp: "", pulse: "", temp: "" });
@@ -279,18 +266,16 @@ function PatientForm() {
 						setTempUnit("C");
 					}
 				} else {
-					// No record yet for this year
 					setIsYearDone(false);
 					setTempUnit("C");
 				}
 
-				// B. Load Tooth Conditions for Selected Year
-				const conditions = await api.getToothConditions(id, selectedYear);
+				const conditions = await apiClient.getToothConditions(id, selectedYear);
 				const newBoxMarks = Array(64).fill("");
 				const newToothSegments = {};
 				const newToothStatuses = {};
 
-				conditions.forEach(c => {
+				(conditions || []).forEach(c => {
 					const [type, indexStr] = c.cell_key.split("-");
 					const index = parseInt(indexStr, 10);
 					if (!isNaN(index)) {
@@ -310,18 +295,14 @@ function PatientForm() {
 				setToothSegments(newToothSegments);
 				setToothStatuses(newToothStatuses);
 
-				// C. Load Timeline for Selected Year
-				const timeline = await api.getTreatmentTimeline(id, selectedYear);
-				setTimelineEntries(timeline);
+				const timeline = await apiClient.getTreatmentTimeline(id, selectedYear);
+				setTimelineEntries(timeline || []);
 
-				// D. Load Medications for Selected Year
-				const meds = await api.getMedications(id, selectedYear);
-				setMedications(meds);
+				const meds = await apiClient.getMedications(id, selectedYear);
+				setMedications(meds || []);
 
-				// E. Autofill from Appointment (ONLY FOR YEAR 1 and if empty)
 				if (selectedYear === 1) {
-					// Only check linked appointment if timeline is empty
-					if (timeline.length === 0) {
+					if ((timeline || []).length === 0) {
 						const linkedAppointment = location.state?.appointment;
 
 						if (linkedAppointment) {
@@ -332,15 +313,12 @@ function PatientForm() {
 							const providerName = linkedAppointment.dentist_name || linkedAppointment.dentist || "";
 							let formattedStart = "";
 
-							// Try to format date from appointment
 							if (linkedAppointment.appointment_datetime) {
 								const dateObj = new Date(linkedAppointment.appointment_datetime);
 								formattedStart = `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 							} else if (linkedAppointment.timeStart) {
-								// **Specific requested logic: Use timeStart + today's date if appt date missing**
 								formattedStart = `${new Date().toLocaleDateString()} ${linkedAppointment.timeStart}`;
 							} else {
-								// Fallback to current time
 								formattedStart = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 							}
 
@@ -352,8 +330,6 @@ function PatientForm() {
 						}
 					}
 				} else if (selectedYear > 1) {
-					// **RESET LOGIC FOR YEAR 2+**
-					// If we switch to Year 2, ensure the form inputs are clean
 					setTimelineForm({
 						start_time: "",
 						end_time: "",
@@ -371,10 +347,8 @@ function PatientForm() {
 		loadAnnualData();
 	}, [id, selectedYear, location.state]);
 
-	// Shortcut for Read-Only mode
 	const isReadOnly = isYearDone;
 
-	// --- RECOMMENDATION LOGIC ---
 	const getRecommendations = () => {
 		const issues = [];
 		boxMarks.forEach((code, idx) => {
@@ -424,24 +398,21 @@ function PatientForm() {
 	const recommendations = getRecommendations();
 
 	const handleApplyRecommendation = (treatmentName) => {
-		if (isReadOnly) return; // Respect read-only mode
+		if (isReadOnly) return; 
 		if (!selectedTimelineServices.includes(treatmentName)) {
 			setSelectedTimelineServices([...selectedTimelineServices, treatmentName]);
-			toast.success(`Added ${treatmentName} to Plan`);
+			alert(`Added ${treatmentName} to Plan`);
 			const timelineSection = document.querySelector('.timeline-section');
 			if (timelineSection) timelineSection.scrollIntoView({ behavior: 'smooth' });
 		} else {
-			toast.error("Service already in plan");
+			alert("Service already in plan");
 		}
 	};
-
-	// --- HANDLERS ---
 
 	const handleSaveAll = async () => {
 		if (!patient) return;
 		setIsSaving(true);
 		try {
-			// 1. Save Patient Global Info (Alerts, Contact)
 			let finalAlerts = [...(patient.medicalAlerts || [])];
 			if (patient.relationship) {
 				finalAlerts.push(`Relation:${patient.relationship}`);
@@ -453,9 +424,8 @@ function PatientForm() {
 				contact_number: patient.contact_number,
 				contact: patient.contact_number
 			};
-			await api.updatePatient(patient.id, patientPayload);
+			await apiClient.updatePatient(patient.id, patientPayload);
 
-			// 2. Save Annual Record (Vitals, History, Xrays, Status)
 			const annualPayload = {
 				patient_id: id,
 				record_year: selectedYear,
@@ -464,12 +434,12 @@ function PatientForm() {
 				xrays: uploadedFiles,
 				status: isYearDone ? "Done" : "Active"
 			};
-			await api.saveAnnualRecord(annualPayload);
+			await apiClient.saveAnnualRecord(annualPayload);
 
-			toast.success(`Records for Year ${selectedYear} saved!`);
+			alert(`Records for Year ${selectedYear} saved!`);
 		} catch (error) {
 			console.error(error);
-			toast.error("Failed to save.");
+			alert("Failed to save.");
 		} finally {
 			setIsSaving(false);
 		}
@@ -477,11 +447,10 @@ function PatientForm() {
 
 	const handleDone = async () => {
 		if (!patient) return;
-		setIsYearDone(true); // Optimistic UI update
+		setIsYearDone(true); 
 		try {
-			await handleSaveAll(); // This will save with status="Done" because isYearDone is now true (or passed explicitly)
+			await handleSaveAll(); 
 
-			// Explicitly ensure status is saved as Done
 			const annualPayload = {
 				patient_id: id,
 				record_year: selectedYear,
@@ -490,22 +459,29 @@ function PatientForm() {
 				xrays: uploadedFiles,
 				status: "Done"
 			};
-			await api.saveAnnualRecord(annualPayload);
+			await apiClient.saveAnnualRecord(annualPayload);
 
-			// If Year 1, also update Queue/Appointment status
-			if (selectedYear === 1) {
-				const queueItem = queue.find(q => String(q.patient_id) === String(id) && q.status !== "Done");
-				if (queueItem) await api.updateQueue(queueItem.id, { status: "Done" });
-				const appointment = allAppointments.find(a => String(a.patient_id) === String(id) && a.status !== "Done");
-				if (appointment) await api.updateAppointment(appointment.id, { status: "Done" });
-			}
+            // ALWAYS mark the active queue and appointment as Done regardless of the year
+            const queueItem = (queue || []).find(q => String(q.patient_id) === String(id) && q.status !== "Done" && q.status !== "Cancelled");
+            if (queueItem) {
+                await apiClient.updateQueueItem(queueItem.id, { status: "Done" });
+            }
 
-			navigate("/app/queue");
-			toast.success(`Year ${selectedYear} marked as Completed.`);
+            const appointment = (allAppointments || []).find(a => String(a.patient_id) === String(id) && a.status !== "Done" && a.status !== "Cancelled");
+            if (appointment) {
+                await apiClient.updateAppointment(appointment.id, { status: "Done" });
+            }
+
+            // Sync global state immediately so it vanishes from Queue/Appt and goes to History
+            if (api.loadQueue) await api.loadQueue();
+            if (api.loadAppointments) await api.loadAppointments();
+
+			alert(`Patient marked as Completed.`);
+			navigate("/app/history"); // PERFECT REDIRECT
 		} catch (error) {
 			console.error(error);
-			setIsYearDone(false); // Revert on error
-			toast.error("Error completing visit.");
+			setIsYearDone(false); 
+			alert("Error completing visit.");
 		}
 	};
 
@@ -516,14 +492,14 @@ function PatientForm() {
 		const updatedSegments = { ...currentSegments, [part]: newStatus };
 		setToothSegments(prev => ({ ...prev, [cellKey]: updatedSegments }));
 		try {
-			await api.upsertToothCondition({
+			await apiClient.upsertToothCondition({
 				patient_id: id,
 				cell_key: cellKey,
 				condition_code: null,
 				status: "mixed",
 				is_shaded: false,
 				segments: updatedSegments,
-				record_year: selectedYear // Pass Year
+				record_year: selectedYear 
 			});
 		} catch (error) {
 			console.error(error);
@@ -569,9 +545,9 @@ function PatientForm() {
 		try {
 			const base64 = await convertToBase64(file);
 			setTimelineForm(prev => ({ ...prev, image: base64 }));
-			toast.success("Image attached");
+			alert("Image attached");
 		} catch (e) {
-			toast.error("Failed to process image");
+			alert("Failed to process image");
 		}
 	};
 
@@ -620,12 +596,12 @@ function PatientForm() {
 
 	const addTimelineEntry = async () => {
 		if (selectedTimelineServices.length === 0) {
-			toast.error("Please add at least one procedure.");
+			alert("Please add at least one procedure.");
 			return;
 		}
 		let providerName = timelineForm.provider;
 		if (!providerName && selectedDentistId) {
-			const d = dentists.find(dentist => dentist.id === Number(selectedDentistId));
+			const d = (dentists || []).find(dentist => dentist.id === Number(selectedDentistId));
 			if (d) providerName = d.name;
 		}
 		const procedureString = selectedTimelineServices.join(", ");
@@ -636,11 +612,11 @@ function PatientForm() {
 			provider: providerName,
 			start_time: timelineForm.start_time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 			image_url: timelineForm.image,
-			record_year: selectedYear // Pass Year
+			record_year: selectedYear 
 		};
 		try {
-			const newEntry = await api.addTreatmentTimelineEntry(payload);
-			setTimelineEntries(prev => [...prev, newEntry]);
+			const newEntry = await apiClient.addTreatmentTimelineEntry(payload);
+			setTimelineEntries(prev => [...(prev || []), newEntry]);
 
 			setTimelineForm(prev => ({
 				...prev,
@@ -653,30 +629,30 @@ function PatientForm() {
 			if (fileInput) fileInput.value = "";
 		} catch (error) {
 			console.error(error);
-			toast.error("Failed to add entry");
+			alert("Failed to add entry");
 		}
 	};
 
 	const deleteTimelineEntry = async (entryId) => {
 		if (isReadOnly) return;
-		try { await api.deleteTreatmentTimelineEntry(entryId); setTimelineEntries(prev => prev.filter(entry => entry.id !== entryId)); } catch (error) { console.error(error); }
+		try { await apiClient.deleteTreatmentTimelineEntry(entryId); setTimelineEntries(prev => (prev || []).filter(entry => entry.id !== entryId)); } catch (error) { console.error(error); }
 	};
 	const updateMedicationForm = (field, value) => setMedicationForm((prev) => ({ ...prev, [field]: value }));
 	const addMedication = async () => {
 		if (!medicationForm.medicine) return;
 		try {
-			const newMed = await api.addMedication({
+			const newMed = await apiClient.addMedication({
 				patient_id: id,
 				...medicationForm,
-				record_year: selectedYear // Pass Year
+				record_year: selectedYear 
 			});
-			setMedications(prev => [...prev, newMed]);
+			setMedications(prev => [...(prev || []), newMed]);
 			setMedicationForm({ medicine: "", dosage: "", frequency: "", notes: "" });
 		} catch (error) { console.error(error); }
 	};
 	const deleteMedication = async (medId) => {
 		if (isReadOnly) return;
-		try { await api.deleteMedication(medId); setMedications(prev => prev.filter(m => m.id !== medId)); } catch (error) { console.error(error); }
+		try { await apiClient.deleteMedication(medId); setMedications(prev => (prev || []).filter(m => m.id !== medId)); } catch (error) { console.error(error); }
 	};
 
 	const handleBoxClick = (idx) => {
@@ -698,13 +674,13 @@ function PatientForm() {
 		if (selected.kind === "box" && selected.index != null) {
 			const newBoxMarks = boxMarks.map((v, i) => (i === selected.index ? code : v));
 			setBoxMarks(newBoxMarks);
-			api.upsertToothCondition({
+			apiClient.upsertToothCondition({
 				patient_id: id,
 				cell_key: selected.cellKey,
 				condition_code: code,
 				status: activeStatus,
 				is_shaded: false,
-				record_year: selectedYear // Pass Year
+				record_year: selectedYear 
 			});
 			const newStatus = { ...toothStatuses, [selected.cellKey]: activeStatus };
 			setToothStatuses(newStatus);
@@ -786,9 +762,9 @@ function PatientForm() {
 						<div className="dentist-row">
 							<div>
 								<h3 className="section-title">Dentist</h3>
-								<select className="dentist-select" value={selectedDentistId} onChange={(e) => setSelectedDentistId(e.target.value)} disabled={isReadOnly}>
+								<select className="dentist-select" value={selectedDentistId || ""} onChange={(e) => setSelectedDentistId(e.target.value)} disabled={isReadOnly}>
 									<option value="">Select a Dentist</option>
-									{dentists.map(d => (<option key={d.id} value={d.id}>{d.name}</option>))}
+									{(dentists || []).map(d => (<option key={d.id} value={d.id}>{d.name}</option>))}
 								</select>
 							</div>
 							<div className="vital-signs">
@@ -855,7 +831,6 @@ function PatientForm() {
 					/>
 				</section>
 
-				{/* AUTOMATED RECOMMENDATIONS (Restored) */}
 				{recommendations.length > 0 && (
 					<div style={{ marginTop: '20px', padding: '15px', background: '#fff7ed', borderLeft: '4px solid #f97316', borderRadius: '4px' }}>
 						<h4 style={{ margin: '0 0 10px 0', color: '#c2410c' }}>Automated Recommendations (Year {selectedYear})</h4>
@@ -884,7 +859,6 @@ function PatientForm() {
 				<section className="oral-section">
 					<h3 className="section-title">Oral Health Condition</h3>
 
-					{/* YEAR TABS - DYNAMIC */}
 					<div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
 						{yearsList.map(year => (
 							<button
@@ -907,7 +881,6 @@ function PatientForm() {
 							</button>
 						))}
 
-						{/* ADD YEAR BUTTON */}
 						<button
 							onClick={handleAddYear}
 							style={{
@@ -990,11 +963,10 @@ function PatientForm() {
 									gap: "8px"
 								}}
 							>
-								{/* SEARCHABLE PROCEDURE INPUT */}
 								<div style={{ display: "flex", gap: "8px" }}>
 									<div style={{ flex: 1 }}>
 										<SearchableInput
-											options={dentalServices}
+											options={dentalServices || []}
 											value={currentTimelineService}
 											onChange={(val) =>
 												setCurrentTimelineService(val)
@@ -1030,7 +1002,6 @@ function PatientForm() {
 									</button>
 								</div>
 
-								{/* SELECTED PROCEDURES */}
 								<div
 									style={{
 										display: "flex",
@@ -1083,7 +1054,6 @@ function PatientForm() {
 								style={{ gridColumn: "1 / -1" }}
 							/>
 
-							{/* IMAGE ATTACHMENT */}
 							<div
 								style={{
 									gridColumn: "1 / -1",
@@ -1143,21 +1113,19 @@ function PatientForm() {
 						</div>
 					)}
 
-					{/* TIMELINE LIST */}
 					<div className="timeline-list">
-						{timelineEntries.map((entry) => (
+						{(timelineEntries || []).map((entry) => (
 							<div key={entry.id} className="timeline-entry">
 								<div className="timeline-meta">
 									<span>{entry.start_time}</span>
 									<span>{entry.provider || "Unassigned"}</span>
 								</div>
 
-								{/* PROCEDURES + PRICES (ONE PER LINE) */}
 								<div className="timeline-procedures">
 									{entry.procedure_text
 										.split(", ")
 										.map((proc, index) => {
-											const service = dentalServices.find(
+											const service = (dentalServices || []).find(
 												(s) => s.name === proc
 											);
 
@@ -1232,10 +1200,9 @@ function PatientForm() {
 					<h3 className="section-title">Medication (Year {selectedYear})</h3>
 					{!isReadOnly && (
 						<div className="medication-form">
-							{/* SEARCHABLE INPUT FOR MEDICINE */}
 							<div style={{ position: 'relative' }}>
 								<SearchableInput
-									options={COMMON_MEDICINES}
+									options={COMMON_MEDICINES || []}
 									value={medicationForm.medicine}
 									onChange={(val) => updateMedicationForm("medicine", val)}
 									placeholder="Medicine (e.g. Amoxicillin)"
@@ -1249,7 +1216,7 @@ function PatientForm() {
 						</div>
 					)}
 					<div className="medication-list">
-						{medications.map((m) => (
+						{(medications || []).map((m) => (
 							<div key={m.id} className="medication-entry">
 								<strong>{m.medicine}</strong> — {m.dosage || ""} — {m.frequency || ""}
 								<div className="muted-text">{m.notes}</div>
@@ -1263,7 +1230,7 @@ function PatientForm() {
 					<h3 className="section-title">Patient X-ray Gallery (Year {selectedYear})</h3>
 					{!isReadOnly && <input type="file" multiple accept="image/*" onChange={handleUpload} />}
 					<div className="thumbnail-grid">
-						{uploadedFiles.length === 0 ? <div className="muted-text">No files uploaded yet.</div> : uploadedFiles.map((file, index) => (
+						{(uploadedFiles || []).length === 0 ? <div className="muted-text">No files uploaded yet.</div> : (uploadedFiles || []).map((file, index) => (
 							<div key={index} className="thumbnail-item"><button onClick={() => openXrayViewer(file)}><img src={file.url} alt={file.name} /></button></div>
 						))}
 					</div>
@@ -1284,7 +1251,7 @@ function PatientForm() {
 					<div className="side-panel" onClick={(e) => e.stopPropagation()}>
 						<h3 className="section-title">{panelTitle}</h3>
 						<div className="side-panel-content">
-							{panelOptions.length === 0 ? <p>Select a box to see options.</p> : <div className="options-grid">{panelOptions.map((option) => (<button key={option.code} className="option-pill" onClick={() => applyCode(option.code)}><strong>{option.code || "Clear"}</strong><span>{option.label}</span></button>))}</div>}
+							{(panelOptions || []).length === 0 ? <p>Select a box to see options.</p> : <div className="options-grid">{(panelOptions || []).map((option) => (<button key={option.code} className="option-pill" onClick={() => applyCode(option.code)}><strong>{option.code || "Clear"}</strong><span>{option.label}</span></button>))}</div>}
 						</div>
 					</div>
 				</div>
@@ -1292,13 +1259,13 @@ function PatientForm() {
 
 			<PatientHistorySidebar
 				patient={patient}
-				timeline={timelineEntries}
-				appointments={patientAppointments}
+				timeline={timelineEntries || []}
+				appointments={patientAppointments || []}
 			/>
 
 			{isContextMenuOpen && contextMenu && (
 				<div className="context-menu" style={{ top: contextMenu.y, left: contextMenu.x }} onClick={closeContextMenu}>
-					<div className="options-grid">{(contextMenu.boxKind === "treatment" ? treatmentOptions : conditionOptions).map((option) => (<button key={option.code} className="option-pill" onClick={() => applyCode(option.code)}><strong>{option.code || "Clear"}</strong><span>{option.label}</span></button>))}</div>
+					<div className="options-grid">{((contextMenu.boxKind === "treatment" ? treatmentOptions : conditionOptions) || []).map((option) => (<button key={option.code} className="option-pill" onClick={() => applyCode(option.code)}><strong>{option.code || "Clear"}</strong><span>{option.label}</span></button>))}</div>
 				</div>
 			)}
 			{isXrayViewerOpen && <XrayViewer file={selectedXray} onClose={closeXrayViewer} />}

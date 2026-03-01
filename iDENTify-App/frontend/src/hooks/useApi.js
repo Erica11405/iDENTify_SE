@@ -7,67 +7,47 @@ export default function useApi() {
   const setAppointments = useAppStore((s) => s.setAppointments);
   const setQueue = useAppStore((s) => s.setQueue);
   const setDentists = useAppStore((s) => s.setDentists);
-  const setTreatments = useAppStore((s) => s.setTreatments);
   const setReports = useAppStore((s) => s.setReports);
+  const updateDentistStore = useAppStore((s) => s.updateDentist);
+  
   const addPatient = useAppStore((s) => s.addPatient);
-  const addAppointment = useAppStore((s) => s.addAppointment);
-  const addQueueItem = useAppStore((s) => s.addQueueItem);
   const updatePatientStore = useAppStore((s) => s.updatePatient);
+  const addAppointment = useAppStore((s) => s.addAppointment);
   const updateAppointmentStore = useAppStore((s) => s.updateAppointment);
   const deleteAppointmentStore = useAppStore((s) => s.deleteAppointment);
-  const updateDentistStore = useAppStore((s) => s.updateDentist);
+  const addQueueItem = useAppStore((s) => s.addQueueItem);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const loadPatients = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const list = await api.getPatients();
       const transformed = list.map((p) => {
         const birthdate = p.birthdate || p.birthday || null;
-        const calculatedAge = birthdate ? (() => {
+        let age = p.age || null;
+        if (birthdate) {
           const b = new Date(birthdate);
           const now = new Date();
-          let a = now.getFullYear() - b.getFullYear();
+          age = now.getFullYear() - b.getFullYear();
           const m = now.getMonth() - b.getMonth();
-          if (m < 0 || (m === 0 && now.getDate() < b.getDate())) a -= 1;
-          return a;
-        })() : null;
-
-        const finalAge = calculatedAge !== null ? calculatedAge : (p.vitals?.age || p.age || null);
-        const gender = (p.gender || p.sex || "").toString();
-        let mappedSex = gender;
-        if (gender.toLowerCase() === 'm' || gender.toLowerCase() === 'male') mappedSex = 'Male';
-        else if (gender.toLowerCase() === 'f' || gender.toLowerCase() === 'female') mappedSex = 'Female';
-        
+          if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age -= 1;
+        }
         return {
-          id: p.id,
+          ...p,
+          age,
           name: p.full_name || p.name || "",
-          age: finalAge,
-          sex: mappedSex || p.sex || "",
-          contact: p.contact_number || p.contact || p.phone || "",
-          email: p.email || "",
-          address: p.address || "",
-          birthday: birthdate,
-          medicalAlerts: p.medical_alerts || p.medicalAlerts || [],
-          vitals: p.vitals || {}, 
         };
       });
       setPatients(transformed);
       return transformed;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err); }
+    finally { setLoading(false); }
   }, [setPatients]);
 
   const loadAppointments = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const list = await api.getAppointments();
       const transformedList = list.map(appt => {
@@ -76,7 +56,6 @@ export default function useApi() {
             const apptDate = new Date(appt.appointment_datetime);
             timeStart = apptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
         }
-
         return {
           ...appt,
           timeStart,
@@ -85,171 +64,125 @@ export default function useApi() {
       });
       setAppointments(transformedList);
       return transformedList;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err); }
+    finally { setLoading(false); }
   }, [setAppointments]);
 
   const loadQueue = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const list = await api.getQueue();
       setQueue(list);
       return list;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err); throw err; }
+    finally { setLoading(false); }
   }, [setQueue]);
 
-  const loadDentists = useCallback(async () => {
+  const loadQueueHistory = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
-      const list = await api.getDentists();
-      setDentists(list);
-      return list;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [setDentists]);
+      const list = await api.getQueueHistory();
+      return list || [];
+    } catch (err) { setError(err); return []; }
+    finally { setLoading(false); }
+  }, []);
 
-  const updateDentist = useCallback(async (id, updates) => {
-    const updated = await api.updateDentist(id, updates);
-    if (updated) {
-      updateDentistStore(updated);
-    }
-    return updated;
-  }, [updateDentistStore]);
+  const deleteQueue = useCallback(async (id) => {
+    await api.deleteQueueItem(id);
+    useAppStore.setState((state) => ({ 
+      queue: state.queue.filter((q) => q.id !== id) 
+    }));
+  }, []);
 
-  const loadTreatments = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const list = await api.getTreatments();
-      setTreatments(list);
-      return list;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [setTreatments]);
-
-  const loadReports = useCallback(async (date) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await api.getReports(date);
-      setReports(data);
-      return data;
-    } catch (err) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [setReports]);
-
+  const getPatientById = useCallback(async (id) => await api.getPatientById(id), []);
+  
   const createPatient = useCallback(async (payload) => {
     const created = await api.createPatient(payload);
-    if (created?.id) addPatient(created);
+    if (created?.id && addPatient) addPatient(created);
     return created;
   }, [addPatient]);
-
+  
   const updatePatient = useCallback(async (id, updates) => {
     const updated = await api.updatePatient(id, updates);
-    if (updated && updated.id) {
-       updatePatientStore(updated.id, updated);
-    }
+    if (updated?.id && updatePatientStore) updatePatientStore(updated.id, updated);
     return updated;
   }, [updatePatientStore]);
 
   const createAppointment = useCallback(async (payload) => {
     const created = await api.createAppointment(payload);
-    if (created?.id) {
-      const apptDate = new Date(created.appointment_datetime);
-      const timeStart = apptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-      addAppointment({ ...created, timeStart, patient: created.full_name });
+    if (created?.id && addAppointment) {
+        let timeStart = "";
+        if (created.appointment_datetime) {
+            const apptDate = new Date(created.appointment_datetime);
+            timeStart = apptDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        }
+        addAppointment({ ...created, timeStart, patient: created.full_name });
     }
     return created;
   }, [addAppointment]);
-
+  
   const updateAppointment = useCallback(async (id, updates) => {
     const updated = await api.updateAppointment(id, updates);
-    if (updated && updated.id) {
-      updateAppointmentStore(updated);
-    }
+    if (updated?.id && updateAppointmentStore) updateAppointmentStore(updated);
     return updated;
   }, [updateAppointmentStore]);
-
+  
   const removeAppointment = useCallback(async (id) => {
     await api.deleteAppointment(id);
-    deleteAppointmentStore(id);
+    if (deleteAppointmentStore) deleteAppointmentStore(id);
     return id;
   }, [deleteAppointmentStore]);
 
   const addQueue = useCallback(async (payload) => {
     const created = await api.addQueueItem(payload);
-    if (created?.id) addQueueItem(created);
+    if (created?.id && addQueueItem) addQueueItem(created);
     return created;
   }, [addQueueItem]);
 
-  const getToothConditions = useCallback(async (patientId, year) => api.getToothConditions(patientId, year), []);
-  const upsertToothCondition = useCallback(async (payload) => api.upsertToothCondition(payload), []);
-  const getTreatmentTimeline = useCallback(async (patientId, year) => api.getTreatmentTimeline(patientId, year), []);
-  const addTreatmentTimelineEntry = useCallback(async (payload) => api.addTreatmentTimelineEntry(payload), []);
-  const deleteTreatmentTimelineEntry = useCallback(async (id) => api.deleteTreatmentTimelineEntry(id), []);
-  const getMedications = useCallback(async (patientId, year) => api.getMedications(patientId, year), []);
-  const addMedication = useCallback(async (payload) => api.addMedication(payload), []);
-  const deleteMedication = useCallback(async (id) => api.deleteMedication(id), []);
-
-  const getAnnualRecord = useCallback(async (patientId, year) => api.getAnnualRecord(patientId, year), []);
-  const saveAnnualRecord = useCallback(async (payload) => api.saveAnnualRecord(payload), []);
-
-  // THE KEY FIX: Stabilize the return object
   return useMemo(() => ({
     loading,
     error,
     loadPatients,
     loadAppointments,
     loadQueue,
-    loadDentists,
-    loadTreatments,
-    loadReports,
+    loadQueueHistory,
+    deleteQueue,
+    loadDentists: async () => {
+      const list = await api.getDentists();
+      setDentists(list);
+      return list; // FIXED: Added missing return so PatientForm gets the data
+    },
+    loadReports: async (date) => {
+      const data = await api.getReports(date);
+      setReports(data);
+      return data;
+    },
+    updateDentist: async (id, updates) => {
+      const updated = await api.updateDentist(id, updates);
+      if (updated) updateDentistStore(updated);
+      return updated;
+    },
+    getPatientById,
     createPatient,
     updatePatient,
     createAppointment,
     updateAppointment,
     removeAppointment,
     addQueue,
-    getToothConditions,
-    upsertToothCondition,
-    getTreatmentTimeline,
-    addTreatmentTimelineEntry,
-    deleteTreatmentTimelineEntry,
-    getMedications,
-    addMedication,
-    deleteMedication,
-    updateDentist,
-    getAnnualRecord,
-    saveAnnualRecord,
+    getToothConditions: async (p, y) => api.getToothConditions(p, y),
+    upsertToothCondition: async (p) => api.upsertToothCondition(p),
+    getTreatmentTimeline: async (p, y) => api.getTreatmentTimeline(p, y),
+    addTreatmentTimelineEntry: async (p) => api.addTreatmentTimelineEntry(p),
+    deleteTreatmentTimelineEntry: async (id) => api.deleteTreatmentTimelineEntry(id),
+    getMedications: async (p, y) => api.getMedications(p, y),
+    addMedication: async (p) => api.addMedication(p),
+    deleteMedication: async (id) => api.deleteMedication(id),
+    getAnnualRecord: async (p, y) => api.getAnnualRecord(p, y),
+    saveAnnualRecord: async (p) => api.saveAnnualRecord(p)
   }), [
-    loading, error, loadPatients, loadAppointments, loadQueue, loadDentists,
-    loadTreatments, loadReports, createPatient, updatePatient,
-    createAppointment, updateAppointment, removeAppointment, addQueue,
-    getToothConditions, upsertToothCondition, getTreatmentTimeline,
-    addTreatmentTimelineEntry, deleteTreatmentTimelineEntry, getMedications,
-    addMedication, deleteMedication, updateDentist, getAnnualRecord, saveAnnualRecord
+    loading, error, loadPatients, loadAppointments, loadQueue, loadQueueHistory, 
+    deleteQueue, setDentists, setReports, updateDentistStore, getPatientById, 
+    createPatient, updatePatient, createAppointment, updateAppointment, 
+    removeAppointment, addQueue
   ]);
 }
