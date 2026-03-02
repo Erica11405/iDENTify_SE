@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
+
 router.get("/", async (req, res) => {
   try {
     const { date } = req.query;
@@ -98,6 +99,35 @@ router.get("/", async (req, res) => {
   } catch (err) {
     console.error("Reports API Error:", err);
     res.status(500).json({ message: "Failed to load reports" });
+  }
+});
+
+
+// Get detailed list of patients for a specific dentist on a specific date
+router.get("/dentist/:id/patients", async (req, res) => {
+  const { id } = req.params;
+  const { date } = req.query;
+  // Default to today if no date is provided
+  const reportDate = date || new Date().toISOString().split('T')[0];
+
+  try {
+    const query = `
+      SELECT 
+        p.full_name, 
+        a.appointment_datetime,
+        a.reason
+      FROM patients p
+      JOIN appointments a ON p.id = a.patient_id
+      WHERE a.dentist_id = ? 
+      AND DATE(a.appointment_datetime) = ?
+      AND a.status = 'Done'
+      ORDER BY a.appointment_datetime ASC
+    `;
+    const [rows] = await db.query(query, [id, reportDate]);
+    res.json({ patients: rows });
+  } catch (error) {
+    console.error("Error fetching dentist patient details:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 

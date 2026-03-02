@@ -165,3 +165,84 @@
   font-weight: 500;
   color: #334155;
 }
+
+/* =========================================
+   HISTORY TABLE STYLES
+   ========================================= */
+
+.history-table-container {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  width: 100%;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.history-table th {
+  background-color: #f8f9fa;
+  padding: 16px;
+  font-weight: 600;
+  color: #495057;
+  font-size: 0.9rem;
+  border-bottom: 2px solid #e9ecef;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.history-table td {
+  padding: 16px;
+  border-bottom: 1px solid #f1f3f5;
+  color: #212529;
+  font-size: 0.95rem;
+  vertical-align: middle;
+}
+
+/* Row Hover Effect */
+.history-row {
+  transition: background-color 0.2s ease;
+}
+
+.history-row:hover {
+  background-color: #f8f9fa;
+}
+
+/* Align the Action Buttons */
+.history-table td:last-child {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Action Buttons Styling */
+.action-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.update-btn {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+}
+
+.update-btn:hover {
+  background-color: #bbdefb;
+}
+
+.delete-btn {
+  background-color: #ffe3e3;
+  color: #c92a2a;
+}
+
+.delete-btn:hover {
+  background-color: #ffc9c9;
+}

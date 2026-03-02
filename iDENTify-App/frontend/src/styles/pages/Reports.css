@@ -1,4 +1,4 @@
-/* .reports-page {
+.reports-page {
   padding: 2rem;
 }
 
@@ -81,60 +81,153 @@ th {
 
 tbody tr:hover {
   background-color: #f1f3f5;
-} */
-
-.reports-page { padding: 2rem; }
-.reports-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-.report-section { background: #fff; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 2rem; }
-.report-table { width: 100%; border-collapse: collapse; }
-.report-table th, .report-table td { padding: 1rem; text-align: left; border-bottom: 1px solid #f1f3f5; }
-
-.dentist-link {
-  background: none; border: none; color: #2563eb; 
-  text-decoration: underline; cursor: pointer; font-weight: bold; padding: 0;
 }
 
-/* Modal Styling */
+/* =========================================
+   DENTIST PATIENT LIST MODAL STYLES
+   ========================================= */
+
+/* Dark transparent background behind the modal */
 .modal-overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
 }
 
+/* White Modal Container */
 .patient-list-modal {
-  background: white; width: 90%; max-width: 600px; border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden;
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 600px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #333333; /* Dark text for readability */
 }
 
+/* Modal Header */
 .modal-header {
-  display: flex; justify-content: space-between; padding: 1.5rem;
-  background: #f8fafc; border-bottom: 1px solid #eee;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background-color: #ffffff;
 }
 
-.modal-title-group h3 { margin: 0; font-size: 1.1rem; color: #1e293b; }
-.modal-title-group p { margin: 0; font-size: 0.85rem; color: #64748b; }
-.close-x { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #94a3b8; }
+.modal-title-group h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.25rem;
+  color: #2b3035;
+}
 
-.modal-body { padding: 1rem 1.5rem; max-height: 400px; overflow-y: auto; }
+.modal-title-group p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6c757d;
+}
 
-/* Grid Layout for Patient List */
+.close-x {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #adb5bd;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.close-x:hover {
+  color: #495057;
+}
+
+/* Modal Body */
+.modal-body {
+  padding: 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background-color: #ffffff;
+}
+
+/* The Table/Grid Layout */
+.patient-grid {
+  width: 100%;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 .grid-header {
-  display: grid; grid-template-columns: 2fr 1fr 2fr;
-  font-weight: bold; padding-bottom: 0.8rem; border-bottom: 2px solid #f1f5f9; font-size: 0.9rem;
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr; /* Ratio for columns: Name, Time, Reason */
+  background-color: #f8f9fa;
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #495057;
+  border-bottom: 2px solid #e9ecef;
 }
 
 .grid-row {
-  display: grid; grid-template-columns: 2fr 1fr 2fr;
-  padding: 1rem 0; border-bottom: 1px solid #f1f5f9; align-items: center;
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr; /* Must match grid-header */
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f3f5;
+  align-items: center;
+  font-size: 0.95rem;
+  color: #212529;
+  transition: background-color 0.2s;
 }
 
-.p-name { font-weight: 600; color: #334155; }
-.p-time { color: #2563eb; font-size: 0.9rem; }
-.p-reason { color: #64748b; font-size: 0.9rem; }
+.grid-row:last-child {
+  border-bottom: none;
+}
 
-.modal-state { padding: 2rem; text-align: center; color: #64748b; font-style: italic; }
-.modal-footer { padding: 1rem 1.5rem; background: #f8fafc; text-align: right; border-top: 1px solid #eee; }
+.grid-row:hover {
+  background-color: #f8f9fa;
+}
+
+/* Modal Footer */
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e9ecef;
+  display: flex;
+  justify-content: flex-end;
+  background-color: #fcfcfc;
+}
 
 .close-btn-simple {
-  padding: 0.5rem 1.5rem; background: #1e293b; color: white;
-  border: none; border-radius: 6px; cursor: pointer; font-weight: 600;
+  padding: 8px 20px;
+  background-color: #e9ecef;
+  color: #495057;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.close-btn-simple:hover {
+  background-color: #dee2e6;
+}
+
+/* Loading/Error/Empty States */
+.modal-state {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.modal-state.error {
+  color: #e03131;
 }
