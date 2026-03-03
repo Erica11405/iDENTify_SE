@@ -1,6 +1,8 @@
 
+// const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:4006/api";
+// const API_BASE = "http://192.168.1.218:4006/api";
+// 
 const API_BASE = import.meta.env.VITE_API_BASE;
-
 async function handleResponse(res) {
     if (!res.ok) {
         let body = null;
