@@ -5,7 +5,7 @@
 // import XrayViewer from "../components/XrayViewer";
 // import MedicalAlertBanner from "../components/MedicalAlertBanner";
 // import useApi from "../hooks/useApi";
-// import apiClient from "../api/apiClient"; // ADDED API CLIENT DIRECTLY
+// import apiClient from "../api/apiClient"; 
 // import useAppStore from "../store/useAppStore";
 // import { dentalServices } from "../data/services";
 
@@ -130,7 +130,8 @@
 // 	const [selectedDentistId, setSelectedDentistId] = useState("");
 
 // 	// --- ANNUAL RECORD STATE ---
-// 	const [yearsList, setYearsList] = useState([1, 2, 3, 4, 5]); 
+// 	// const [yearsList, setYearsList] = useState([1, 2, 3, 4, 5]); 
+// 	const [yearsList, setYearsList] = useState([1]);
 // 	const [selectedYear, setSelectedYear] = useState(1);
 // 	const [isYearDone, setIsYearDone] = useState(false); 
 
@@ -347,7 +348,16 @@
 // 		loadAnnualData();
 // 	}, [id, selectedYear, location.state]);
 
-// 	const isReadOnly = isYearDone;
+// 	// --- NEW DUAL READ-ONLY LOGIC ---
+// 	const maxYear = Math.max(...(yearsList.length > 0 ? yearsList : [1]));
+// 	const isLatestYear = selectedYear === maxYear;
+
+// 	// Chart shading is locked if the year is finished or it's an old year snapshot
+// 	const isChartReadOnly = isYearDone || !isLatestYear; 
+
+// 	// Visit clinical details (meds, vitals, timeline) stay editable ONLY for the latest year
+// 	// They remain UN-FROZEN even if the chart is "Done", allowing ongoing notes while waiting for Year 2.
+// 	const isVisitReadOnly = !isLatestYear; 
 
 // 	const getRecommendations = () => {
 // 		const issues = [];
@@ -398,7 +408,7 @@
 // 	const recommendations = getRecommendations();
 
 // 	const handleApplyRecommendation = (treatmentName) => {
-// 		if (isReadOnly) return; 
+// 		if (isVisitReadOnly) return; 
 // 		if (!selectedTimelineServices.includes(treatmentName)) {
 // 			setSelectedTimelineServices([...selectedTimelineServices, treatmentName]);
 // 			alert(`Added ${treatmentName} to Plan`);
@@ -486,7 +496,7 @@
 // 	};
 
 // 	const handleSegmentClick = async (cellKey, part) => {
-// 		if (isReadOnly) return;
+// 		if (isChartReadOnly) return;
 // 		const currentSegments = toothSegments[cellKey] || {};
 // 		const newStatus = currentSegments[part] === activeStatus ? null : activeStatus;
 // 		const updatedSegments = { ...currentSegments, [part]: newStatus };
@@ -552,7 +562,7 @@
 // 	};
 
 // 	const handleUpload = async (event) => {
-// 		if (isReadOnly) return;
+// 		if (isVisitReadOnly) return;
 // 		const files = Array.from(event.target.files || []);
 // 		const newFiles = [];
 // 		for (const file of files) {
@@ -594,6 +604,7 @@
 // 		setSelectedTimelineServices(selectedTimelineServices.filter(s => s !== svc));
 // 	};
 
+// 	// ---- CORRECTED TIMELINE ENTRY SAVER FOR MOBILE SYNC ----
 // 	const addTimelineEntry = async () => {
 // 		if (selectedTimelineServices.length === 0) {
 // 			alert("Please add at least one procedure.");
@@ -605,15 +616,18 @@
 // 			if (d) providerName = d.name;
 // 		}
 // 		const procedureString = selectedTimelineServices.join(", ");
+		
+// 		// The mapped payload to match Mobile expectations precisely
 // 		const payload = {
-// 			...timelineForm,
-// 			procedure_text: procedureString,
 // 			patient_id: id,
+// 			procedure_text: procedureString,
 // 			provider: providerName,
-// 			start_time: timelineForm.start_time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+// 			start_time: timelineForm.start_time || new Date().toLocaleString(),
+// 			notes: timelineForm.notes,
 // 			image_url: timelineForm.image,
 // 			record_year: selectedYear 
 // 		};
+
 // 		try {
 // 			const newEntry = await apiClient.addTreatmentTimelineEntry(payload);
 // 			setTimelineEntries(prev => [...(prev || []), newEntry]);
@@ -634,7 +648,7 @@
 // 	};
 
 // 	const deleteTimelineEntry = async (entryId) => {
-// 		if (isReadOnly) return;
+// 		if (isVisitReadOnly) return;
 // 		try { await apiClient.deleteTreatmentTimelineEntry(entryId); setTimelineEntries(prev => (prev || []).filter(entry => entry.id !== entryId)); } catch (error) { console.error(error); }
 // 	};
 // 	const updateMedicationForm = (field, value) => setMedicationForm((prev) => ({ ...prev, [field]: value }));
@@ -651,12 +665,12 @@
 // 		} catch (error) { console.error(error); }
 // 	};
 // 	const deleteMedication = async (medId) => {
-// 		if (isReadOnly) return;
+// 		if (isVisitReadOnly) return;
 // 		try { await apiClient.deleteMedication(medId); setMedications(prev => (prev || []).filter(m => m.id !== medId)); } catch (error) { console.error(error); }
 // 	};
 
 // 	const handleBoxClick = (idx) => {
-// 		if (isReadOnly) return;
+// 		if (isChartReadOnly) return;
 // 		const row = Math.floor(idx / 16);
 // 		let boxKind = "condition";
 // 		if (row === 0 || row === 3) boxKind = "treatment";
@@ -665,7 +679,7 @@
 // 	};
 
 // 	const closePanel = () => { setIsPanelOpen(false); setSelected({ kind: null, index: null, boxKind: null, cellKey: null }); };
-// 	const handleContextMenu = (e, cellKey, boxKind) => { e.preventDefault(); if (isReadOnly) return; setContextMenu({ x: e.pageX, y: e.pageY, cellKey, boxKind }); setIsContextMenuOpen(true); };
+// 	const handleContextMenu = (e, cellKey, boxKind) => { e.preventDefault(); if (isChartReadOnly) return; setContextMenu({ x: e.pageX, y: e.pageY, cellKey, boxKind }); setIsContextMenuOpen(true); };
 // 	const closeContextMenu = () => { setIsContextMenuOpen(false); setContextMenu(null); };
 // 	const openXrayViewer = (file) => { setSelectedXray(file); setIsXrayViewerOpen(true); };
 // 	const closeXrayViewer = () => { setSelectedXray(null); setIsXrayViewerOpen(false); };
@@ -699,7 +713,7 @@
 // 					const cellKey = `box-${idx}`;
 // 					const statusClass = toothStatuses[cellKey] ? ` tc-status-${toothStatuses[cellKey]}` : "";
 // 					return (
-// 						<button key={idx} className={`tc-box-cell${mark ? " tc-has-mark" : ""}${isSelected ? " tc-selected" : ""}${statusClass}`} onClick={() => handleBoxClick(idx)} onContextMenu={(e) => handleContextMenu(e, cellKey, rowIndex === 0 || rowIndex === 3 ? "treatment" : "condition")} onDoubleClick={() => { if (!isReadOnly) { setSelected({ kind: "box", index: idx, boxKind: "condition", cellKey }); applyCode("D"); } }} disabled={isReadOnly}>{mark}</button>
+// 						<button key={idx} className={`tc-box-cell${mark ? " tc-has-mark" : ""}${isSelected ? " tc-selected" : ""}${statusClass}`} onClick={() => handleBoxClick(idx)} onContextMenu={(e) => handleContextMenu(e, cellKey, rowIndex === 0 || rowIndex === 3 ? "treatment" : "condition")} onDoubleClick={() => { if (!isChartReadOnly) { setSelected({ kind: "box", index: idx, boxKind: "condition", cellKey }); applyCode("D"); } }} disabled={isChartReadOnly}>{mark}</button>
 // 					);
 // 				})}
 // 			</div>
@@ -762,7 +776,7 @@
 // 						<div className="dentist-row">
 // 							<div>
 // 								<h3 className="section-title">Dentist</h3>
-// 								<select className="dentist-select" value={selectedDentistId || ""} onChange={(e) => setSelectedDentistId(e.target.value)} disabled={isReadOnly}>
+// 								<select className="dentist-select" value={selectedDentistId || ""} onChange={(e) => setSelectedDentistId(e.target.value)} disabled={isVisitReadOnly}>
 // 									<option value="">Select a Dentist</option>
 // 									{(dentists || []).map(d => (<option key={d.id} value={d.id}>{d.name}</option>))}
 // 								</select>
@@ -772,17 +786,17 @@
 // 								<div className="vital-row" style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
 // 									<div className="vital-field" style={{ flex: '1 1 120px' }}>
 // 										<label>BP</label>
-// 										<input className="pill-input-input" placeholder="120/80" value={vitals.bp || ""} onChange={(e) => updateVitals("bp", e.target.value)} disabled={isReadOnly} />
+// 										<input className="pill-input-input" placeholder="120/80" value={vitals.bp || ""} onChange={(e) => updateVitals("bp", e.target.value)} disabled={isVisitReadOnly} />
 // 									</div>
 // 									<div className="vital-field" style={{ flex: '1 1 120px' }}>
 // 										<label>Pulse</label>
-// 										<input className="pill-input-input" placeholder="72" value={vitals.pulse || ""} onChange={(e) => updateVitals("pulse", e.target.value)} disabled={isReadOnly} />
+// 										<input className="pill-input-input" placeholder="72" value={vitals.pulse || ""} onChange={(e) => updateVitals("pulse", e.target.value)} disabled={isVisitReadOnly} />
 // 									</div>
 // 									<div className="vital-field" style={{ flex: '1 1 140px' }}>
 // 										<label>Temp</label>
 // 										<div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-// 											<input type="number" step="0.1" className="pill-input-input" placeholder="36.5" value={getTempNumericValue()} onChange={(e) => handleTempNumberChange(e.target.value)} disabled={isReadOnly} style={{ flex: 1 }} />
-// 											<select className="pill-input-input" style={{ width: '60px', textAlign: 'center' }} value={tempUnit} onChange={(e) => handleUnitToggle(e.target.value)} disabled={isReadOnly}>
+// 											<input type="number" step="0.1" className="pill-input-input" placeholder="36.5" value={getTempNumericValue()} onChange={(e) => handleTempNumberChange(e.target.value)} disabled={isVisitReadOnly} style={{ flex: 1 }} />
+// 											<select className="pill-input-input" style={{ width: '60px', textAlign: 'center' }} value={tempUnit} onChange={(e) => handleUnitToggle(e.target.value)} disabled={isVisitReadOnly}>
 // 												<option value="C">°C</option>
 // 												<option value="F">°F</option>
 // 											</select>
@@ -826,7 +840,7 @@
 // 						value={dentalHistory}
 // 						onChange={(e) => setDentalHistory(e.target.value)}
 // 						placeholder="Enter past dental surgeries, allergies, or other history..."
-// 						disabled={isReadOnly}
+// 						disabled={isVisitReadOnly}
 // 						style={{ width: '100%', marginTop: '5px' }}
 // 					/>
 // 				</section>
@@ -845,7 +859,7 @@
 // 									</div>
 // 									<div style={{ display: 'flex', gap: '5px' }}>
 // 										{rec.treatments.map((tx, idx) => (
-// 											<button key={idx} className="small-btn" style={{ fontSize: '0.75rem', padding: '4px 8px', background: '#f97316' }} onClick={() => handleApplyRecommendation(tx)} disabled={isReadOnly}>
+// 											<button key={idx} className="small-btn" style={{ fontSize: '0.75rem', padding: '4px 8px', background: '#f97316' }} onClick={() => handleApplyRecommendation(tx)} disabled={isVisitReadOnly}>
 // 												+ {tx}
 // 											</button>
 // 										))}
@@ -935,7 +949,7 @@
 // 						Treatment Timeline (Year {selectedYear})
 // 					</h3>
 
-// 					{!isReadOnly && (
+// 					{!isVisitReadOnly && (
 // 						<div className="timeline-form">
 // 							<input
 // 								className="pill-input-input"
@@ -1083,7 +1097,9 @@
 // 										gap: "10px"
 // 									}}
 // 								>
+// 									{/* ADDED ID HERE SO IT CLEARS AFTER UPLOAD */}
 // 									<input
+// 										id="timeline-file-input"
 // 										type="file"
 // 										accept="image/*"
 // 										onChange={handleTimelineImageUpload}
@@ -1178,7 +1194,7 @@
 // 									</div>
 // 								)}
 
-// 								{!isReadOnly && (
+// 								{!isVisitReadOnly && (
 // 									<div className="timeline-entry-actions">
 // 										<button
 // 											className="small-btn danger"
@@ -1198,7 +1214,7 @@
 
 // 				<section className="medication-section">
 // 					<h3 className="section-title">Medication (Year {selectedYear})</h3>
-// 					{!isReadOnly && (
+// 					{!isVisitReadOnly && (
 // 						<div className="medication-form">
 // 							<div style={{ position: 'relative' }}>
 // 								<SearchableInput
@@ -1220,7 +1236,7 @@
 // 							<div key={m.id} className="medication-entry">
 // 								<strong>{m.medicine}</strong> — {m.dosage || ""} — {m.frequency || ""}
 // 								<div className="muted-text">{m.notes}</div>
-// 								{!isReadOnly && <div className="medication-entry-actions"><button className="small-btn danger" onClick={() => deleteMedication(m.id)}>Delete</button></div>}
+// 								{!isVisitReadOnly && <div className="medication-entry-actions"><button className="small-btn danger" onClick={() => deleteMedication(m.id)}>Delete</button></div>}
 // 							</div>
 // 						))}
 // 					</div>
@@ -1228,7 +1244,7 @@
 
 // 				<section className="upload-section">
 // 					<h3 className="section-title">Patient X-ray Gallery (Year {selectedYear})</h3>
-// 					{!isReadOnly && <input type="file" multiple accept="image/*" onChange={handleUpload} />}
+// 					{!isVisitReadOnly && <input type="file" multiple accept="image/*" onChange={handleUpload} />}
 // 					<div className="thumbnail-grid">
 // 						{(uploadedFiles || []).length === 0 ? <div className="muted-text">No files uploaded yet.</div> : (uploadedFiles || []).map((file, index) => (
 // 							<div key={index} className="thumbnail-item"><button onClick={() => openXrayViewer(file)}><img src={file.url} alt={file.name} /></button></div>
@@ -1237,13 +1253,15 @@
 // 				</section>
 
 // 				<div className="form-actions-bottom" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid #e9ecef', paddingTop: '1rem' }}>
-// 					{!isReadOnly ? (
+// 					{!isVisitReadOnly ? (
 // 						<>
-// 							<button className="done-btn secondary" onClick={handleSaveAll} disabled={isSaving}>{isSaving ? "Saving..." : "Save Changes"}</button>
-// 							<button className="done-btn" onClick={handleDone} disabled={isSaving}>{isSaving ? "Saving..." : `Complete Year ${selectedYear}`}</button>
+// 							<button className="done-btn secondary" onClick={handleSaveAll} disabled={isSaving}>{isSaving ? "Saving..." : "Save Appointment Progress"}</button>
+// 							{!isYearDone && (
+// 								<button className="done-btn" onClick={handleDone} disabled={isSaving}>{isSaving ? "Saving..." : `Complete Year ${selectedYear}`}</button>
+// 							)}
 // 						</>
 // 					) : (
-// 						<div style={{ color: 'green', fontWeight: 'bold' }}>Year {selectedYear} is Completed (Read-Only)</div>
+// 						<div style={{ color: 'green', fontWeight: 'bold' }}>Year {selectedYear} is Historical (Read-Only)</div>
 // 					)}
 // 				</div>
 
@@ -1276,7 +1294,6 @@
 // export default PatientForm;
 
 
-
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import "../styles/pages/PatientForm.css";
@@ -1284,7 +1301,7 @@ import PatientHistorySidebar from "../components/PatientHistorySidebar";
 import XrayViewer from "../components/XrayViewer";
 import MedicalAlertBanner from "../components/MedicalAlertBanner";
 import useApi from "../hooks/useApi";
-import apiClient from "../api/apiClient"; // ADDED API CLIENT DIRECTLY
+import apiClient from "../api/apiClient"; 
 import useAppStore from "../store/useAppStore";
 import { dentalServices } from "../data/services";
 
@@ -1409,7 +1426,8 @@ function PatientForm() {
 	const [selectedDentistId, setSelectedDentistId] = useState("");
 
 	// --- ANNUAL RECORD STATE ---
-	const [yearsList, setYearsList] = useState([1, 2, 3, 4, 5]); 
+	// const [yearsList, setYearsList] = useState([1, 2, 3, 4, 5]); 
+	const [yearsList, setYearsList] = useState([1]);
 	const [selectedYear, setSelectedYear] = useState(1);
 	const [isYearDone, setIsYearDone] = useState(false); 
 
@@ -1725,6 +1743,10 @@ function PatientForm() {
 			await apiClient.saveAnnualRecord(annualPayload);
 
 			alert(`Records for Year ${selectedYear} saved!`);
+			
+			// ADDED REDIRECT HERE
+			navigate("/app/history"); 
+
 		} catch (error) {
 			console.error(error);
 			alert("Failed to save.");
@@ -1882,6 +1904,7 @@ function PatientForm() {
 		setSelectedTimelineServices(selectedTimelineServices.filter(s => s !== svc));
 	};
 
+	// ---- CORRECTED TIMELINE ENTRY SAVER FOR MOBILE SYNC ----
 	const addTimelineEntry = async () => {
 		if (selectedTimelineServices.length === 0) {
 			alert("Please add at least one procedure.");
@@ -1893,15 +1916,18 @@ function PatientForm() {
 			if (d) providerName = d.name;
 		}
 		const procedureString = selectedTimelineServices.join(", ");
+		
+		// The mapped payload to match Mobile expectations precisely
 		const payload = {
-			...timelineForm,
-			procedure_text: procedureString,
 			patient_id: id,
+			procedure_text: procedureString,
 			provider: providerName,
-			start_time: timelineForm.start_time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+			start_time: timelineForm.start_time || new Date().toLocaleString(),
+			notes: timelineForm.notes,
 			image_url: timelineForm.image,
 			record_year: selectedYear 
 		};
+
 		try {
 			const newEntry = await apiClient.addTreatmentTimelineEntry(payload);
 			setTimelineEntries(prev => [...(prev || []), newEntry]);
@@ -2371,7 +2397,9 @@ function PatientForm() {
 										gap: "10px"
 									}}
 								>
+									{/* ADDED ID HERE SO IT CLEARS AFTER UPLOAD */}
 									<input
+										id="timeline-file-input"
 										type="file"
 										accept="image/*"
 										onChange={handleTimelineImageUpload}
