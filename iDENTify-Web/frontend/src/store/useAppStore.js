@@ -56,6 +56,17 @@ const useAppStore = create((set, get) => ({
   setDentists: (dentists) => set({ dentists }),
   setTreatments: (treatments) => set({ treatments }),
   setReports: (reports) => set({ reports }),
+
+
+  // Add this inside your useAppStore.js
+  resetStore: () => set({
+    patients: [],
+    appointments: [],
+    queue: [],
+    dentists: [],
+    treatments: [],
+    reports: {}
+  }),
 }));
 
 export default useAppStore;
