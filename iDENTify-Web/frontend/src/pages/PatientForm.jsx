@@ -447,6 +447,10 @@
 // 			await apiClient.saveAnnualRecord(annualPayload);
 
 // 			alert(`Records for Year ${selectedYear} saved!`);
+			
+// 			// ADDED REDIRECT HERE
+// 			navigate("/app/history"); 
+
 // 		} catch (error) {
 // 			console.error(error);
 // 			alert("Failed to save.");
@@ -1293,7 +1297,6 @@
 
 // export default PatientForm;
 
-
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import "../styles/pages/PatientForm.css";
@@ -1426,7 +1429,6 @@ function PatientForm() {
 	const [selectedDentistId, setSelectedDentistId] = useState("");
 
 	// --- ANNUAL RECORD STATE ---
-	// const [yearsList, setYearsList] = useState([1, 2, 3, 4, 5]); 
 	const [yearsList, setYearsList] = useState([1]);
 	const [selectedYear, setSelectedYear] = useState(1);
 	const [isYearDone, setIsYearDone] = useState(false); 
@@ -1644,15 +1646,10 @@ function PatientForm() {
 		loadAnnualData();
 	}, [id, selectedYear, location.state]);
 
-	// --- NEW DUAL READ-ONLY LOGIC ---
 	const maxYear = Math.max(...(yearsList.length > 0 ? yearsList : [1]));
 	const isLatestYear = selectedYear === maxYear;
 
-	// Chart shading is locked if the year is finished or it's an old year snapshot
 	const isChartReadOnly = isYearDone || !isLatestYear; 
-
-	// Visit clinical details (meds, vitals, timeline) stay editable ONLY for the latest year
-	// They remain UN-FROZEN even if the chart is "Done", allowing ongoing notes while waiting for Year 2.
 	const isVisitReadOnly = !isLatestYear; 
 
 	const getRecommendations = () => {
@@ -1715,7 +1712,8 @@ function PatientForm() {
 		}
 	};
 
-	const handleSaveAll = async () => {
+	// FIXED: Uses apiClient for all operations to prevent missing function crashes
+	const handleSaveAll = async (e, isCompleting = false) => {
 		if (!patient) return;
 		setIsSaving(true);
 		try {
@@ -1730,6 +1728,8 @@ function PatientForm() {
 				contact_number: patient.contact_number,
 				contact: patient.contact_number
 			};
+			
+			// Using apiClient directly
 			await apiClient.updatePatient(patient.id, patientPayload);
 
 			const annualPayload = {
@@ -1738,18 +1738,41 @@ function PatientForm() {
 				vitals: { ...vitals, dentist_id: selectedDentistId },
 				dental_history: dentalHistory,
 				xrays: uploadedFiles,
-				status: isYearDone ? "Done" : "Active"
+				status: isYearDone || isCompleting ? "Done" : "Active"
 			};
 			await apiClient.saveAnnualRecord(annualPayload);
 
-			alert(`Records for Year ${selectedYear} saved!`);
+			// --- MARK SESSION AS DONE SO IT MOVES TO HISTORY ---
+			// Remove from Queue using apiClient safely
+			const queueItem = (queue || []).find(q => String(q.patient_id) === String(id) && q.status !== "Done" && q.status !== "Cancelled");
+			if (queueItem) {
+				await apiClient.updateQueueItem(queueItem.id, { status: "Done" });
+			}
+
+			// Remove from Appointments using apiClient safely
+			const appointment = (allAppointments || []).find(a => String(a.patient_id) === String(id) && a.status !== "Done" && a.status !== "Cancelled");
+			if (appointment) {
+				await apiClient.updateAppointment(appointment.id, { status: "Done" });
+			}
+
+			// Sync global state immediately so it vanishes from Queue/Appt
+			if (api.loadQueue) await api.loadQueue();
+			if (api.loadAppointments) await api.loadAppointments();
+
+			// Alert and redirect
+			if (!isCompleting) {
+				alert(`Appointment Progress Saved. Session moved to History.`);
+			} else {
+				alert(`Year ${selectedYear} Completed and Locked. Session moved to History.`);
+			}
 			
-			// ADDED REDIRECT HERE
-			navigate("/app/history"); 
+			// Both actions now send you back to history!
+			navigate("/app/history");
 
 		} catch (error) {
 			console.error(error);
-			alert("Failed to save.");
+			alert("Failed to save. Please check connection.");
+			throw error; 
 		} finally {
 			setIsSaving(false);
 		}
@@ -1759,35 +1782,8 @@ function PatientForm() {
 		if (!patient) return;
 		setIsYearDone(true); 
 		try {
-			await handleSaveAll(); 
-
-			const annualPayload = {
-				patient_id: id,
-				record_year: selectedYear,
-				vitals: { ...vitals, dentist_id: selectedDentistId },
-				dental_history: dentalHistory,
-				xrays: uploadedFiles,
-				status: "Done"
-			};
-			await apiClient.saveAnnualRecord(annualPayload);
-
-            // ALWAYS mark the active queue and appointment as Done regardless of the year
-            const queueItem = (queue || []).find(q => String(q.patient_id) === String(id) && q.status !== "Done" && q.status !== "Cancelled");
-            if (queueItem) {
-                await apiClient.updateQueueItem(queueItem.id, { status: "Done" });
-            }
-
-            const appointment = (allAppointments || []).find(a => String(a.patient_id) === String(id) && a.status !== "Done" && a.status !== "Cancelled");
-            if (appointment) {
-                await apiClient.updateAppointment(appointment.id, { status: "Done" });
-            }
-
-            // Sync global state immediately so it vanishes from Queue/Appt and goes to History
-            if (api.loadQueue) await api.loadQueue();
-            if (api.loadAppointments) await api.loadAppointments();
-
-			alert(`Patient marked as Completed.`);
-			navigate("/app/history"); // PERFECT REDIRECT
+			// Trigger handleSaveAll but force the record to lock ("isCompleting = true")
+			await handleSaveAll(null, true); 
 		} catch (error) {
 			console.error(error);
 			setIsYearDone(false); 
@@ -1904,7 +1900,6 @@ function PatientForm() {
 		setSelectedTimelineServices(selectedTimelineServices.filter(s => s !== svc));
 	};
 
-	// ---- CORRECTED TIMELINE ENTRY SAVER FOR MOBILE SYNC ----
 	const addTimelineEntry = async () => {
 		if (selectedTimelineServices.length === 0) {
 			alert("Please add at least one procedure.");
@@ -1917,7 +1912,6 @@ function PatientForm() {
 		}
 		const procedureString = selectedTimelineServices.join(", ");
 		
-		// The mapped payload to match Mobile expectations precisely
 		const payload = {
 			patient_id: id,
 			procedure_text: procedureString,
