@@ -18,23 +18,22 @@ function History() {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
 
-    // --- SEARCH & FILTER STATES ---
     const [search, setSearch] = useState("");
     const [filters, setFilters] = useState({
         dentist: "all",
         procedure: "all",
-        date: "", // YYYY-MM-DD
+        date: "", 
     });
 
-    // --- PAGINATION STATES ---
     const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(10); // Default to 10 for better view
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
     useEffect(() => {
         const loadData = async () => {
             try {
+                // FIXED: Request history data (all dates)
                 await Promise.all([
-                    api.loadQueue(),
+                    api.loadQueue(true), 
                     api.loadDentists(),
                     api.loadPatients(),
                     api.loadAppointments()
@@ -46,7 +45,6 @@ function History() {
         loadData();
     }, []);
 
-    // 1. Prepare the Base List (Map data & Normalize)
     const baseHistoryList = useMemo(
         () =>
             queue
@@ -64,8 +62,6 @@ function History() {
                         if (linkedAppt) {
                             procedureInfo = linkedAppt.procedure || linkedAppt.reason || item.notes || "-";
                         }
-                    } else if (item.source === 'walk-in' && item.notes) {
-                        procedureInfo = item.notes;
                     }
 
                     const dateObj = new Date(item.time_added || item.checkedInTime || 0);
@@ -82,7 +78,6 @@ function History() {
         [queue, patients, dentists, appointments]
     );
 
-    // 2. Extract Unique Values for Dropdowns
     const uniqueProcedures = useMemo(() => {
         return Array.from(new Set(baseHistoryList.map(item => item.procedureDisplay).filter(p => p !== "-")));
     }, [baseHistoryList]);
@@ -91,40 +86,37 @@ function History() {
         return Array.from(new Set(baseHistoryList.map(item => item.assignedDentist)));
     }, [baseHistoryList]);
 
-    // 3. Apply Search & Filters
     const filteredHistory = useMemo(() => {
         return baseHistoryList.filter((item) => {
-            // Search Logic
             const searchLower = search.toLowerCase();
             const matchesSearch =
                 item.name.toLowerCase().includes(searchLower) ||
                 item.assignedDentist.toLowerCase().includes(searchLower) ||
                 item.procedureDisplay.toLowerCase().includes(searchLower);
 
-            // Filter Logic
             const matchesDentist = filters.dentist === "all" || item.assignedDentist === filters.dentist;
             const matchesProcedure = filters.procedure === "all" || item.procedureDisplay === filters.procedure;
 
             let matchesDate = true;
             if (filters.date) {
-                // Convert item date to YYYY-MM-DD for comparison
-                const itemDateStr = item.rawDate.toISOString().split('T')[0];
+                // FIXED: Use timezone-safe local date string for comparison
+                const year = item.rawDate.getFullYear();
+                const month = String(item.rawDate.getMonth() + 1).padStart(2, '0');
+                const day = String(item.rawDate.getDate()).padStart(2, '0');
+                const itemDateStr = `${year}-${month}-${day}`;
                 matchesDate = itemDateStr === filters.date;
             }
 
             return matchesSearch && matchesDentist && matchesProcedure && matchesDate;
-        }).map((item, i) => ({ ...item, number: i + 1 })); // Re-index after filtering
+        }).map((item, i) => ({ ...item, number: i + 1 }));
     }, [baseHistoryList, search, filters]);
 
-    // --- PAGINATION LOGIC (Applied to Filtered List) ---
     const indexOfLastItem = currentPage * rowsPerPage;
     const indexOfFirstItem = indexOfLastItem - rowsPerPage;
     const currentItems = filteredHistory.slice(indexOfFirstItem, indexOfLastItem);
     const totalPages = Math.ceil(filteredHistory.length / rowsPerPage);
 
-    const handlePageChange = (pageNumber) => {
-        setCurrentPage(pageNumber);
-    };
+    const handlePageChange = (pageNumber) => setCurrentPage(pageNumber);
 
     const handleRowsPerPageChange = (e) => {
         setRowsPerPage(Number(e.target.value));
@@ -133,10 +125,8 @@ function History() {
 
     const handleFilterChange = (key, value) => {
         setFilters(prev => ({ ...prev, [key]: value }));
-        setCurrentPage(1); // Reset to page 1 on filter change
+        setCurrentPage(1);
     };
-
-    // -------------------------
 
     const handleUpdate = (queueItem) => {
         const fullPatientData = patients.find(p => String(p.id) === String(queueItem.patient_id));
@@ -185,8 +175,6 @@ function History() {
         <div className="history-page">
             <div className="history-header">
                 <h2 className="history-title">Patient History</h2>
-
-                {/* SEARCH BAR */}
                 <div className="history-search">
                     <input
                         type="text"
@@ -200,7 +188,6 @@ function History() {
                 </div>
             </div>
 
-            {/* FILTERS SECTION */}
             <div className="history-filters">
                 <div className="filter-group">
                     <label htmlFor="date-filter">Date</label>
@@ -241,7 +228,6 @@ function History() {
                     </select>
                 </div>
 
-                {/* Reset Button (Optional helper) */}
                 {(filters.date || filters.dentist !== 'all' || filters.procedure !== 'all' || search) && (
                     <div className="filter-group" style={{ justifyContent: 'flex-end' }}>
                         <label>&nbsp;</label>
@@ -288,9 +274,7 @@ function History() {
                                     <td>{item.number}</td>
                                     <td>{formatDate(item.rawDate)}</td>
                                     <td>{item.name}</td>
-                                    <td>
-                                        <StatusBadge status="Done" />
-                                    </td>
+                                    <td><StatusBadge status="Done" /></td>
                                     <td>{item.assignedDentist}</td>
                                     <td>
                                         <span style={{ fontWeight: 500, color: '#334155' }}>
@@ -298,18 +282,8 @@ function History() {
                                         </span>
                                     </td>
                                     <td>
-                                        <button
-                                            className="action-btn update-btn"
-                                            onClick={() => handleUpdate(item)}
-                                        >
-                                            View
-                                        </button>
-                                        <button
-                                            className="action-btn delete-btn"
-                                            onClick={() => handleDeleteClick(item)}
-                                        >
-                                            Delete
-                                        </button>
+                                        <button className="action-btn update-btn" onClick={() => handleUpdate(item)}>View</button>
+                                        <button className="action-btn delete-btn" onClick={() => handleDeleteClick(item)}>Delete</button>
                                     </td>
                                 </tr>
                             ))
@@ -317,7 +291,6 @@ function History() {
                     </tbody>
                 </table>
 
-                {/* --- PAGINATION CONTROLS --- */}
                 {filteredHistory.length > 0 && (
                     <div className="pagination-container">
                         <div className="rows-selector">
@@ -330,23 +303,9 @@ function History() {
                             </select>
                         </div>
                         <div className="page-controls">
-                            <button
-                                className="page-btn"
-                                disabled={currentPage === 1}
-                                onClick={() => handlePageChange(currentPage - 1)}
-                            >
-                                Prev
-                            </button>
-                            <span className="page-info">
-                                Page {currentPage} of {totalPages || 1}
-                            </span>
-                            <button
-                                className="page-btn"
-                                disabled={currentPage === totalPages}
-                                onClick={() => handlePageChange(currentPage + 1)}
-                            >
-                                Next
-                            </button>
+                            <button className="page-btn" disabled={currentPage === 1} onClick={() => handlePageChange(currentPage - 1)}>Prev</button>
+                            <span className="page-info">Page {currentPage} of {totalPages || 1}</span>
+                            <button className="page-btn" disabled={currentPage === totalPages} onClick={() => handlePageChange(currentPage + 1)}>Next</button>
                         </div>
                     </div>
                 )}
