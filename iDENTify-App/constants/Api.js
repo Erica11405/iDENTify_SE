@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://192.168.1.218:4006"; 
+const API_BASE_URL = "http://10.253.96.33:4006"; 
 
 export const API = {
   patients: `${API_BASE_URL}/api/patients`,

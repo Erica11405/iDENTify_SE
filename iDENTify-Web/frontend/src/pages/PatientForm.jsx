@@ -1,5 +1,6 @@
 // import React, { useState, useEffect, useRef } from "react";
 // import { useNavigate, useParams, useLocation } from "react-router-dom";
+// import toast from "react-hot-toast";
 // import "../styles/pages/PatientForm.css";
 // import PatientHistorySidebar from "../components/PatientHistorySidebar";
 // import XrayViewer from "../components/XrayViewer";
@@ -130,7 +131,6 @@
 // 	const [selectedDentistId, setSelectedDentistId] = useState("");
 
 // 	// --- ANNUAL RECORD STATE ---
-// 	// const [yearsList, setYearsList] = useState([1, 2, 3, 4, 5]); 
 // 	const [yearsList, setYearsList] = useState([1]);
 // 	const [selectedYear, setSelectedYear] = useState(1);
 // 	const [isYearDone, setIsYearDone] = useState(false); 
@@ -191,7 +191,7 @@
 // 		const newYear = maxYear + 1;
 // 		setYearsList([...yearsList, newYear]);
 // 		setSelectedYear(newYear); 
-// 		alert(`Started Year ${newYear}`);
+// 		toast.success(`Started Year ${newYear}`);
 // 	};
 
 // 	useEffect(() => {
@@ -348,15 +348,10 @@
 // 		loadAnnualData();
 // 	}, [id, selectedYear, location.state]);
 
-// 	// --- NEW DUAL READ-ONLY LOGIC ---
 // 	const maxYear = Math.max(...(yearsList.length > 0 ? yearsList : [1]));
 // 	const isLatestYear = selectedYear === maxYear;
 
-// 	// Chart shading is locked if the year is finished or it's an old year snapshot
 // 	const isChartReadOnly = isYearDone || !isLatestYear; 
-
-// 	// Visit clinical details (meds, vitals, timeline) stay editable ONLY for the latest year
-// 	// They remain UN-FROZEN even if the chart is "Done", allowing ongoing notes while waiting for Year 2.
 // 	const isVisitReadOnly = !isLatestYear; 
 
 // 	const getRecommendations = () => {
@@ -411,15 +406,15 @@
 // 		if (isVisitReadOnly) return; 
 // 		if (!selectedTimelineServices.includes(treatmentName)) {
 // 			setSelectedTimelineServices([...selectedTimelineServices, treatmentName]);
-// 			alert(`Added ${treatmentName} to Plan`);
+// 			toast.success(`Added ${treatmentName} to Plan`);
 // 			const timelineSection = document.querySelector('.timeline-section');
 // 			if (timelineSection) timelineSection.scrollIntoView({ behavior: 'smooth' });
 // 		} else {
-// 			alert("Service already in plan");
+// 			toast.error("Service already in plan");
 // 		}
 // 	};
 
-// 	const handleSaveAll = async () => {
+// 	const handleSaveAll = async (e, isCompleting = false) => {
 // 		if (!patient) return;
 // 		setIsSaving(true);
 // 		try {
@@ -434,6 +429,7 @@
 // 				contact_number: patient.contact_number,
 // 				contact: patient.contact_number
 // 			};
+			
 // 			await apiClient.updatePatient(patient.id, patientPayload);
 
 // 			const annualPayload = {
@@ -442,18 +438,35 @@
 // 				vitals: { ...vitals, dentist_id: selectedDentistId },
 // 				dental_history: dentalHistory,
 // 				xrays: uploadedFiles,
-// 				status: isYearDone ? "Done" : "Active"
+// 				status: isYearDone || isCompleting ? "Done" : "Active"
 // 			};
 // 			await apiClient.saveAnnualRecord(annualPayload);
 
-// 			alert(`Records for Year ${selectedYear} saved!`);
+// 			const queueItem = (queue || []).find(q => String(q.patient_id) === String(id) && q.status !== "Done" && q.status !== "Cancelled");
+// 			if (queueItem) {
+// 				await apiClient.updateQueueItem(queueItem.id, { status: "Done" });
+// 			}
+
+// 			const appointment = (allAppointments || []).find(a => String(a.patient_id) === String(id) && a.status !== "Done" && a.status !== "Cancelled");
+// 			if (appointment) {
+// 				await apiClient.updateAppointment(appointment.id, { status: "Done" });
+// 			}
+
+// 			if (api.loadQueue) await api.loadQueue();
+// 			if (api.loadAppointments) await api.loadAppointments();
+
+// 			if (!isCompleting) {
+// 				toast.success(`Appointment Progress Saved. Session moved to History.`);
+// 			} else {
+// 				toast.success(`Year ${selectedYear} Completed and Locked. Session moved to History.`);
+// 			}
 			
-// 			// ADDED REDIRECT HERE
-// 			navigate("/app/history"); 
+// 			navigate("/app/history");
 
 // 		} catch (error) {
 // 			console.error(error);
-// 			alert("Failed to save.");
+// 			toast.error("Failed to save. Please check connection.");
+// 			throw error; 
 // 		} finally {
 // 			setIsSaving(false);
 // 		}
@@ -463,39 +476,11 @@
 // 		if (!patient) return;
 // 		setIsYearDone(true); 
 // 		try {
-// 			await handleSaveAll(); 
-
-// 			const annualPayload = {
-// 				patient_id: id,
-// 				record_year: selectedYear,
-// 				vitals: { ...vitals, dentist_id: selectedDentistId },
-// 				dental_history: dentalHistory,
-// 				xrays: uploadedFiles,
-// 				status: "Done"
-// 			};
-// 			await apiClient.saveAnnualRecord(annualPayload);
-
-//             // ALWAYS mark the active queue and appointment as Done regardless of the year
-//             const queueItem = (queue || []).find(q => String(q.patient_id) === String(id) && q.status !== "Done" && q.status !== "Cancelled");
-//             if (queueItem) {
-//                 await apiClient.updateQueueItem(queueItem.id, { status: "Done" });
-//             }
-
-//             const appointment = (allAppointments || []).find(a => String(a.patient_id) === String(id) && a.status !== "Done" && a.status !== "Cancelled");
-//             if (appointment) {
-//                 await apiClient.updateAppointment(appointment.id, { status: "Done" });
-//             }
-
-//             // Sync global state immediately so it vanishes from Queue/Appt and goes to History
-//             if (api.loadQueue) await api.loadQueue();
-//             if (api.loadAppointments) await api.loadAppointments();
-
-// 			alert(`Patient marked as Completed.`);
-// 			navigate("/app/history"); // PERFECT REDIRECT
+// 			await handleSaveAll(null, true); 
 // 		} catch (error) {
 // 			console.error(error);
 // 			setIsYearDone(false); 
-// 			alert("Error completing visit.");
+// 			toast.error("Error completing visit.");
 // 		}
 // 	};
 
@@ -559,9 +544,9 @@
 // 		try {
 // 			const base64 = await convertToBase64(file);
 // 			setTimelineForm(prev => ({ ...prev, image: base64 }));
-// 			alert("Image attached");
+// 			toast.success("Image attached");
 // 		} catch (e) {
-// 			alert("Failed to process image");
+// 			toast.error("Failed to process image");
 // 		}
 // 	};
 
@@ -608,10 +593,9 @@
 // 		setSelectedTimelineServices(selectedTimelineServices.filter(s => s !== svc));
 // 	};
 
-// 	// ---- CORRECTED TIMELINE ENTRY SAVER FOR MOBILE SYNC ----
 // 	const addTimelineEntry = async () => {
 // 		if (selectedTimelineServices.length === 0) {
-// 			alert("Please add at least one procedure.");
+// 			toast.error("Please add at least one procedure.");
 // 			return;
 // 		}
 // 		let providerName = timelineForm.provider;
@@ -621,7 +605,6 @@
 // 		}
 // 		const procedureString = selectedTimelineServices.join(", ");
 		
-// 		// The mapped payload to match Mobile expectations precisely
 // 		const payload = {
 // 			patient_id: id,
 // 			procedure_text: procedureString,
@@ -647,7 +630,7 @@
 // 			if (fileInput) fileInput.value = "";
 // 		} catch (error) {
 // 			console.error(error);
-// 			alert("Failed to add entry");
+// 			toast.error("Failed to add entry");
 // 		}
 // 	};
 
@@ -1101,7 +1084,6 @@
 // 										gap: "10px"
 // 									}}
 // 								>
-// 									{/* ADDED ID HERE SO IT CLEARS AFTER UPLOAD */}
 // 									<input
 // 										id="timeline-file-input"
 // 										type="file"
@@ -1299,6 +1281,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import toast from "react-hot-toast";
 import "../styles/pages/PatientForm.css";
 import PatientHistorySidebar from "../components/PatientHistorySidebar";
 import XrayViewer from "../components/XrayViewer";
@@ -1489,7 +1472,7 @@ function PatientForm() {
 		const newYear = maxYear + 1;
 		setYearsList([...yearsList, newYear]);
 		setSelectedYear(newYear); 
-		alert(`Started Year ${newYear}`);
+		toast.success(`Started Year ${newYear}`);
 	};
 
 	useEffect(() => {
@@ -1539,6 +1522,9 @@ function PatientForm() {
 	useEffect(() => {
 		const loadAnnualData = async () => {
 			if (!id) return;
+
+			// ---> CRITICAL FIX: Reset isYearDone explicitly so the new year chart isn't locked <---
+			setIsYearDone(false);
 
 			setBoxMarks(Array(64).fill(""));
 			setToothSegments({});
@@ -1704,15 +1690,14 @@ function PatientForm() {
 		if (isVisitReadOnly) return; 
 		if (!selectedTimelineServices.includes(treatmentName)) {
 			setSelectedTimelineServices([...selectedTimelineServices, treatmentName]);
-			alert(`Added ${treatmentName} to Plan`);
+			toast.success(`Added ${treatmentName} to Plan`);
 			const timelineSection = document.querySelector('.timeline-section');
 			if (timelineSection) timelineSection.scrollIntoView({ behavior: 'smooth' });
 		} else {
-			alert("Service already in plan");
+			toast.error("Service already in plan");
 		}
 	};
 
-	// FIXED: Uses apiClient for all operations to prevent missing function crashes
 	const handleSaveAll = async (e, isCompleting = false) => {
 		if (!patient) return;
 		setIsSaving(true);
@@ -1729,7 +1714,6 @@ function PatientForm() {
 				contact: patient.contact_number
 			};
 			
-			// Using apiClient directly
 			await apiClient.updatePatient(patient.id, patientPayload);
 
 			const annualPayload = {
@@ -1742,36 +1726,30 @@ function PatientForm() {
 			};
 			await apiClient.saveAnnualRecord(annualPayload);
 
-			// --- MARK SESSION AS DONE SO IT MOVES TO HISTORY ---
-			// Remove from Queue using apiClient safely
 			const queueItem = (queue || []).find(q => String(q.patient_id) === String(id) && q.status !== "Done" && q.status !== "Cancelled");
 			if (queueItem) {
 				await apiClient.updateQueueItem(queueItem.id, { status: "Done" });
 			}
 
-			// Remove from Appointments using apiClient safely
 			const appointment = (allAppointments || []).find(a => String(a.patient_id) === String(id) && a.status !== "Done" && a.status !== "Cancelled");
 			if (appointment) {
 				await apiClient.updateAppointment(appointment.id, { status: "Done" });
 			}
 
-			// Sync global state immediately so it vanishes from Queue/Appt
 			if (api.loadQueue) await api.loadQueue();
 			if (api.loadAppointments) await api.loadAppointments();
 
-			// Alert and redirect
 			if (!isCompleting) {
-				alert(`Appointment Progress Saved. Session moved to History.`);
+				toast.success(`Appointment Progress Saved. Session moved to History.`);
 			} else {
-				alert(`Year ${selectedYear} Completed and Locked. Session moved to History.`);
+				toast.success(`Year ${selectedYear} Completed and Locked. Session moved to History.`);
 			}
 			
-			// Both actions now send you back to history!
 			navigate("/app/history");
 
 		} catch (error) {
 			console.error(error);
-			alert("Failed to save. Please check connection.");
+			toast.error("Failed to save. Please check connection.");
 			throw error; 
 		} finally {
 			setIsSaving(false);
@@ -1782,12 +1760,11 @@ function PatientForm() {
 		if (!patient) return;
 		setIsYearDone(true); 
 		try {
-			// Trigger handleSaveAll but force the record to lock ("isCompleting = true")
 			await handleSaveAll(null, true); 
 		} catch (error) {
 			console.error(error);
 			setIsYearDone(false); 
-			alert("Error completing visit.");
+			toast.error("Error completing visit.");
 		}
 	};
 
@@ -1851,9 +1828,9 @@ function PatientForm() {
 		try {
 			const base64 = await convertToBase64(file);
 			setTimelineForm(prev => ({ ...prev, image: base64 }));
-			alert("Image attached");
+			toast.success("Image attached");
 		} catch (e) {
-			alert("Failed to process image");
+			toast.error("Failed to process image");
 		}
 	};
 
@@ -1902,7 +1879,7 @@ function PatientForm() {
 
 	const addTimelineEntry = async () => {
 		if (selectedTimelineServices.length === 0) {
-			alert("Please add at least one procedure.");
+			toast.error("Please add at least one procedure.");
 			return;
 		}
 		let providerName = timelineForm.provider;
@@ -1937,7 +1914,7 @@ function PatientForm() {
 			if (fileInput) fileInput.value = "";
 		} catch (error) {
 			console.error(error);
-			alert("Failed to add entry");
+			toast.error("Failed to add entry");
 		}
 	};
 
@@ -2391,7 +2368,6 @@ function PatientForm() {
 										gap: "10px"
 									}}
 								>
-									{/* ADDED ID HERE SO IT CLEARS AFTER UPLOAD */}
 									<input
 										id="timeline-file-input"
 										type="file"
