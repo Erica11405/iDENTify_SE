@@ -52,16 +52,25 @@ router.get("/status", async (req, res) => {
   }
 });
 
+// FIXED: Added history parameter support to fetch all records
 router.get("/", async (req, res) => {
+  const { history } = req.query;
   try {
-    const [rows] = await db.query(
-      `SELECT q.*, p.full_name, d.name as dentist_name 
+    let sql = `
+       SELECT q.*, p.full_name, d.name as dentist_name 
        FROM walk_in_queue q
        LEFT JOIN patients p ON q.patient_id = p.id
        LEFT JOIN dentists d ON q.dentist_id = d.id
-       WHERE DATE(q.time_added) = CURDATE()
-       ORDER BY FIELD(q.status, 'On Chair', 'Treatment', 'Checked-In', 'Waiting', 'Payment / Billing', 'Done', 'Cancelled'), time_added ASC`
-    );
+    `;
+    
+    // Only filter by current date if NOT in history mode
+    if (history !== 'true') {
+      sql += ` WHERE DATE(q.time_added) = CURDATE() `;
+    }
+
+    sql += ` ORDER BY FIELD(q.status, 'On Chair', 'Treatment', 'Checked-In', 'Waiting', 'Payment / Billing', 'Done', 'Cancelled'), time_added ASC`;
+    
+    const [rows] = await db.query(sql);
     res.json(rows);
   } catch (err) {
     console.error("Error fetching dashboard queue:", err);
