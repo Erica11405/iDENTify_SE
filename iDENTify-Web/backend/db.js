@@ -79,20 +79,23 @@ require("dotenv").config();
 
 let dbConfig;
 
-if (process.env.DATABASE_URL) {
-  // Parse the URL to strip away the confusing '?ssl-mode=REQUIRED' tag
-  const dbUrl = new URL(process.env.DATABASE_URL);
+// Look for our new private URL first, then fallback to the standard one
+const connectionString = process.env.PRIVATE_DB_URL || process.env.DATABASE_URL;
+
+if (connectionString) {
+  const dbUrl = new URL(connectionString);
   
   dbConfig = {
     host: dbUrl.hostname,
-    port: dbUrl.port || 25060, // DigitalOcean's default MySQL port
+    port: dbUrl.port || 25060,
     user: dbUrl.username,
     password: dbUrl.password,
-    database: dbUrl.pathname.replace('/', ''), // Removes the slash before the DB name
+    database: dbUrl.pathname.replace('/', '').split('?')[0], 
     ssl: {
       rejectUnauthorized: false
     }
   };
+  console.log("-> Trying to connect to DB at Host:", dbConfig.host, "| Port:", dbConfig.port);
 } else {
   // Local development fallback
   dbConfig = {
