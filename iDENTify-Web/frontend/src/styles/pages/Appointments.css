@@ -239,3 +239,35 @@
   background-color: #f8f9fa;
   border-radius: 12px;
 }
+
+/* Styling for the Date Picker to match Select dropdowns */
+.date-input {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  font-size: 1rem;
+  border: 1px solid #e2e8f0; /* Standard border color for your inputs */
+  border-radius: 8px; /* Matching the soft corners of your dropdowns */
+  background-color: #ffffff;
+  color: #1a202c;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  font-family: inherit; /* Ensures it uses the same font as the rest of the app */
+  cursor: pointer;
+}
+
+/* Hover and Focus states */
+.date-input:hover {
+  border-color: #cbd5e0;
+}
+
+.date-input:focus {
+  border-color: #4a90e2; /* Standard blue focus color */
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+/* Optional: Styling the calendar icon inside the input (Chrome/Edge/Safari) */
+.date-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.4); /* Makes the icon slightly more subtle to match the arrows */
+  padding: 5px;
+}

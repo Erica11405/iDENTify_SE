@@ -22,3 +22,21 @@ pool.on('error', (err) => {
 });
 
 module.exports = pool;
+
+
+// <========== For Deployment ==========>
+// require('dotenv').config({ path: __dirname + '/.env' });
+// const mysql = require('mysql2');
+
+// // Now process.env.DATABASE_URL will successfully pull the string from your .env file!
+// const connection = mysql.createConnection(process.env.DATABASE_URL);
+
+// connection.connect((err) => {
+//   if (err) {
+//     console.error('Error connecting to the database:', err);
+//     return;
+//   }
+//   console.log('Successfully connected to the database!');
+// });
+
+// module.exports = connection;

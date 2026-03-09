@@ -542,7 +542,7 @@ function Queue() {
           </button>
         </div>
       </div>
-      <div className="queue-legend">
+      {/* <div className="queue-legend">
         <StatusBadge status="Checked-In" />
         <StatusBadge status="Waiting" />
         <StatusBadge status="On Chair" />
@@ -550,7 +550,7 @@ function Queue() {
         <StatusBadge status="Payment / Billing" />
         <StatusBadge status="No-Show" />
         <StatusBadge status="Cancelled" />
-      </div>
+      </div> */}
 
       <AddWalkInModal
         isOpen={isModalOpen}
