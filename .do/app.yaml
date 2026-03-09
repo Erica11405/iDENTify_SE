@@ -12,17 +12,22 @@ services:
   - name: backend
     source_dir: iDENTify-Web/backend
     run_command: npm start
+    http_port: 8080
     envs:
       - key: PORT
         scope: RUN_TIME
         value: "8080"
+    routes:
+      - path: /api
 static_sites:
   - name: frontend
     source_dir: iDENTify-Web/frontend
     build_command: npm install && npm run build
     output_dir: dist
     catchall_document: index.html
+    routes:
+      - path: /
     envs:
       - key: VITE_API_BASE
         scope: BUILD_TIME
-        value: https://identify-app-hth8t.ondigitalocean.app/identify-se-i-den-tify-web-backe
+        value: "/api"
