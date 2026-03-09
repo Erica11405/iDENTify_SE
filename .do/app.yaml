@@ -1,0 +1,7 @@
+name: identify-app
+static_sites:
+  - name: frontend
+    source_dir: iDENTify-Web/frontend
+    build_command: npm install && npm run build
+    output_dir: dist
+    catchall_document: index.html
