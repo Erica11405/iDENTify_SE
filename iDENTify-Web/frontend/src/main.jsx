@@ -6,7 +6,7 @@ import ErrorBoundary from "./ErrorBoundary.jsx";
 import "./styles/base.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-    <BrowserRouter>
+    <BrowserRouter basename="/app">
       <ErrorBoundary>
         <App />
       </ErrorBoundary>
