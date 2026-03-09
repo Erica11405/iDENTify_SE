@@ -43,18 +43,60 @@
 
 
 
+// const mysql = require("mysql2/promise");
+// require("dotenv").config();
+
+// // Check if DigitalOcean provided a DATABASE_URL, otherwise use local variables
+// const dbConfig = process.env.DATABASE_URL 
+//   ? process.env.DATABASE_URL 
+//   : {
+//       host: process.env.DB_HOST,
+//       user: process.env.DB_USER,
+//       password: process.env.DB_PASS,
+//       database: process.env.DB_NAME,
+//     };
+
+// const pool = mysql.createPool(dbConfig);
+
+// pool.getConnection()
+//   .then(connection => {
+//     console.log("Successfully connected to the database!");
+//     connection.release();
+//   })
+//   .catch(error => {
+//     console.error("Error connecting to the database:", error);
+//   });
+
+// pool.on('error', (err) => {
+//   console.error('Database pool error:', err);
+// });
+
+// module.exports = pool;
+
+
 const mysql = require("mysql2/promise");
 require("dotenv").config();
 
-// Check if DigitalOcean provided a DATABASE_URL, otherwise use local variables
-const dbConfig = process.env.DATABASE_URL 
-  ? process.env.DATABASE_URL 
-  : {
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASS,
-      database: process.env.DB_NAME,
-    };
+// Determine connection settings based on environment
+let dbConfig;
+
+if (process.env.DATABASE_URL) {
+  // If we have a DATABASE_URL (DigitalOcean), use it and ADD the required SSL config
+  dbConfig = {
+    uri: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // This allows connection to the managed DO database
+    }
+  };
+} else {
+  // Local development fallback
+  dbConfig = {
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME,
+  };
+}
 
 const pool = mysql.createPool(dbConfig);
 
