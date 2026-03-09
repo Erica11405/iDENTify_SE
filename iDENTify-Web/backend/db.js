@@ -77,15 +77,20 @@
 const mysql = require("mysql2/promise");
 require("dotenv").config();
 
-// Determine connection settings based on environment
 let dbConfig;
 
 if (process.env.DATABASE_URL) {
-  // If we have a DATABASE_URL (DigitalOcean), use it and ADD the required SSL config
+  // Parse the URL to strip away the confusing '?ssl-mode=REQUIRED' tag
+  const dbUrl = new URL(process.env.DATABASE_URL);
+  
   dbConfig = {
-    uri: process.env.DATABASE_URL,
+    host: dbUrl.hostname,
+    port: dbUrl.port || 25060, // DigitalOcean's default MySQL port
+    user: dbUrl.username,
+    password: dbUrl.password,
+    database: dbUrl.pathname.replace('/', ''), // Removes the slash before the DB name
     ssl: {
-      rejectUnauthorized: false // This allows connection to the managed DO database
+      rejectUnauthorized: false
     }
   };
 } else {
