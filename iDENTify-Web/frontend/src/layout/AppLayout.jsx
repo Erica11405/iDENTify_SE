@@ -33,7 +33,7 @@ function AppLayout({ setIsLoggedIn }) {
 	}, [loadPatients, loadAppointments, loadQueue]);
 
 	const handleLogout = () => {
-		setIsLoggedIn(false);
+		setIsLoggedIn();
 		navigate("/");
 	};
 

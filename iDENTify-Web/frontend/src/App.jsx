@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useEffect } from "react";
+import React, { Suspense, lazy, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import Login from "./pages/Login.jsx";
@@ -23,27 +23,28 @@ function ProtectedRoute({ isLoggedIn, children }) {
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    const savedState = localStorage.getItem("isLoggedIn");
-    return savedState || false;
+    return localStorage.getItem("isLoggedIn") || false;
   });
 
-  useEffect(() => {
-    if (isLoggedIn) {
-      localStorage.setItem("isLoggedIn", isLoggedIn);
-    } else {
-      localStorage.removeItem("isLoggedIn");
-    }
-  }, [isLoggedIn]);
+  const handleLogin = (role) => {
+    localStorage.setItem("isLoggedIn", role);
+    setIsLoggedIn(role);
+  };
+
+  const handleLogout = () => {
+    localStorage.clear();
+    setIsLoggedIn(false);
+  };
 
   return (
     <Routes>
-      <Route path="/" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
+      <Route path="/" element={isLoggedIn ? <Navigate to="/app" replace /> : <Login setIsLoggedIn={handleLogin} />} />
 
       <Route
         path="/app"
         element={
           <ProtectedRoute isLoggedIn={isLoggedIn}>
-            <AppLayout setIsLoggedIn={setIsLoggedIn} />
+            <AppLayout setIsLoggedIn={handleLogout} />
           </ProtectedRoute>
         }
       >
