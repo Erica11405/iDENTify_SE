@@ -124,7 +124,6 @@ require("dotenv").config();
 // Import Routes
 const patientsRoutes = require("./routes/patients");
 const annualRecordsRoutes = require("./routes/annual_records");
-// const appointmentsRoutes = require("./node_modules/appointments"); // Use relative path if needed
 const appointmentsRoutes = require("./routes/appointments");
 const queueRoutes = require("./routes/queue");
 const toothConditionsRoutes = require("./routes/tooth_conditions");
