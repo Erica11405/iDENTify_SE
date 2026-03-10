@@ -334,6 +334,9 @@
 // });
 
 // module.exports = router;
+
+
+
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
@@ -352,63 +355,49 @@ function parseTime(dateTimeStr) {
   return dateTimeStr; 
 }
 
-// --- NEW ENDPOINT: Check Daily Limit (Fixes the 404 Errors) ---
+// Check Daily Limit (Fixes 404s in console)
 router.get("/check-limit", async (req, res) => {
   const { dentist_id, date } = req.query;
-  if (!dentist_id || !date) {
-    return res.status(400).json({ message: "Missing dentist_id or date" });
-  }
+  if (!dentist_id || !date) return res.status(400).json({ message: "Missing dentist_id or date" });
 
   try {
     const [countResult] = await db.query(
-      `SELECT COUNT(*) as count 
-       FROM appointments 
-       WHERE dentist_id = ? 
-         AND DATE(appointment_datetime) = ? 
-         AND status != 'Cancelled'`,
+      `SELECT COUNT(*) as count FROM appointments WHERE dentist_id = ? AND DATE(appointment_datetime) = ? AND status != 'Cancelled'`,
       [dentist_id, date]
     );
-
-    const count = countResult[0].count;
-    res.json({
-      count,
-      limit: 5,
-      isFull: count >= 5,
-      remaining: Math.max(0, 5 - count)
-    });
+    res.json({ count: countResult[0].count, limit: 5 });
   } catch (err) {
-    console.error("Error checking limit:", err);
-    res.status(500).json({ message: "Server error checking limit" });
+    res.status(500).json({ message: "Error checking limit" });
   }
 });
 
-// GET ALL APPOINTMENTS
+// GET appointments for the list view
 router.get("/", async (req, res) => {
-  const { patient_id } = req.query;
+  const { patient_id, date } = req.query;
   let query = `SELECT a.*, a.reason AS \`procedure\`, p.full_name FROM appointments a JOIN patients p ON a.patient_id = p.id`;
   const params = [];
+  
   if (patient_id) {
     query += " WHERE a.patient_id = ?";
     params.push(patient_id);
+  } else if (date) {
+    query += " WHERE DATE(a.appointment_datetime) = ?";
+    params.push(date);
   }
-  query += " ORDER BY appointment_datetime ASC";
-  try {
-    const [rows] = await db.query(query, params);
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ message: "Error fetching appointments" });
-  }
+  
+  query += " ORDER BY a.appointment_datetime ASC";
+  const [rows] = await db.query(query, params);
+  res.json(rows);
 });
 
-// ADD NEW APPOINTMENT (Fixes the 400 Bad Request)
+// ADD NEW APPOINTMENT
 router.post("/", async (req, res) => {
   const { patient_id, dentist_id, timeStart, procedure, services, notes, status } = req.body;
   const appointment_datetime = parseTime(timeStart);
 
-  if (!appointment_datetime) {
-      return res.status(400).json({ message: "Invalid Start Time Format" });
-  }
+  if (!appointment_datetime) return res.status(400).json({ message: "Invalid time format" });
 
+  // Convert "Regular Check-up" tag array into a string for the 'reason' column
   let finalReason = procedure || "";
   if (services && Array.isArray(services)) {
     finalReason = services.join(", ");
@@ -423,14 +412,15 @@ router.post("/", async (req, res) => {
       [patient_id, dentist_id, appointment_datetime, finalReason, notes, status || 'Scheduled']
     );
     
+    // Return the new appointment with the patient name so the frontend updates immediately
     const [rows] = await db.query(
         `SELECT a.*, a.reason AS \`procedure\`, p.full_name FROM appointments a JOIN patients p ON a.patient_id = p.id WHERE a.id = ?`,
         [result.insertId]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
-    console.error("Error saving appointment:", err);
-    res.status(500).json({ message: "Database error saving appointment" });
+    console.error("Save error:", err);
+    res.status(500).json({ message: "Failed to save appointment" });
   }
 });
 
