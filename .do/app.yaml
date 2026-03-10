@@ -31,21 +31,36 @@
 #         value: "/api"
 
 
+# name: identify-app
+# static_sites:
+#   - name: frontend
+#     source_dir: iDENTify-Web/frontend
+#     build_command: npm install && npm run build
+#     output_dir: dist
+#     catchall_document: index.html
+
+
 name: identify-app
 services:
-  - name: api
-    github:
-      branch: main
-      repo: erica11405/identify_se
+  - name: backend
     source_dir: iDENTify-Web/backend
-    build_command: npm install
-    run_command: node server.js
+    run_command: npm start
+    http_port: 8080
     envs:
       - key: PORT
+        scope: RUN_TIME
         value: "8080"
+    routes:
+      - path: /api
 static_sites:
   - name: frontend
     source_dir: iDENTify-Web/frontend
     build_command: npm install && npm run build
     output_dir: dist
     catchall_document: index.html
+    routes:
+      - path: /
+    envs:
+      - key: VITE_API_BASE
+        scope: BUILD_TIME
+        value: "/api"
