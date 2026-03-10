@@ -180,19 +180,25 @@
 const mysql = require("mysql2/promise");
 require("dotenv").config();
 
-let connectionString = process.env.PRIVATE_DB_URL || process.env.DATABASE_URL;
+// DigitalOcean injects this automatically now!
+const connectionString = process.env.DATABASE_URL;
 let pool;
 
 if (connectionString) {
-  console.log("-> Trying to connect using DigitalOcean connection string...");
+  console.log("-> Connecting to DigitalOcean managed database...");
   
-  // Strip off DO's "?ssl-mode=REQUIRED" so it doesn't confuse mysql2
-  const cleanString = connectionString.split('?')[0];
-
+  // Use Node's built-in URL parser to handle special characters perfectly
+  const dbUrl = new URL(connectionString);
+  
   pool = mysql.createPool({
-    uri: cleanString,
+    host: dbUrl.hostname,
+    port: dbUrl.port || 25060,
+    user: decodeURIComponent(dbUrl.username),
+    password: decodeURIComponent(dbUrl.password),
+    // Grabs the database name (e.g., 'defaultdb') and removes the leading slash
+    database: dbUrl.pathname.replace('/', '') || 'defaultdb', 
     ssl: {
-      rejectUnauthorized: false // This replaces the need for ssl-mode=REQUIRED
+      rejectUnauthorized: false
     }
   });
 } else {
