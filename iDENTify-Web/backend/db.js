@@ -180,17 +180,19 @@
 const mysql = require("mysql2/promise");
 require("dotenv").config();
 
-const connectionString = process.env.PRIVATE_DB_URL || process.env.DATABASE_URL;
-
+let connectionString = process.env.PRIVATE_DB_URL || process.env.DATABASE_URL;
 let pool;
 
 if (connectionString) {
   console.log("-> Trying to connect using DigitalOcean connection string...");
-  // mysql2 can read the URI string directly, avoiding parsing errors
+  
+  // Strip off DO's "?ssl-mode=REQUIRED" so it doesn't confuse mysql2
+  const cleanString = connectionString.split('?')[0];
+
   pool = mysql.createPool({
-    uri: connectionString,
+    uri: cleanString,
     ssl: {
-      rejectUnauthorized: false // Required for DigitalOcean
+      rejectUnauthorized: false // This replaces the need for ssl-mode=REQUIRED
     }
   });
 } else {
