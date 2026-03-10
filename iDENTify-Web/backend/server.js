@@ -64,7 +64,7 @@ require("dotenv").config();
 // Import Routes
 const patientsRoutes = require("./routes/patients");
 const annualRecordsRoutes = require("./routes/annual_records");
-const appointmentsRoutes = require("./routes/appointments");
+const appointmentsRoutes = require("./node_modules/appointments"); // Use relative path if needed
 const queueRoutes = require("./routes/queue");
 const toothConditionsRoutes = require("./routes/tooth_conditions");
 const treatmentTimelineRoutes = require("./routes/treatment_timeline");
@@ -76,11 +76,10 @@ const reportsRoutes = require("./routes/reports");
 const app = express();
 
 app.use(cors()); 
-app.use(express.json({ limit: "5000mb" }));
-app.use(express.urlencoded({ limit: "5000mb", extended: true }));
+app.use(express.json({ limit: "50mb" })); // Standardized limit
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // --- THE FIX: ROUTE WRAPPER ---
-// We create a single router for all your paths
 const apiRouter = express.Router();
 
 apiRouter.use("/patients", patientsRoutes);
@@ -94,17 +93,17 @@ apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
 
-// Now we tell Express: "If it starts with /api OR if it starts with /, use these routes"
+// This ensures requests for /api/dentists AND /dentists both work
 app.use("/api", apiRouter);
 app.use("/", apiRouter);
-// ------------------------------
 
-// Keep your health check for DigitalOcean
+// Health Check for DigitalOcean
 app.get('/health', (req, res) => {
     res.status(200).send('Server is healthy');
 });
 
+// Standard port for DigitalOcean App Platform
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
