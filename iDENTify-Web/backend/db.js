@@ -124,39 +124,84 @@
 // module.exports = pool;
 
 
+
+
+
+// const mysql = require("mysql2/promise");
+// require("dotenv").config();
+
+// let dbConfig;
+
+// const connectionString = process.env.PRIVATE_DB_URL || process.env.DATABASE_URL;
+
+// if (connectionString) {
+//   const dbUrl = new URL(connectionString);
+  
+//   dbConfig = {
+//     host: dbUrl.hostname,
+//     port: dbUrl.port || 25060,
+//     // THE FIX: Decode the username and password!
+//     user: decodeURIComponent(dbUrl.username),
+//     password: decodeURIComponent(dbUrl.password),
+//     database: dbUrl.pathname.replace('/', '').split('?')[0], 
+//     ssl: {
+//       rejectUnauthorized: false
+//     }
+//   };
+//   console.log("-> Trying to connect to DB at Host:", dbConfig.host, "| Port:", dbConfig.port);
+// } else {
+//   // Local development fallback
+//   dbConfig = {
+//     host: process.env.DB_HOST,
+//     user: process.env.DB_USER,
+//     password: process.env.DB_PASS,
+//     database: process.env.DB_NAME,
+//   };
+// }
+
+// const pool = mysql.createPool(dbConfig);
+
+// pool.getConnection()
+//   .then(connection => {
+//     console.log("Successfully connected to the database!");
+//     connection.release();
+//   })
+//   .catch(error => {
+//     console.error("Error connecting to the database:", error);
+//   });
+
+// pool.on('error', (err) => {
+//   console.error('Database pool error:', err);
+// });
+
+// module.exports = pool;
+
+
 const mysql = require("mysql2/promise");
 require("dotenv").config();
 
-let dbConfig;
-
 const connectionString = process.env.PRIVATE_DB_URL || process.env.DATABASE_URL;
 
+let pool;
+
 if (connectionString) {
-  const dbUrl = new URL(connectionString);
-  
-  dbConfig = {
-    host: dbUrl.hostname,
-    port: dbUrl.port || 25060,
-    // THE FIX: Decode the username and password!
-    user: decodeURIComponent(dbUrl.username),
-    password: decodeURIComponent(dbUrl.password),
-    database: dbUrl.pathname.replace('/', '').split('?')[0], 
+  console.log("-> Trying to connect using DigitalOcean connection string...");
+  // mysql2 can read the URI string directly, avoiding parsing errors
+  pool = mysql.createPool({
+    uri: connectionString,
     ssl: {
-      rejectUnauthorized: false
+      rejectUnauthorized: false // Required for DigitalOcean
     }
-  };
-  console.log("-> Trying to connect to DB at Host:", dbConfig.host, "| Port:", dbConfig.port);
+  });
 } else {
-  // Local development fallback
-  dbConfig = {
+  console.log("-> Using local environment variables...");
+  pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASS,
     database: process.env.DB_NAME,
-  };
+  });
 }
-
-const pool = mysql.createPool(dbConfig);
 
 pool.getConnection()
   .then(connection => {
