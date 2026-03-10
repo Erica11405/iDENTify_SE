@@ -25,6 +25,9 @@
 //   const navigate = useNavigate();
 //   const api = useApi();
 
+//   // State to track the date selected in the calendar
+//   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
+
 //   useEffect(() => {
 //     const loadData = async () => {
 //       try {
@@ -59,17 +62,9 @@
 //     time: "all",
 //   });
 
-//   const procedures = useMemo(
-//     () => Array.from(new Set(appointments.map((a) => a.procedure || a.reason).filter(Boolean))),
-//     [appointments]
-//   );
-
-//   const { todayAppointments, tomorrowAppointments } = useMemo(() => {
-//     const today = new Date();
+//   const { selectedDateAppointments, tomorrowAppointments } = useMemo(() => {
 //     const tomorrow = new Date();
-//     tomorrow.setDate(today.getDate() + 1);
-
-//     const todayStr = today.toLocaleDateString('en-CA'); 
+//     tomorrow.setDate(tomorrow.getDate() + 1);
 //     const tomorrowStr = tomorrow.toLocaleDateString('en-CA'); 
 
 //     const filtered = appointments.filter((appt) => {
@@ -90,12 +85,11 @@
 //     });
 
 //     return {
-//       todayAppointments: filtered.filter(a => a.appointment_datetime?.split('T')[0] === todayStr),
+//       selectedDateAppointments: filtered.filter(a => a.appointment_datetime?.split('T')[0] === selectedDate),
 //       tomorrowAppointments: filtered.filter(a => a.appointment_datetime?.split('T')[0] === tomorrowStr),
 //     };
-//   }, [appointments, dentists, filters]);
+//   }, [appointments, dentists, filters, selectedDate]);
 
-//   // UPDATED: Added showActions parameter to control column visibility
 //   const renderTable = (data, title, showActions = false) => (
 //     <div className="appointments-section">
 //       <h3 className="section-subtitle">{title}</h3>
@@ -170,24 +164,13 @@
 //   const handleAddToQueue = async (appointment) => {
 //     let patientId = appointment.patient_id;
 //     let fullPatientData = patients.find((p) => String(p.id) === String(patientId));
-
 //     if (!fullPatientData) return;
-
-//     const isAlreadyInQueue = queue.some((q) =>
-//       String(q.patient_id) === String(patientId) &&
-//       q.status !== 'Done' && q.status !== 'Cancelled'
-//     );
-
-//     if (isAlreadyInQueue) {
-//         toast.error("Patient is already in the active Queue!");
-//         return;
-//     }
-
+//     const isAlreadyInQueue = queue.some((q) => String(q.patient_id) === String(patientId) && q.status !== 'Done' && q.status !== 'Cancelled');
+//     if (isAlreadyInQueue) { toast.error("Patient is already in the active Queue!"); return; }
 //     try {
 //       await api.updateAppointment(appointment.id, { status: 'Checked-In' });
 //       const now = new Date();
 //       const mysqlDateTime = now.toISOString().slice(0, 19).replace('T', ' ');
-
 //       await api.addQueue({
 //         patient_id: patientId,
 //         appointment_id: appointment.id,
@@ -197,7 +180,6 @@
 //         notes: appointment.procedure || appointment.reason || "",
 //         time_added: mysqlDateTime,
 //       });
-
 //       toast.success("Added to Queue.");
 //       api.loadAppointments();
 //       api.loadQueue();
@@ -246,21 +228,46 @@
 //       </div>
 
 //       <div className="appointments-filters">
-//         <div className="filter-group"><label>Dentist</label><select value={filters.dentist} onChange={(e) => handleFilterChange("dentist", e.target.value)}><option value="all">All</option>{dentists.map((d) => (<option key={d.id} value={d.name}>{d.name}</option>))}</select></div>
-//         <div className="filter-group"><label>Status</label><select value={filters.status} onChange={(e) => handleFilterChange("status", e.target.value)}><option value="all">All</option><option value="Scheduled">Scheduled</option><option value="Checked-In">Checked-In</option><option value="Done">Done</option></select></div>
+//         <div className="filter-group">
+//           <label>Dentist</label>
+//           <select value={filters.dentist} onChange={(e) => handleFilterChange("dentist", e.target.value)}>
+//             <option value="all">All</option>
+//             {dentists.map((d) => (<option key={d.id} value={d.name}>{d.name}</option>))}
+//           </select>
+//         </div>
+        
+//         <div className="filter-group">
+//           <label>Status</label>
+//           <select value={filters.status} onChange={(e) => handleFilterChange("status", e.target.value)}>
+//             <option value="all">All</option>
+//             <option value="Scheduled">Scheduled</option>
+//             <option value="Checked-In">Checked-In</option>
+//             <option value="Done">Done</option>
+//           </select>
+//         </div>
+
+//         {/* CALENDAR SELECTOR: Moved beside Status */}
+//         <div className="filter-group">
+//           <label htmlFor="date-picker">Date</label>
+//           <input 
+//             id="date-picker"
+//             type="date" 
+//             value={selectedDate} 
+//             onChange={(e) => setSelectedDate(e.target.value)}
+//             className="date-input"
+//           />
+//         </div>
 //       </div>
 
 //       <div className="appointments-legend">
 //         <StatusBadge status="Scheduled" /><StatusBadge status="Checked-In" /><StatusBadge status="Done" />
 //       </div>
 
-//       {/* TODAY: showActions is true */}
-//       {renderTable(todayAppointments, "Today's Appointments", true)}
+//       {renderTable(selectedDateAppointments, `Appointments for ${new Date(selectedDate).toLocaleDateString()}`, true)}
       
 //       <hr style={{ margin: '3rem 0', border: 'none', borderTop: '2px dashed #e2e8f0' }} />
       
-//       {/* TOMORROW: showActions is false */}
-//       {renderTable(tomorrowAppointments, "Tomorrow's Appointments", false)}
+//       {renderTable(tomorrowAppointments, "Tomorrow's Preview", false)}
 
 //       {isEditModalOpen && <EditAppointmentModal appointment={selectedAppointment} onSave={handleSaveAppointment} onCancel={handleCloseModal} dentists={dentists} />}
 //       {isAddModalOpen && <AddAppointmentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} dentists={dentists} onSave={handleAddAppointment} />}
@@ -270,7 +277,6 @@
 // }
 
 // export default Appointments;
-
 
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -299,7 +305,6 @@ function Appointments() {
   const navigate = useNavigate();
   const api = useApi();
 
-  // State to track the date selected in the calendar
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
 
   useEffect(() => {
@@ -483,13 +488,44 @@ function Appointments() {
     } catch (err) { console.error(err); }
   };
 
+  // --- THE FIX: Create patient FIRST if they are new ---
   const handleAddAppointment = async (data) => {
     try {
-      await api.createAppointment(data);
-      toast.success("Added.");
+      let finalPatientId = data.patient_id;
+
+      if (data.isNewPatient) {
+        // Step 1: Create the patient record
+        const newPatientRes = await api.createPatient({
+          first_name: data.first_name,
+          last_name: data.last_name,
+          middle_name: data.middle_name,
+          birthdate: data.birthdate,
+          gender: data.sex, 
+          contact_number: data.contact_number,
+          email: data.email || "",
+          address: "Update profile" 
+        });
+        
+        // Extract the ID safely based on your API response structure
+        finalPatientId = newPatientRes.id || newPatientRes.data?.id || newPatientRes.patientId; 
+      }
+
+      // Step 2: Create the appointment
+      await api.createAppointment({
+        ...data,
+        patient_id: finalPatientId
+      });
+
+      toast.success("Appointment successfully added!");
       setIsAddModalOpen(false);
       api.loadAppointments();
-    } catch (err) { toast.error("Failed to add."); }
+      if (data.isNewPatient) {
+        api.loadPatients();
+      }
+    } catch (err) { 
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to add appointment."); 
+    }
   };
 
   return (
@@ -520,7 +556,6 @@ function Appointments() {
           </select>
         </div>
 
-        {/* CALENDAR SELECTOR: Moved beside Status */}
         <div className="filter-group">
           <label htmlFor="date-picker">Date</label>
           <input 
