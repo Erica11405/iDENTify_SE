@@ -11,10 +11,10 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-// Import Routes - Fixed paths
+// Import Routes - Corrected paths to use the /routes/ folder
 const patientsRoutes = require("./routes/patients");
 const annualRecordsRoutes = require("./routes/annual_records");
-const appointmentsRoutes = require("./routes/appointments"); // Fixed from node_modules
+const appointmentsRoutes = require("./routes/appointments"); 
 const queueRoutes = require("./routes/queue");
 const toothConditionsRoutes = require("./routes/tooth_conditions");
 const treatmentTimelineRoutes = require("./routes/treatment_timeline");
@@ -30,7 +30,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // --- ROUTE WRAPPER ---
-// This handles the /api prefix correctly for DigitalOcean
+// This ensures that DigitalOcean's /api prefix works correctly
 const apiRouter = express.Router();
 
 apiRouter.use("/patients", patientsRoutes);
@@ -44,11 +44,11 @@ apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
 
-// Ensure requests for /api/dentists AND /dentists both work
+// Apply the wrapper to both /api and root paths
 app.use("/api", apiRouter);
 app.use("/", apiRouter);
 
-// Health Check for DigitalOcean
+// Health Check for DigitalOcean Deployment
 app.get('/health', (req, res) => {
     res.status(200).send('Server is healthy');
 });
