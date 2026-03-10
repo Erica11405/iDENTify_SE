@@ -75,43 +75,31 @@ const reportsRoutes = require("./routes/reports");
 
 const app = express();
 
-// Middlewares
 app.use(cors()); 
 app.use(express.json({ limit: "5000mb" }));
 app.use(express.urlencoded({ limit: "5000mb", extended: true }));
 
-// --- NEW ROUTER WRAPPER ---
-// This ensures /api/dentists and /dentists both work correctly
-const router = express.Router();
+// --- THE FIX: ROUTE WRAPPER ---
+// We create a single router for all your paths
+const apiRouter = express.Router();
 
-router.use("/patients", patientsRoutes);
-router.use("/annual-records", annualRecordsRoutes);
-router.use("/appointments", appointmentsRoutes);
-router.use("/queue", queueRoutes);
-router.use("/tooth-conditions", toothConditionsRoutes);
-router.use("/treatment-timeline", treatmentTimelineRoutes);
-router.use("/medications", medicationsRoutes);
-router.use("/dentists", dentistsRoutes);
-router.use("/treatments", treatmentsRoutes);
-router.use("/reports", reportsRoutes);
+apiRouter.use("/patients", patientsRoutes);
+apiRouter.use("/annual-records", annualRecordsRoutes);
+apiRouter.use("/appointments", appointmentsRoutes);
+apiRouter.use("/queue", queueRoutes);
+apiRouter.use("/tooth-conditions", toothConditionsRoutes);
+apiRouter.use("/treatment-timeline", treatmentTimelineRoutes);
+apiRouter.use("/medications", medicationsRoutes);
+apiRouter.use("/dentists", dentistsRoutes);
+apiRouter.use("/treatments", treatmentsRoutes);
+apiRouter.use("/reports", reportsRoutes);
 
-// Apply the router to both base and /api paths
-app.use("/api", router);
-app.use("/", router);
-// ---------------------------
+// Now we tell Express: "If it starts with /api OR if it starts with /, use these routes"
+app.use("/api", apiRouter);
+app.use("/", apiRouter);
+// ------------------------------
 
-// Fix for specific dentist patients report
-app.get('/api/reports/dentist/:dentistId/patients', async (req, res) => {
-    try {
-        const { dentistId } = req.params;
-        res.status(200).json([]);
-    } catch (error) {
-        console.error("Error fetching dentist patients:", error);
-        res.status(500).json({ message: "Server error" });
-    }
-});
-
-// Health Check for DigitalOcean
+// Keep your health check for DigitalOcean
 app.get('/health', (req, res) => {
     res.status(200).send('Server is healthy');
 });
