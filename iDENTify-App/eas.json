@@ -6,13 +6,22 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EAS_PROJECT_ROOT": "./iDENTIfy-App"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EAS_PROJECT_ROOT": "./iDENTIfy-App"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EAS_PROJECT_ROOT": "./iDENTIfy-App"
+      }
     }
   },
   "submit": {
