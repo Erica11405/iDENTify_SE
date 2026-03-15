@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://192.168.1.218:4006"; 
+const API_BASE_URL = "https://identify-app-hth8t.ondigitalocean.app/app"; 
 
 export const API = {
   patients: `${API_BASE_URL}/api/patients`,
