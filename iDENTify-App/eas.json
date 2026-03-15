@@ -24,7 +24,10 @@
       "env": {
         "EAS_PROJECT_ROOT": "./iDENTIfy-App"
       },
-      "channel": "production"
+      "channel": "production",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {
