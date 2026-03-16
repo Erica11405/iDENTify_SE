@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import toast from "react-hot-toast";
+import api from "../api/apiClient"; //
 import toothLogo from "../assets/toothlogo.svg";
 import "../styles/pages/Login.css";
 
@@ -10,8 +11,8 @@ function SignUp() {
 	const [surname, setSurname] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
-	const [confirmPassword, setConfirmPassword] = useState(""); // <-- New Field
-	const [clinicPassword, setClinicPassword] = useState(""); // <-- Master Authorization Field
+	const [confirmPassword, setConfirmPassword] = useState(""); 
+	const [clinicPassword, setClinicPassword] = useState(""); 
 	const [showPassword, setShowPassword] = useState(false);
 	const [errors, setErrors] = useState({});
 	const navigate = useNavigate();
@@ -37,7 +38,6 @@ function SignUp() {
 		if (!confirmPassword.trim()) { newErrors.confirmPassword = "Confirm your password"; hasError = true; }
 		if (!clinicPassword.trim()) { newErrors.clinicPassword = "Clinic Master Password is required"; hasError = true; }
 		
-		// Password match validation
 		if (password !== confirmPassword) {
 			newErrors.confirmPassword = "Passwords do not match!";
 			hasError = true;
@@ -49,33 +49,23 @@ function SignUp() {
 		}
 
 		try {
-			// Sending data to our backend route
-			const response = await fetch('http://localhost:8080/api/auth/signup/dentist', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					firstName,
-					surname,
-					email,
-					password,       // Their secure login password
-					clinicPassword  // The secret key to authorize signup
-				})
+			// Using the shared api client ensures it points to your hosted URL
+			await api.signupDentist({
+				firstName,
+				surname,
+				email,
+				password,
+				clinicPassword
 			});
 
-			const data = await response.json();
-
-			if (!response.ok) {
-				toast.error(data.error || "Failed to create account.");
-				setErrors({ form: data.error });
-				return;
-			}
-
 			toast.success("Dentist account successfully created!");
-			navigate("/"); // Navigate back to login screen
+			navigate("/"); 
 
 		} catch (error) {
-			console.error("Signup fetch error:", error);
-			toast.error("Cannot connect to server. Is the backend running?");
+			console.error("Signup error:", error);
+			// Display the specific error message from the backend
+			toast.error(error.message || "Cannot connect to server.");
+			setErrors({ form: error.message });
 		}
 	};
 
@@ -154,7 +144,6 @@ function SignUp() {
 						{errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
 					</div>
 
-					{/* NEW FIELD: The Clinic Master Password */}
 					<div className="login-form__group">
 						<label htmlFor="clinicPassword">Clinic Master Password</label>
 						<div className="password-input-wrapper">
