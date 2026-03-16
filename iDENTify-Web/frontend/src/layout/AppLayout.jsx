@@ -165,11 +165,12 @@ function AppLayout({ setIsLoggedIn, userRole }) {
         <div className="sidebar-header">
           <h2>iDENTify</h2>
           <p style={{ fontSize: "0.85rem", color: "var(--primary-color)", fontWeight: "bold", marginTop: "-10px", marginBottom: "20px" }}>
-            {userRole === 'dentist' ? 'Dentist Account' : 'Dental Aide Account'}
+            {userRole === 'dentist' ? 'Dentist Account' : 'Dental Aide'}
           </p>
         </div>
 
         <nav className="sidebar-nav">
+          {/* COMMON LINKS */}
           <NavLink to="/app" end className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
             <img src={dashboardIcon} alt="Dashboard" className="nav-icon" />
             <span>Dashboard</span>
@@ -180,7 +181,7 @@ function AppLayout({ setIsLoggedIn, userRole }) {
             <span>Appointments</span>
           </NavLink>
 
-          {/* DENTAL AIDE ONLY LINKS */}
+          {/* ================= DENTAL AIDE ONLY LINKS ================= */}
           {userRole === 'aide' && (
             <>
               <NavLink to="/app/queue" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
@@ -206,7 +207,7 @@ function AppLayout({ setIsLoggedIn, userRole }) {
             </>
           )}
 
-          {/* DENTIST ONLY LINKS */}
+          {/* ================= DENTIST ONLY LINKS ================= */}
           {userRole === 'dentist' && (
             <NavLink to="/app/settings" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
               <img src={dentistIcon} alt="Settings" className="nav-icon" /> 
@@ -216,8 +217,29 @@ function AppLayout({ setIsLoggedIn, userRole }) {
         </nav>
 
         <div className="sidebar-footer">
-          <button className="logout-button" onClick={handleLogout}>
-            <img src={logoutIcon} alt="Logout" className="nav-icon" />
+          <button 
+            onClick={handleLogout}
+            style={{
+              width: '100%', 
+              padding: '12px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: '10px',
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: '#ef4444',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              borderRadius: '8px',
+              transition: 'background-color 0.2s ease',
+              marginTop: 'auto'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            <img src={logoutIcon} alt="Logout" style={{ width: '22px', height: '22px', margin: 0 }} />
             <span>Logout</span>
           </button>
         </div>

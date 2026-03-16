@@ -8,21 +8,21 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EAS_PROJECT_ROOT": "./iDENTIfy-App"
+        "EAS_PROJECT_ROOT": "./iDENTify-App"
       },
       "channel": "development"
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EAS_PROJECT_ROOT": "./iDENTIfy-App"
+        "EAS_PROJECT_ROOT": "./iDENTify-App"
       },
       "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EAS_PROJECT_ROOT": "./iDENTIfy-App"
+        "EAS_PROJECT_ROOT": "./iDENTify-App"
       },
       "channel": "production",
       "android": {

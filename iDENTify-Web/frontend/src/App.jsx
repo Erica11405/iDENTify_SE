@@ -76,14 +76,13 @@
 // export default App;
 
 
-// frontend/src/App.jsx
 import React, { Suspense, lazy, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import Login from "./pages/Login.jsx";
 import AppLayout from "./layout/AppLayout.jsx";
 
-// --- AIDE PAGES ---
+// --- DENTAL AIDE PAGES ---
 const AideDashboard = lazy(() => import("./pages/aide/Dashboard.jsx"));
 const AideAppointments = lazy(() => import("./pages/aide/Appointments.jsx"));
 const AideQueue = lazy(() => import("./pages/aide/Queue.jsx"));
@@ -91,7 +90,7 @@ const AideHistory = lazy(() => import("./pages/aide/History.jsx"));
 const AideReports = lazy(() => import("./pages/aide/Reports.jsx"));
 const AideDentists = lazy(() => import("./pages/aide/Dentists.jsx"));
 const AidePatients = lazy(() => import("./pages/aide/Patients.jsx"));
-const PatientForm = lazy(() => import("./pages/aide/PatientForm.jsx")); // Shared for review
+const AidePatientForm = lazy(() => import("./pages/aide/PatientForm.jsx")); // Shared for Dentist Review
 
 // --- DENTIST PAGES ---
 const DentistDashboard = lazy(() => import("./pages/dentist/Dashboard.jsx"));
@@ -133,7 +132,6 @@ function App() {
           </ProtectedRoute>
         }
       >
-        
         {/* ======================= DENTIST ROUTES ======================= */}
         {userRole === 'dentist' && (
           <>
@@ -142,7 +140,10 @@ function App() {
             <Route path="settings" element={<Suspense fallback={<div>Loading…</div>}><DentistSettings userRole={userRole} /></Suspense>} />
             
             {/* Allow Dentist to view patient forms for review mode */}
-            <Route path="patient/:id" element={<Suspense fallback={<div>Loading patient…</div>}><PatientForm userRole={userRole} /></Suspense>} />
+            <Route path="patient/:id" element={<Suspense fallback={<div>Loading patient…</div>}><AidePatientForm userRole={userRole} /></Suspense>} />
+            
+            {/* Prevent Dentist from accessing Aide URLs manually */}
+            <Route path="*" element={<Navigate to="/app" replace />} />
           </>
         )}
 
@@ -156,8 +157,10 @@ function App() {
             <Route path="reports" element={<Suspense fallback={<div>Loading reports…</div>}><AideReports userRole={userRole} /></Suspense>} />
             <Route path="dentists" element={<Suspense fallback={<div>Loading dentists…</div>}><AideDentists userRole={userRole} /></Suspense>} />
             <Route path="patients" element={<Suspense fallback={<div>Loading patients…</div>}><AidePatients userRole={userRole} /></Suspense>} />
+            <Route path="patient/:id" element={<Suspense fallback={<div>Loading patient…</div>}><AidePatientForm userRole={userRole} /></Suspense>} />
             
-            <Route path="patient/:id" element={<Suspense fallback={<div>Loading patient…</div>}><PatientForm userRole={userRole} /></Suspense>} />
+            {/* Prevent Aide from accessing Dentist URLs manually */}
+            <Route path="*" element={<Navigate to="/app" replace />} />
           </>
         )}
       </Route>
