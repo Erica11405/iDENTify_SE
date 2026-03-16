@@ -5,7 +5,7 @@ import Login from "./pages/Login.jsx";
 import SignUp from "./pages/SignUp.jsx"; // <-- 1. IMPORT SIGNUP HERE
 import AppLayout from "./layout/AppLayout.jsx";
 
-// --- DENTAL AIDE PAGES ---
+// --- DENTAL AIDE PAGES --
 const AideDashboard = lazy(() => import("./pages/aide/Dashboard.jsx"));
 const AideAppointments = lazy(() => import("./pages/aide/Appointments.jsx"));
 const AideQueue = lazy(() => import("./pages/aide/Queue.jsx"));
