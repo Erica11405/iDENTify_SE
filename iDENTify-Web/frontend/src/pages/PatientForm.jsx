@@ -242,6 +242,9 @@
 // 		const loadAnnualData = async () => {
 // 			if (!id) return;
 
+// 			// ---> CRITICAL FIX: Reset isYearDone explicitly so the new year chart isn't locked <---
+// 			setIsYearDone(false);
+
 // 			setBoxMarks(Array(64).fill(""));
 // 			setToothSegments({});
 // 			setToothStatuses({});
@@ -1397,11 +1400,15 @@ const Tooth5Surface = ({ toothNumber, segments, onSegmentClick }) => {
 	);
 };
 
-function PatientForm() {
+// --- WE ADDED userRole AS A PROP HERE ---
+function PatientForm({ userRole }) {
 	const navigate = useNavigate();
 	const { id } = useParams();
 	const location = useLocation();
 	const api = useApi();
+
+    // --- CHECK IF DENTIST IS REVIEWING ---
+    const isDentistReviewing = userRole === 'dentist';
 
 	const queue = useAppStore((state) => state.queue || []);
 	const allAppointments = useAppStore((state) => state.appointments || []);
@@ -1523,7 +1530,6 @@ function PatientForm() {
 		const loadAnnualData = async () => {
 			if (!id) return;
 
-			// ---> CRITICAL FIX: Reset isYearDone explicitly so the new year chart isn't locked <---
 			setIsYearDone(false);
 
 			setBoxMarks(Array(64).fill(""));
@@ -2031,6 +2037,14 @@ function PatientForm() {
 					</div>
 				</div>
 
+                {/* --- DENTIST REVIEW BANNER ADDED HERE --- */}
+                {isDentistReviewing && (
+                    <div className="review-banner" style={{ backgroundColor: "#e0f7fa", color: "#006064", padding: "15px", borderRadius: "8px", marginBottom: "20px", borderLeft: "5px solid #00bcd4" }}>
+                    <strong style={{ display: "block", fontSize: "1.1em", marginBottom: "5px" }}>Dentist Review Mode</strong>
+                    <span>Please double-check the patient data, charting, and timeline entered by the Dental Aide to ensure accuracy before beginning treatment.</span>
+                    </div>
+                )}
+
 				<div className="sections-container">
 					<section className="patient-info-card">
 						<h3 className="section-title">Patient Info</h3>
@@ -2525,9 +2539,14 @@ function PatientForm() {
 				<div className="form-actions-bottom" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid #e9ecef', paddingTop: '1rem' }}>
 					{!isVisitReadOnly ? (
 						<>
-							<button className="done-btn secondary" onClick={handleSaveAll} disabled={isSaving}>{isSaving ? "Saving..." : "Save Appointment Progress"}</button>
+                            {/* --- THE BUTTON CHANGES TEXT IF THE DENTIST IS REVIEWING --- */}
+							<button className="done-btn secondary" onClick={handleSaveAll} disabled={isSaving}>
+                                {isSaving ? "Saving..." : (isDentistReviewing ? "Verify & Save Progress" : "Save Appointment Progress")}
+                            </button>
 							{!isYearDone && (
-								<button className="done-btn" onClick={handleDone} disabled={isSaving}>{isSaving ? "Saving..." : `Complete Year ${selectedYear}`}</button>
+								<button className="done-btn" onClick={handleDone} disabled={isSaving}>
+                                    {isSaving ? "Saving..." : `Complete Year ${selectedYear}`}
+                                </button>
 							)}
 						</>
 					) : (
