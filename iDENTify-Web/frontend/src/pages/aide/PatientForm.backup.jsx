@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import "../styles/pages/PatientForm.css";
-import PatientHistorySidebar from "../components/PatientHistorySidebar";
-import XrayViewer from "../components/XrayViewer";
-import MedicalAlertBanner from "../components/MedicalAlertBanner";
+import "../../styles/pages/PatientForm.css";
+import PatientHistorySidebar from "../../components/PatientHistorySidebar";
+import XrayViewer from "../../components/XrayViewer";
+import MedicalAlertBanner from "../../components/MedicalAlertBanner";
 import toast from "react-hot-toast";
-import useAppStore from "../store/useAppStore";
-import useApi from "../hooks/useApi";
+import useAppStore from "../../store/useAppStore";
+import useApi from "../../hooks/useApi";
 
 function PatientForm() {
   const navigate = useNavigate();

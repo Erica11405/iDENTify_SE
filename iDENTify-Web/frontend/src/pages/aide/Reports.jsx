@@ -1,10 +1,10 @@
 // import React, { useEffect, useState } from "react";
 // import DatePicker from "react-datepicker";
 // import "react-datepicker/dist/react-datepicker.css";
-// import apiClient from "../api/apiClient";
-// import useApi from "../hooks/useApi";
-// import useAppStore from "../store/useAppStore";
-// import "../styles/pages/Reports.css";
+// import apiClient from "../../api/apiClient";
+// import useApi from "../../hooks/useApi";
+// import useAppStore from "../../store/useAppStore";
+// import "../../styles/pages/Reports.css";
 
 // function Reports() {
 //   const api = useApi();
@@ -367,10 +367,10 @@
 import React, { useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import apiClient from "../api/apiClient";
-import useApi from "../hooks/useApi";
-import useAppStore from "../store/useAppStore";
-import "../styles/pages/Reports.css";
+import apiClient from "../../api/apiClient";
+import useApi from "../../hooks/useApi";
+import useAppStore from "../../store/useAppStore";
+import "../../styles/pages/Reports.css";
 
 function Reports() {
   const api = useApi();

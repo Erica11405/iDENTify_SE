@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
-import "../styles/pages/Dashboard.css";
-import WeeklyBarChart from "../components/WeeklyBarChart.jsx";
-import AddWalkInModal from "../components/AddWalkInModal";
-import useAppStore from "../store/useAppStore";
-import useApi from "../hooks/useApi";
+import "../../styles/pages/Dashboard.css";
+import WeeklyBarChart from "../../components/WeeklyBarChart.jsx";
+import AddWalkInModal from "../../components/AddWalkInModal";
+import useAppStore from "../../store/useAppStore";
+import useApi from "../../hooks/useApi";
 import { useNavigate } from "react-router-dom";
 
 function Dashboard() {
