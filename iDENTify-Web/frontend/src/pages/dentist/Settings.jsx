@@ -1,12 +1,11 @@
-// frontend/src/pages/Settings.jsx
+// frontend/src/pages/dentist/Settings.jsx
 import React, { useState } from "react";
 import toast from "react-hot-toast";
-import "../styles/base.css"; // Ensure this uses your standard table and button classes
+import "../../styles/base.css";
 
-function Settings({ userRole }) {
+function DentistSettings({ userRole }) {
   const [activeTab, setActiveTab] = useState("aides");
 
-  // Mock Data (To be replaced with API calls)
   const [aides, setAides] = useState([
     { id: 1, fullName: "Sarah Connor", email: "sarah@identify.com" }
   ]);
@@ -14,11 +13,9 @@ function Settings({ userRole }) {
     { id: 1, name: "Teeth Cleaning", price: 1500 }
   ]);
 
-  // Form States
   const [newAide, setNewAide] = useState({ fullName: "", email: "", password: "" });
   const [newService, setNewService] = useState({ name: "", price: "" });
 
-  // Handlers for Aides
   const handleAddAide = (e) => {
     e.preventDefault();
     if (!newAide.fullName || !newAide.email || !newAide.password) return toast.error("All fields are required.");
@@ -33,7 +30,6 @@ function Settings({ userRole }) {
     toast.success("Dental Aide removed.");
   };
 
-  // Handlers for Services
   const handleAddService = (e) => {
     e.preventDefault();
     if (!newService.name || !newService.price) return toast.error("All fields are required.");
@@ -48,17 +44,12 @@ function Settings({ userRole }) {
     toast.success("Service removed.");
   };
 
-  if (userRole !== 'dentist') {
-    return <div className="error-banner">Access Denied. Dentists only.</div>;
-  }
-
   return (
     <div className="page-container">
       <div className="page-header">
         <h1 className="page-title">Clinic Settings</h1>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: "flex", gap: "20px", marginBottom: "20px" }}>
         <button 
           className={`tab-button ${activeTab === "aides" ? "active" : ""}`} 
@@ -151,4 +142,4 @@ function Settings({ userRole }) {
   );
 }
 
-export default Settings;
+export default DentistSettings;

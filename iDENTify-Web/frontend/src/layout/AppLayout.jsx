@@ -142,7 +142,6 @@
 import React from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 
-// Standardizing your icon imports based on your existing assets folder
 import dashboardIcon from "../assets/dashboard.svg";
 import appointmentIcon from "../assets/appointment.svg";
 import queueIcon from "../assets/queue.svg";
@@ -162,13 +161,11 @@ function AppLayout({ setIsLoggedIn, userRole }) {
 
   return (
     <div className="app-layout">
-      {/* Sidebar Navigation */}
       <aside className="sidebar">
         <div className="sidebar-header">
           <h2>iDENTify</h2>
-          {/* Display the active role directly in the sidebar */}
           <p style={{ fontSize: "0.85rem", color: "var(--primary-color)", fontWeight: "bold", marginTop: "-10px", marginBottom: "20px" }}>
-            {userRole === 'dentist' ? 'Dentist Account' : 'Dental Aide'}
+            {userRole === 'dentist' ? 'Dentist Account' : 'Dental Aide Account'}
           </p>
         </div>
 
@@ -183,32 +180,33 @@ function AppLayout({ setIsLoggedIn, userRole }) {
             <span>Appointments</span>
           </NavLink>
 
-          <NavLink to="/app/queue" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-            <img src={queueIcon} alt="Queue" className="nav-icon" />
-            <span>Queue</span>
-          </NavLink>
+          {/* DENTAL AIDE ONLY LINKS */}
+          {userRole === 'aide' && (
+            <>
+              <NavLink to="/app/queue" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
+                <img src={queueIcon} alt="Queue" className="nav-icon" />
+                <span>Queue</span>
+              </NavLink>
+              <NavLink to="/app/history" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
+                <img src={historyIcon} alt="History" className="nav-icon" />
+                <span>History</span>
+              </NavLink>
+              <NavLink to="/app/patients" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
+                <img src={historyIcon} alt="Patients" className="nav-icon" />
+                <span>Patients</span>
+              </NavLink>
+              <NavLink to="/app/reports" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
+                <img src={reportsIcon} alt="Reports" className="nav-icon" />
+                <span>Reports</span>
+              </NavLink>
+              <NavLink to="/app/dentists" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
+                <img src={dentistIcon} alt="Dentists" className="nav-icon" />
+                <span>Dentists</span>
+              </NavLink>
+            </>
+          )}
 
-          <NavLink to="/app/history" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-            <img src={historyIcon} alt="History" className="nav-icon" />
-            <span>History</span>
-          </NavLink>
-
-          <NavLink to="/app/patients" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-            <img src={historyIcon} alt="Patients" className="nav-icon" />
-            <span>Patients</span>
-          </NavLink>
-
-          <NavLink to="/app/reports" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-            <img src={reportsIcon} alt="Reports" className="nav-icon" />
-            <span>Reports</span>
-          </NavLink>
-
-          <NavLink to="/app/dentists" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-            <img src={dentistIcon} alt="Dentists" className="nav-icon" />
-            <span>Dentists</span>
-          </NavLink>
-
-          {/* DENTIST ONLY: Settings Menu */}
+          {/* DENTIST ONLY LINKS */}
           {userRole === 'dentist' && (
             <NavLink to="/app/settings" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
               <img src={dentistIcon} alt="Settings" className="nav-icon" /> 
@@ -225,7 +223,6 @@ function AppLayout({ setIsLoggedIn, userRole }) {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="main-content">
         <Outlet />
       </main>
