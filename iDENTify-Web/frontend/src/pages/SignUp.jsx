@@ -10,6 +10,8 @@ function SignUp() {
 	const [surname, setSurname] = useState("");
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const [confirmPassword, setConfirmPassword] = useState(""); // <-- New Field
+	const [clinicPassword, setClinicPassword] = useState(""); // <-- Master Authorization Field
 	const [showPassword, setShowPassword] = useState(false);
 	const [errors, setErrors] = useState({});
 	const navigate = useNavigate();
@@ -32,6 +34,14 @@ function SignUp() {
 		const emailError = validateEmail(email);
 		if (emailError) { newErrors.email = emailError; hasError = true; }
 		if (!password.trim()) { newErrors.password = "Password is required"; hasError = true; }
+		if (!confirmPassword.trim()) { newErrors.confirmPassword = "Confirm your password"; hasError = true; }
+		if (!clinicPassword.trim()) { newErrors.clinicPassword = "Clinic Master Password is required"; hasError = true; }
+		
+		// Password match validation
+		if (password !== confirmPassword) {
+			newErrors.confirmPassword = "Passwords do not match!";
+			hasError = true;
+		}
 
 		if (hasError) {
 			setErrors(newErrors);
@@ -39,7 +49,7 @@ function SignUp() {
 		}
 
 		try {
-			// Sending data to our new backend route
+			// Sending data to our backend route
 			const response = await fetch('http://localhost:8080/api/auth/signup/dentist', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -47,8 +57,8 @@ function SignUp() {
 					firstName,
 					surname,
 					email,
-					password,
-					clinicPassword: password // We are using the password field to check the master password for now
+					password,       // Their secure login password
+					clinicPassword  // The secret key to authorize signup
 				})
 			});
 
@@ -61,7 +71,7 @@ function SignUp() {
 			}
 
 			toast.success("Dentist account successfully created!");
-			navigate("/login"); 
+			navigate("/"); // Navigate back to login screen
 
 		} catch (error) {
 			console.error("Signup fetch error:", error);
@@ -75,7 +85,12 @@ function SignUp() {
 		if (field === "surname") setSurname(value);
 		if (field === "email") setEmail(value);
 		if (field === "password") setPassword(value);
-		if (errors[field] || errors.form) { setErrors((prev) => ({ ...prev, [field]: null, form: null })); }
+		if (field === "confirmPassword") setConfirmPassword(value);
+		if (field === "clinicPassword") setClinicPassword(value);
+		
+		if (errors[field] || errors.form) { 
+			setErrors((prev) => ({ ...prev, [field]: null, form: null })); 
+		}
 	};
 
 	return (
@@ -123,18 +138,36 @@ function SignUp() {
 					</div>
 
 					<div className="login-form__group">
-						<label htmlFor="password">Clinic Settings Password</label>
+						<label htmlFor="password">Your Login Password</label>
 						<div className="password-input-wrapper">
-							<input type={showPassword ? "text" : "password"} id="password" value={password} onChange={(e) => handleInputChange("password", e.target.value)} placeholder="Enter authorized clinic password" className={errors.password ? "input-error" : ""} />
+							<input type={showPassword ? "text" : "password"} id="password" value={password} onChange={(e) => handleInputChange("password", e.target.value)} placeholder="Create a secure password" className={errors.password ? "input-error" : ""} />
 							<button type="button" className="password-toggle-btn" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "Hide" : "Show"}</button>
 						</div>
 						{errors.password && <span className="error-text">{errors.password}</span>}
+					</div>
+					
+					<div className="login-form__group">
+						<label htmlFor="confirmPassword">Confirm Password</label>
+						<div className="password-input-wrapper">
+							<input type={showPassword ? "text" : "password"} id="confirmPassword" value={confirmPassword} onChange={(e) => handleInputChange("confirmPassword", e.target.value)} placeholder="Confirm your password" className={errors.confirmPassword ? "input-error" : ""} />
+						</div>
+						{errors.confirmPassword && <span className="error-text">{errors.confirmPassword}</span>}
+					</div>
+
+					{/* NEW FIELD: The Clinic Master Password */}
+					<div className="login-form__group">
+						<label htmlFor="clinicPassword">Clinic Master Password</label>
+						<div className="password-input-wrapper">
+							<input type={showPassword ? "text" : "password"} id="clinicPassword" value={clinicPassword} onChange={(e) => handleInputChange("clinicPassword", e.target.value)} placeholder="Enter authorized clinic key" className={errors.clinicPassword ? "input-error" : ""} />
+						</div>
+						<p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>Required to prove you are authorized staff.</p>
+						{errors.clinicPassword && <span className="error-text">{errors.clinicPassword}</span>}
 					</div>
 
 					<button type="submit" className="login-form__button">Create Account</button>
 
 					<p style={{ textAlign: "center", marginTop: "15px" }}>
-						Already have an account? <Link to="/login" style={{ color: "var(--primary-color)", fontWeight: "bold" }}>Log in here</Link>
+						Already have an account? <Link to="/" style={{ color: "var(--primary-color)", fontWeight: "bold" }}>Log in here</Link>
 					</p>
 				</form>
 			</div>
