@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import "../../../../styles/pages/Dentists.css";
-import useAppStore from "../../../../store/useAppStore";
-import useApi from "../../../../hooks/useApi";
+import "../../styles/pages/Dentists.css";
+import useAppStore from "../../store/useAppStore";
+import useApi from "../../hooks/useApi";
 import toast from "react-hot-toast";
-import AddDentistModal from "../../../../components/AddDentistModal";
+import AddDentistModal from "../../components/AddDentistModal";
 
 const DAYS = [
   { label: "S", value: 0 },
