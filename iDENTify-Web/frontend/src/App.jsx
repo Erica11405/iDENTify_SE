@@ -93,9 +93,9 @@ const AidePatients = lazy(() => import("./pages/aide/Patients.jsx"));
 const AidePatientForm = lazy(() => import("./pages/aide/PatientForm.jsx")); // Shared for Dentist Review
 
 // --- DENTIST PAGES ---
-const DentistDashboard = lazy(() => import("./pages/dentist/Dashboard.jsx"));
-const DentistAppointments = lazy(() => import("./pages/dentist/Appointments.jsx"));
-const DentistSettings = lazy(() => import("./pages/dentist/Settings.jsx"));
+const DentistDashboard = lazy(() => import("./pages/dentist/DentistDashboard.jsx"));
+const DentistAppointments = lazy(() => import("./pages/dentist/DentistAppointments.jsx"));
+const DentistSettings = lazy(() => import("./pages/dentist/DentistSettings.jsx"));
 
 function ProtectedRoute({ isLoggedIn, children }) {
   const location = useLocation();

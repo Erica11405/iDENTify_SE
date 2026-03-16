@@ -1,6 +1,7 @@
 // frontend/src/pages/dentist/Dashboard.jsx
 import React from "react";
 import "../../styles/base.css";
+import "../../styles/pages/Dentists.css";
 
 function DentistDashboard() {
   return (
