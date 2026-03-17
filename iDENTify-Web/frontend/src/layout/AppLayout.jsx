@@ -142,7 +142,7 @@ import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import useAppStore from '../store/useAppStore';
 import '../styles/layout/AppLayout.css';
-import logo from '../assets/logo1.png'; // Make sure this matches your logo path
+import logo from '../assets/toothlogo.svg';
 
 function AppLayout({ userRole }) {
     const { logout, user } = useAppStore();
