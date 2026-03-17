@@ -5,11 +5,7 @@
 
 // // --- DENTIST SIGN UP ---
 // router.post('/signup/dentist', async (req, res) => {
-//     const { firstName, surname, email, password, clinicPassword } = req.body;
-
-//     if (clinicPassword !== process.env.CLINIC_MASTER_PASSWORD) {
-//         return res.status(401).json({ error: "Unauthorized clinic password." });
-//     }
+//     const { firstName, surname, email, password } = req.body;
 
 //     try {
 //         const [existingUser] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
@@ -45,19 +41,28 @@
 //     const { email, password, role } = req.body;
 
 //     try {
-//         const [users] = await db.query('SELECT * FROM users WHERE email = ? AND role = ?', [email, role]);
+//         // 1. Find user ONLY by email first to prevent case-sensitivity bugs
+//         const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
         
 //         if (users.length === 0) {
-//             return res.status(404).json({ error: "Account not found or incorrect role selected." });
+//             return res.status(404).json({ error: "Account not found." });
 //         }
 
 //         const userRecord = users[0];
+
+//         // 2. If a role was sent from the frontend, check it case-insensitively
+//         if (role && userRecord.role.toLowerCase() !== role.toLowerCase()) {
+//             return res.status(401).json({ error: "Incorrect role selected for this account." });
+//         }
+
+//         // 3. Verify the password
 //         const isMatch = await bcrypt.compare(password, userRecord.password_hash);
         
 //         if (!isMatch) {
 //             return res.status(401).json({ error: "Invalid password." });
 //         }
 
+//         // 4. Success!
 //         res.status(200).json({ 
 //             message: "Login successful", 
 //             user: {
@@ -129,9 +134,12 @@ router.post('/login', async (req, res) => {
 
         const userRecord = users[0];
 
-        // 2. If a role was sent from the frontend, check it case-insensitively
-        if (role && userRecord.role.toLowerCase() !== role.toLowerCase()) {
-            return res.status(401).json({ error: "Incorrect role selected for this account." });
+        // 2. SAFETY CHECK: Ensure the user actually has a role in the DB before checking it
+        if (role) {
+            // This prevents the server from crashing if userRecord.role is empty!
+            if (!userRecord.role || userRecord.role.toLowerCase() !== role.toLowerCase()) {
+                return res.status(401).json({ error: "Incorrect role selected for this account." });
+            }
         }
 
         // 3. Verify the password
