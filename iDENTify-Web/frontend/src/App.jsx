@@ -93,15 +93,14 @@
 // export default App;
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import AppLayout from './layout/AppLayout';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import useAppStore from './store/useAppStore';
 
-// Public Pages
+import AppLayout from './layout/AppLayout';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 
-// Aide Pages
+// --- Aide Pages ---
 import Dashboard from './pages/aide/Dashboard';
 import Patients from './pages/aide/Patients';
 import PatientForm from './pages/aide/PatientForm';
@@ -111,68 +110,56 @@ import History from './pages/aide/History';
 import Dentists from './pages/aide/Dentists';
 import Reports from './pages/aide/Reports';
 
-// Dentist Pages (Importing the new dentist-specific files)
+// --- Dentist Pages ---
 import DentistDashboard from './pages/dentist/DentistDashboard';
 import DentistAppointments from './pages/dentist/DentistAppointments';
 import DentistSettings from './pages/dentist/DentistSettings';
 
 function App() {
-    const { user } = useAppStore(); // Assuming your global store holds the logged-in user
+    const { user } = useAppStore();
 
-    // 1. If not logged in, only allow Login and Signup pages
+    // 1. If not logged in, force them to Login or Signup
     if (!user) {
         return (
-            <BrowserRouter>
-                <Routes>
-                    <Route path="/" element={<Login />} />
-                    <Route path="/signup" element={<SignUp />} />
-                    {/* Redirect any random URL back to login */}
-                    <Route path="*" element={<Navigate to="/" />} />
-                </Routes>
-            </BrowserRouter>
+            <Routes>
+                <Route path="/" element={<Login />} />
+                <Route path="/signup" element={<SignUp />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
         );
     }
 
-    // 2. If the user is logged in as a DENTIST
-    if (user.role === 'dentist') {
-        return (
-            <BrowserRouter>
-                <Routes>
-                    {/* Wrap dentist pages in the AppLayout sidebar */}
-                    <Route element={<AppLayout userRole="dentist" />}>
-                        <Route path="/" element={<Navigate to="/dashboard" />} />
+    // 2. If logged in, wrap the routes inside AppLayout
+    return (
+        <Routes>
+            <Route element={<AppLayout userRole={user.role} />}>
+                {user.role === 'dentist' ? (
+                    // DENTIST ROUTES
+                    <>
+                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/dashboard" element={<DentistDashboard />} />
                         <Route path="/appointments" element={<DentistAppointments />} />
                         <Route path="/settings" element={<DentistSettings />} />
-                        {/* If a dentist clicks a random URL, send them to their dashboard */}
-                        <Route path="*" element={<Navigate to="/dashboard" />} />
-                    </Route>
-                </Routes>
-            </BrowserRouter>
-        );
-    }
-
-    // 3. If the user is logged in as an AIDE
-    return (
-        <BrowserRouter>
-            <Routes>
-                {/* Wrap aide pages in the AppLayout sidebar */}
-                <Route element={<AppLayout userRole="aide" />}>
-                    <Route path="/" element={<Navigate to="/dashboard" />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/patients" element={<Patients />} />
-                    <Route path="/patients/new" element={<PatientForm />} />
-                    <Route path="/patients/:id" element={<PatientForm />} />
-                    <Route path="/appointments" element={<Appointments />} />
-                    <Route path="/queue" element={<Queue />} />
-                    <Route path="/history" element={<History />} />
-                    <Route path="/dentists" element={<Dentists />} />
-                    <Route path="/reports" element={<Reports />} />
-                    {/* If an aide clicks a random URL, send them to their dashboard */}
-                    <Route path="*" element={<Navigate to="/dashboard" />} />
-                </Route>
-            </Routes>
-        </BrowserRouter>
+                        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                    </>
+                ) : (
+                    // AIDE ROUTES
+                    <>
+                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/patients" element={<Patients />} />
+                        <Route path="/patients/new" element={<PatientForm />} />
+                        <Route path="/patients/:id" element={<PatientForm />} />
+                        <Route path="/appointments" element={<Appointments />} />
+                        <Route path="/queue" element={<Queue />} />
+                        <Route path="/history" element={<History />} />
+                        <Route path="/dentists" element={<Dentists />} />
+                        <Route path="/reports" element={<Reports />} />
+                        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                    </>
+                )}
+            </Route>
+        </Routes>
     );
 }
 
