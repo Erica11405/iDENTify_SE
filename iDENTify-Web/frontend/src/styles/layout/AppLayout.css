@@ -182,3 +182,18 @@
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   font-weight: 600;
 }
+
+
+.app-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.main-content-area {
+  flex: 1; /* This forces the dashboard to take up all remaining space */
+  overflow-y: auto;
+  background-color: #f4f7f6; /* Light gray background from your 2nd pic */
+  padding: 2rem;
+}
