@@ -224,20 +224,20 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import api from "../api/apiClient";
-import useAppStore from "../store/useAppStore"; // Added this import
+import api from "../api/apiClient"; // Use the 'api' object
+import useAppStore from "../store/useAppStore";
 import toothLogo from "../assets/toothlogo.svg";
 import "../styles/pages/Login.css";
 
 function Login() {
-    const [role, setRole] = useState("aide");
+    const [role, setRole] = useState("aide"); 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [errors, setErrors] = useState({});
     
     const navigate = useNavigate();
-    const { setUser } = useAppStore(); // Extract setUser to save the session
+    const { setUser } = useAppStore();
 
     const handleInputChange = (field, value) => {
         setErrors((prev) => ({ ...prev, [field]: null, form: null }));
@@ -258,9 +258,10 @@ function Login() {
         }
 
         try {
+            // This calls the login function from your apiClient.js
             const response = await api.login({ email, password, role });
             
-            // CRITICAL FIX: Save the user to the store so App.jsx knows you are logged in
+            // This saves the user to your store to stop the looping
             setUser(response.user); 
             
             toast.success(response.message || "Welcome back!");
@@ -273,33 +274,47 @@ function Login() {
     };
 
     return (
-        <div className="login-container">
-            <div className="login-box">
-                <div className="login-header">
-                    <img src={toothLogo} alt="Logo" className="login-logo" />
-                    <h1>Welcome to iDENTify</h1>
-                    <p>Please login to your account</p>
+        <div className="login-page">
+            {/* Left side visual area - This creates the split screen */}
+            <div className="login-visual">
+                <div className="login-visual__header">
+                    <h1 className="login-visual__title">Welcome to iDENTify</h1>
+                    <p className="login-visual__subtitle">Dental Clinic Management System</p>
                 </div>
+            </div>
 
+            {/* Right side form area */}
+            <div className="login-form-container">
                 <form className="login-form" onSubmit={handleSubmit}>
-                    <div className="role-selector">
-                        <button 
-                            type="button"
-                            className={`role-option ${role === "aide" ? "active" : ""}`}
-                            onClick={() => setRole("aide")}
-                        >
-                            Dental Aide
-                        </button>
-                        <button 
-                            type="button"
-                            className={`role-option ${role === "dentist" ? "active" : ""}`}
-                            onClick={() => setRole("dentist")}
-                        >
-                            Dentist
-                        </button>
+                    <div className="login-form__header-center">
+                        <div className="logo-circle-large">
+                            <img src={toothLogo} alt="iDENTify Logo" className="login-logo-large" />
+                        </div>
+                        <h2 className="login-form__title">Welcome Back</h2>
+                        <p className="login-form__subtitle">Log in to your account</p>
                     </div>
 
-                    {errors.form && <div className="error-banner" style={{color: 'red', marginBottom: '10px'}}>{errors.form}</div>}
+                    {/* Role Selector with radio buttons as per your screenshot */}
+                    <div className="role-selector" style={{ display: 'flex', gap: '15px', marginBottom: '20px', justifyContent: 'center' }}>
+                        <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <input 
+                                type="radio" 
+                                value="aide" 
+                                checked={role === "aide"} 
+                                onChange={(e) => setRole(e.target.value)} 
+                            /> Dental Aide
+                        </label>
+                        <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <input 
+                                type="radio" 
+                                value="dentist" 
+                                checked={role === "dentist"} 
+                                onChange={(e) => setRole(e.target.value)} 
+                            /> Dentist
+                        </label>
+                    </div>
+
+                    {errors.form && <div className="error-banner" style={{color: 'red', textAlign: 'center', marginBottom: '10px'}}>{errors.form}</div>}
 
                     <div className="login-form__group">
                         <label htmlFor="email">Email</label>
@@ -338,11 +353,9 @@ function Login() {
 
                     <button type="submit" className="login-form__button">Login</button>
 
-                    {role === "dentist" && (
-                        <p style={{ textAlign: "center", marginTop: "15px" }}>
-                            Don't have an account? <Link to="/signup">Sign up here</Link>
-                        </p>
-                    )}
+                    <p style={{ textAlign: "center", marginTop: "15px" }}>
+                        Don't have an account? <Link to="/signup" style={{ color: "var(--primary-color)", fontWeight: "bold" }}>Sign up here</Link>
+                    </p>
                 </form>
             </div>
         </div>
