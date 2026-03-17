@@ -72,7 +72,7 @@ export const createDentist = async (payload) => {
     return handleResponse(res);
 };
 
-// Also export a default object so old imports don't break
+// Also export as default object for compatibility with other files
 export default {
     login,
     signupDentist,
