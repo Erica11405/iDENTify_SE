@@ -99,9 +99,9 @@ app.get('/health', (req, res) => {
 });
 
 // 4. API Router Wrapper
+// This centralizes all your /api/... calls
 const apiRouter = express.Router();
 
-// Mount all feature routes to the apiRouter
 apiRouter.use("/patients", patientsRoutes);
 apiRouter.use("/annual-records", annualRecordsRoutes);
 apiRouter.use("/appointments", appointmentsRoutes);
@@ -112,10 +112,9 @@ apiRouter.use("/medications", medicationsRoutes);
 apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
-apiRouter.use("/auth", authRoutes); // This makes the path: /api/auth/login
+apiRouter.use("/auth", authRoutes); // This creates the path /api/auth/login
 
-// 5. Apply the API Router to the app under /api
-// This prefix combines with the routes above
+// 5. Apply the prefix
 app.use("/api", apiRouter); 
 
 const PORT = process.env.PORT || 8080;
