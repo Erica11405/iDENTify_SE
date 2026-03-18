@@ -50,9 +50,12 @@
 
 //         const userRecord = users[0];
 
-//         // 2. If a role was sent from the frontend, check it case-insensitively
-//         if (role && userRecord.role.toLowerCase() !== role.toLowerCase()) {
-//             return res.status(401).json({ error: "Incorrect role selected for this account." });
+//         // 2. SAFETY CHECK: Ensure the user actually has a role in the DB before checking it
+//         if (role) {
+//             // This prevents the server from crashing if userRecord.role is empty!
+//             if (!userRecord.role || userRecord.role.toLowerCase() !== role.toLowerCase()) {
+//                 return res.status(401).json({ error: "Incorrect role selected for this account." });
+//             }
 //         }
 
 //         // 3. Verify the password
@@ -88,6 +91,7 @@ const db = require('../db');
 const bcrypt = require('bcrypt');
 
 // --- DENTIST SIGN UP ---
+// This remains public for new dentists to join the system.
 router.post('/signup/dentist', async (req, res) => {
     const { firstName, surname, email, password } = req.body;
 
@@ -106,7 +110,7 @@ router.post('/signup/dentist', async (req, res) => {
         const [dentistResult] = await db.query(dentistSql, [fullName, firstName, surname, email]);
         const newDentistId = dentistResult.insertId;
 
-        // Insert into users table
+        // Insert into users table with 'dentist' role
         const userSql = `INSERT INTO users (email, password_hash, full_name, role, dentist_id, is_verified) VALUES (?, ?, ?, 'dentist', ?, 1)`;
         await db.query(userSql, [email, hashedPassword, fullName, newDentistId]);
 
@@ -115,7 +119,6 @@ router.post('/signup/dentist', async (req, res) => {
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ error: "This email is already taken in the system." });
         }
-        console.error("Signup Error:", err);
         res.status(500).json({ error: "Server error during sign up." });
     }
 });
@@ -125,7 +128,6 @@ router.post('/login', async (req, res) => {
     const { email, password, role } = req.body;
 
     try {
-        // 1. Find user ONLY by email first to prevent case-sensitivity bugs
         const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
         
         if (users.length === 0) {
@@ -134,22 +136,18 @@ router.post('/login', async (req, res) => {
 
         const userRecord = users[0];
 
-        // 2. SAFETY CHECK: Ensure the user actually has a role in the DB before checking it
         if (role) {
-            // This prevents the server from crashing if userRecord.role is empty!
             if (!userRecord.role || userRecord.role.toLowerCase() !== role.toLowerCase()) {
                 return res.status(401).json({ error: "Incorrect role selected for this account." });
             }
         }
 
-        // 3. Verify the password
         const isMatch = await bcrypt.compare(password, userRecord.password_hash);
         
         if (!isMatch) {
             return res.status(401).json({ error: "Invalid password." });
         }
 
-        // 4. Success!
         res.status(200).json({ 
             message: "Login successful", 
             user: {
@@ -162,7 +160,6 @@ router.post('/login', async (req, res) => {
         });
 
     } catch (err) {
-        console.error("Login Error:", err);
         res.status(500).json({ error: "Server error during login." });
     }
 });
