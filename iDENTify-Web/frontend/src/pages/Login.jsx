@@ -35,16 +35,11 @@
 //         }
 
 //         try {
-//             // This calls the login function from your apiClient.js
 //             const response = await api.login({ email, password, role });
-            
-//             // This saves the user to your store to stop the looping
 //             setUser(response.user); 
-            
 //             toast.success(response.message || "Welcome back!");
 //             navigate("/dashboard");
 //         } catch (error) {
-//             console.error("Login fetch error:", error);
 //             setErrors({ form: error.message || "Invalid credentials." });
 //             toast.error(error.message || "Invalid credentials.");
 //         }
@@ -52,7 +47,6 @@
 
 //     return (
 //         <div className="login-page">
-//             {/* Left side visual area - This creates the split screen */}
 //             <div className="login-visual">
 //                 <div className="login-visual__header">
 //                     <h1 className="login-visual__title">Welcome to iDENTify</h1>
@@ -60,7 +54,6 @@
 //                 </div>
 //             </div>
 
-//             {/* Right side form area */}
 //             <div className="login-form-container">
 //                 <form className="login-form" onSubmit={handleSubmit}>
 //                     <div className="login-form__header-center">
@@ -71,7 +64,6 @@
 //                         <p className="login-form__subtitle">Log in to your account</p>
 //                     </div>
 
-//                     {/* Role Selector with radio buttons as per your screenshot */}
 //                     <div className="role-selector" style={{ display: 'flex', gap: '15px', marginBottom: '20px', justifyContent: 'center' }}>
 //                         <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
 //                             <input 
@@ -130,9 +122,12 @@
 
 //                     <button type="submit" className="login-form__button">Login</button>
 
-//                     <p style={{ textAlign: "center", marginTop: "15px" }}>
-//                         Don't have an account? <Link to="/signup" style={{ color: "var(--primary-color)", fontWeight: "bold" }}>Sign up here</Link>
-//                     </p>
+//                     {/* CORRECTED: Only dentists see the signup link */}
+//                     {role === "dentist" && (
+//                         <p style={{ textAlign: "center", marginTop: "15px" }}>
+//                             Don't have an account? <Link to="/signup" style={{ color: "var(--primary-color)", fontWeight: "bold" }}>Sign up here</Link>
+//                         </p>
+//                     )}
 //                 </form>
 //             </div>
 //         </div>
@@ -184,6 +179,7 @@ function Login() {
             toast.success(response.message || "Welcome back!");
             navigate("/dashboard");
         } catch (error) {
+            console.error("Login fetch error:", error);
             setErrors({ form: error.message || "Invalid credentials." });
             toast.error(error.message || "Invalid credentials.");
         }
@@ -266,7 +262,7 @@ function Login() {
 
                     <button type="submit" className="login-form__button">Login</button>
 
-                    {/* CORRECTED: Only dentists see the signup link */}
+                    {/* CORRECTED: Only dentists can see the signup link */}
                     {role === "dentist" && (
                         <p style={{ textAlign: "center", marginTop: "15px" }}>
                             Don't have an account? <Link to="/signup" style={{ color: "var(--primary-color)", fontWeight: "bold" }}>Sign up here</Link>

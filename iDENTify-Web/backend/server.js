@@ -1,4 +1,3 @@
-
 // const express = require("express");
 // const cors = require("cors");
 // require("dotenv").config();
@@ -14,7 +13,7 @@
 // const dentistsRoutes = require("./routes/dentists");
 // const treatmentsRoutes = require("./routes/treatments");
 // const reportsRoutes = require("./routes/reports");
-// const authRoutes = require("./routes/auth"); // Handles login and signup
+// const authRoutes = require("./routes/auth"); 
 
 // const app = express();
 
@@ -23,9 +22,26 @@
 // app.use(express.json({ limit: "50mb" })); 
 // app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// // 3. Route Wrapper
-// const apiRouter = express.Router();
+// // ==========================================
+// // 3. HEALTH CHECKS (Must go BEFORE routers)
+// // ==========================================
+// // This catches the root ping
+// app.get('/', (req, res) => {
+//     res.status(200).send('iDENTify API is successfully running!');
+// });
 
+// // This catches the standard health ping
+// app.get('/health', (req, res) => {
+//     res.status(200).send('Server is healthy');
+// });
+
+// // This catches it if DigitalOcean forces the /api routing rule
+// app.get('/api/health', (req, res) => {
+//     res.status(200).send('API is healthy');
+// });
+
+// // 4. Route Wrapper
+// const apiRouter = express.Router();
 // apiRouter.use("/patients", patientsRoutes);
 // apiRouter.use("/annual-records", annualRecordsRoutes);
 // apiRouter.use("/appointments", appointmentsRoutes);
@@ -36,23 +52,18 @@
 // apiRouter.use("/dentists", dentistsRoutes);
 // apiRouter.use("/treatments", treatmentsRoutes);
 // apiRouter.use("/reports", reportsRoutes);
-// apiRouter.use("/auth", authRoutes); // Auth routes applied here
+// apiRouter.use("/auth", authRoutes); 
 
-// // 4. Apply the Router
+// // 5. Apply the Router
 // app.use("/api", apiRouter);
 // app.use("/", apiRouter);
 
-// // 5. Health Check for DigitalOcean
-// app.get('/health', (req, res) => {
-//     res.status(200).send('Server is healthy');
-// });
-
 // // 6. Start the Server
-// // Binds to 0.0.0.0 so DigitalOcean's proxy can successfully route traffic to it
 // const PORT = process.env.PORT || 8080;
 // app.listen(PORT, '0.0.0.0', () => {
 //     console.log(`Server is running on port ${PORT}`);
 // });
+
 
 const express = require("express");
 const cors = require("cors");
@@ -78,26 +89,19 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" })); 
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// ==========================================
-// 3. HEALTH CHECKS (Must go BEFORE routers)
-// ==========================================
-// This catches the root ping
+// 3. Health Checks (Must go BEFORE routers)
 app.get('/', (req, res) => {
     res.status(200).send('iDENTify API is successfully running!');
 });
 
-// This catches the standard health ping
 app.get('/health', (req, res) => {
     res.status(200).send('Server is healthy');
 });
 
-// This catches it if DigitalOcean forces the /api routing rule
-app.get('/api/health', (req, res) => {
-    res.status(200).send('API is healthy');
-});
-
-// 4. Route Wrapper
+// 4. API Router Wrapper
 const apiRouter = express.Router();
+
+// Mount all feature routes to the apiRouter
 apiRouter.use("/patients", patientsRoutes);
 apiRouter.use("/annual-records", annualRecordsRoutes);
 apiRouter.use("/appointments", appointmentsRoutes);
@@ -108,14 +112,13 @@ apiRouter.use("/medications", medicationsRoutes);
 apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
-apiRouter.use("/auth", authRoutes); 
+apiRouter.use("/auth", authRoutes); // This makes the path: /api/auth/login
 
-// 5. Apply the Router
-app.use("/api", apiRouter);
-app.use("/", apiRouter);
+// 5. Apply the API Router to the app under /api
+// This prefix combines with the routes above
+app.use("/api", apiRouter); 
 
-// 6. Start the Server
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
