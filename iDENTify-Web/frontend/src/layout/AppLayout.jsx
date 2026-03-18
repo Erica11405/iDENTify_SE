@@ -199,167 +199,167 @@
 // //     );
 // // }
 
-// export default AppLayout;
+// // export default AppLayout;
 
-import React, { useState, useEffect } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import useAppStore from "../store/useAppStore";
-import useApi from "../hooks/useApi";
-import "../styles/layout/AppLayout.css";
-
-// 1. Restoring your original SVG icons
-import DashboardIcon from "../assets/dashboard.svg";
-import AppointmentIcon from "../assets/appointment.svg";
-import QueueIcon from "../assets/queue.svg";
-import ReportIcon from "../assets/report.svg";
-import DentistIcon from "../assets/dentist.svg";
-import LogoutIcon from "../assets/logout.svg";
-import ConditionIcon from "../assets/condition.svg"; 
-import logo from "../assets/toothlogo.svg";
-
-function AppLayout({ userRole }) {
-    const navigate = useNavigate();
-    const { logout, user } = useAppStore();
-    const { loadPatients, loadAppointments, loadQueue } = useApi();
-    
-    // 2. Restoring your original collapsing sidebar state
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-    const [isLoadingData, setIsLoadingData] = useState(false);
-
-    // 3. Restoring your background data fetching
-    useEffect(() => {
-        let mounted = true;
-        async function initData() {
-            setIsLoadingData(true);
-            try {
-                if (userRole !== 'dentist') {
-                     await Promise.all([loadPatients(), loadAppointments(), loadQueue()]);
-                }
-            } catch (error) {
-                console.error('Failed to load initial data:', error);
-            } finally {
-                if (mounted) setIsLoadingData(false);
-            }
-        }
-        initData();
-        return () => { mounted = false; };
-    }, [loadPatients, loadAppointments, loadQueue, userRole]);
-
-    const handleLogout = () => {
-        logout();
-        navigate('/');
-    };
-
-    return (
-        <div className="app-layout">
-            {/* The sidebar will now collapse again properly */}
-            <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-                <div className="sidebar-header">
-                    <img src={logo} alt="iDENTify Logo" className="sidebar-logo" />
-                    {!isSidebarCollapsed && <h2>iDENTify</h2>}
-                    
-                    <button 
-                        className="collapse-toggle" 
-                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', marginLeft: 'auto', color: 'white' }}
-                    >
-                        ☰
-                    </button>
-                </div>
-
-                <nav className="sidebar-nav">
-                    {/* DENTIST LINKS */}
-                    {userRole === 'dentist' ? (
-                        <>
-                            <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                                <img src={DashboardIcon} alt="Dashboard" className="nav-icon" />
-                                {!isSidebarCollapsed && <span>Dashboard</span>}
-                            </NavLink>
-                            <NavLink to="/appointments" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                                <img src={AppointmentIcon} alt="Appointments" className="nav-icon" />
-                                {!isSidebarCollapsed && <span>Appointments</span>}
-                            </NavLink>
-                            <NavLink to="/settings" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                                <img src={DentistIcon} alt="Settings" className="nav-icon" />
-                                {!isSidebarCollapsed && <span>Clinic Settings</span>}
-                            </NavLink>
-                        </>
-                    ) : (
-                    /* AIDE LINKS */
-                        <>
-                            <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                                <img src={DashboardIcon} alt="Dashboard" className="nav-icon" />
-                                {!isSidebarCollapsed && <span>Dashboard</span>}
-                            </NavLink>
-                            <NavLink to="/patients" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                                <img src={ConditionIcon} alt="Patients" className="nav-icon" />
-                                {!isSidebarCollapsed && <span>Patients</span>}
-                            </NavLink>
-                            <NavLink to="/appointments" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                                <img src={AppointmentIcon} alt="Appointments" className="nav-icon" />
-                                {!isSidebarCollapsed && <span>Appointments</span>}
-                            </NavLink>
-                            <NavLink to="/queue" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                                <img src={QueueIcon} alt="Queue" className="nav-icon" />
-                                {!isSidebarCollapsed && <span>Queue</span>}
-                            </NavLink>
-                            <NavLink to="/history" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                                <img src={ReportIcon} alt="History" className="nav-icon" />
-                                {!isSidebarCollapsed && <span>History</span>}
-                            </NavLink>
-                            <NavLink to="/dentists" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                                <img src={DentistIcon} alt="Dentists" className="nav-icon" />
-                                {!isSidebarCollapsed && <span>Dentists</span>}
-                            </NavLink>
-                            <NavLink to="/reports" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                                <img src={ReportIcon} alt="Reports" className="nav-icon" />
-                                {!isSidebarCollapsed && <span>Reports</span>}
-                            </NavLink>
-                        </>
-                    )}
-                </nav>
-
-                <div className="sidebar-footer">
-                    {!isSidebarCollapsed && (
-                        <div className="user-info">
-                            <p className="user-name">{user?.name || 'User'}</p>
-                            <p className="user-role">{userRole === 'dentist' ? 'Dentist' : 'Dental Aide'}</p>
-                        </div>
-                    )}
-                    <button className="logout-btn" onClick={handleLogout}>
-                        <img src={LogoutIcon} alt="Logout" className="nav-icon" />
-                        {!isSidebarCollapsed && <span>Log Out</span>}
-                    </button>
-                </div>
-            </aside>
-
-            <main className="main-content">
-                {isLoadingData ? (
-                    <div className="loading-overlay">Loading Clinic Data...</div>
-                ) : (
-                    <Outlet />
-                )}
-            </main>
-        </div>
-    );
-}
-
-export default AppLayout;
-
-// import React from "react";
-// import { Outlet } from "react-router-dom";
-// import Sidebar from "../components/Sidebar"; 
+// import React, { useState, useEffect } from "react";
+// import { NavLink, Outlet, useNavigate } from "react-router-dom";
+// import useAppStore from "../store/useAppStore";
+// import useApi from "../hooks/useApi";
 // import "../styles/layout/AppLayout.css";
 
+// // 1. Restoring your original SVG icons
+// import DashboardIcon from "../assets/dashboard.svg";
+// import AppointmentIcon from "../assets/appointment.svg";
+// import QueueIcon from "../assets/queue.svg";
+// import ReportIcon from "../assets/report.svg";
+// import DentistIcon from "../assets/dentist.svg";
+// import LogoutIcon from "../assets/logout.svg";
+// import ConditionIcon from "../assets/condition.svg"; 
+// import logo from "../assets/toothlogo.svg";
+
 // function AppLayout({ userRole }) {
-//   return (
-//     <div className="app-container">
-//       <Sidebar role={userRole} />
-//       <main className="main-content-area">
-//         <Outlet />
-//       </main>
-//     </div>
-//   );
+//     const navigate = useNavigate();
+//     const { logout, user } = useAppStore();
+//     const { loadPatients, loadAppointments, loadQueue } = useApi();
+    
+//     // 2. Restoring your original collapsing sidebar state
+//     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+//     const [isLoadingData, setIsLoadingData] = useState(false);
+
+//     // 3. Restoring your background data fetching
+//     useEffect(() => {
+//         let mounted = true;
+//         async function initData() {
+//             setIsLoadingData(true);
+//             try {
+//                 if (userRole !== 'dentist') {
+//                      await Promise.all([loadPatients(), loadAppointments(), loadQueue()]);
+//                 }
+//             } catch (error) {
+//                 console.error('Failed to load initial data:', error);
+//             } finally {
+//                 if (mounted) setIsLoadingData(false);
+//             }
+//         }
+//         initData();
+//         return () => { mounted = false; };
+//     }, [loadPatients, loadAppointments, loadQueue, userRole]);
+
+//     const handleLogout = () => {
+//         logout();
+//         navigate('/');
+//     };
+
+//     return (
+//         <div className="app-layout">
+//             {/* The sidebar will now collapse again properly */}
+//             <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
+//                 <div className="sidebar-header">
+//                     <img src={logo} alt="iDENTify Logo" className="sidebar-logo" />
+//                     {!isSidebarCollapsed && <h2>iDENTify</h2>}
+                    
+//                     <button 
+//                         className="collapse-toggle" 
+//                         onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+//                         style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', marginLeft: 'auto', color: 'white' }}
+//                     >
+//                         ☰
+//                     </button>
+//                 </div>
+
+//                 <nav className="sidebar-nav">
+//                     {/* DENTIST LINKS */}
+//                     {userRole === 'dentist' ? (
+//                         <>
+//                             <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+//                                 <img src={DashboardIcon} alt="Dashboard" className="nav-icon" />
+//                                 {!isSidebarCollapsed && <span>Dashboard</span>}
+//                             </NavLink>
+//                             <NavLink to="/appointments" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+//                                 <img src={AppointmentIcon} alt="Appointments" className="nav-icon" />
+//                                 {!isSidebarCollapsed && <span>Appointments</span>}
+//                             </NavLink>
+//                             <NavLink to="/settings" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+//                                 <img src={DentistIcon} alt="Settings" className="nav-icon" />
+//                                 {!isSidebarCollapsed && <span>Clinic Settings</span>}
+//                             </NavLink>
+//                         </>
+//                     ) : (
+//                     /* AIDE LINKS */
+//                         <>
+//                             <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+//                                 <img src={DashboardIcon} alt="Dashboard" className="nav-icon" />
+//                                 {!isSidebarCollapsed && <span>Dashboard</span>}
+//                             </NavLink>
+//                             <NavLink to="/patients" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+//                                 <img src={ConditionIcon} alt="Patients" className="nav-icon" />
+//                                 {!isSidebarCollapsed && <span>Patients</span>}
+//                             </NavLink>
+//                             <NavLink to="/appointments" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+//                                 <img src={AppointmentIcon} alt="Appointments" className="nav-icon" />
+//                                 {!isSidebarCollapsed && <span>Appointments</span>}
+//                             </NavLink>
+//                             <NavLink to="/queue" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+//                                 <img src={QueueIcon} alt="Queue" className="nav-icon" />
+//                                 {!isSidebarCollapsed && <span>Queue</span>}
+//                             </NavLink>
+//                             <NavLink to="/history" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+//                                 <img src={ReportIcon} alt="History" className="nav-icon" />
+//                                 {!isSidebarCollapsed && <span>History</span>}
+//                             </NavLink>
+//                             <NavLink to="/dentists" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+//                                 <img src={DentistIcon} alt="Dentists" className="nav-icon" />
+//                                 {!isSidebarCollapsed && <span>Dentists</span>}
+//                             </NavLink>
+//                             <NavLink to="/reports" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+//                                 <img src={ReportIcon} alt="Reports" className="nav-icon" />
+//                                 {!isSidebarCollapsed && <span>Reports</span>}
+//                             </NavLink>
+//                         </>
+//                     )}
+//                 </nav>
+
+//                 <div className="sidebar-footer">
+//                     {!isSidebarCollapsed && (
+//                         <div className="user-info">
+//                             <p className="user-name">{user?.name || 'User'}</p>
+//                             <p className="user-role">{userRole === 'dentist' ? 'Dentist' : 'Dental Aide'}</p>
+//                         </div>
+//                     )}
+//                     <button className="logout-btn" onClick={handleLogout}>
+//                         <img src={LogoutIcon} alt="Logout" className="nav-icon" />
+//                         {!isSidebarCollapsed && <span>Log Out</span>}
+//                     </button>
+//                 </div>
+//             </aside>
+
+//             <main className="main-content">
+//                 {isLoadingData ? (
+//                     <div className="loading-overlay">Loading Clinic Data...</div>
+//                 ) : (
+//                     <Outlet />
+//                 )}
+//             </main>
+//         </div>
+//     );
 // }
 
 // export default AppLayout;
+
+import React from "react";
+import { Outlet } from "react-router-dom";
+import Sidebar from "../components/Sidebar"; 
+import "../styles/layout/AppLayout.css";
+
+function AppLayout({ userRole }) {
+  return (
+    <div className="app-container">
+      <Sidebar role={userRole} />
+      <main className="main-content-area">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+
+export default AppLayout;
