@@ -179,7 +179,7 @@ async function handleResponse(res) {
 
 /* --- Auth Functions --- */
 export const login = async (payload) => {
-    // This calls: /api/auth/login
+    // This will now hit: https://.../api/auth/login
     const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -89,7 +89,7 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" })); 
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// 3. Health Checks (Required for DigitalOcean to pass deployment)
+// 3. Health Checks (DigitalOcean needs these to stay "Green")
 app.get('/', (req, res) => {
     res.status(200).send('iDENTify API is successfully running!');
 });
@@ -101,7 +101,7 @@ app.get('/health', (req, res) => {
 // 4. API Router Wrapper
 const apiRouter = express.Router();
 
-// These routes are prefixed by whatever we use in app.use()
+// Register all sub-routes to the router
 apiRouter.use("/auth", authRoutes); 
 apiRouter.use("/patients", patientsRoutes);
 apiRouter.use("/annual-records", annualRecordsRoutes);
@@ -114,15 +114,14 @@ apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
 
-// 5. THE CRITICAL FIX: Double-mounting the router
-// This ensures that BOTH https://.../api/auth/login AND https://.../auth/login work.
-// This solves 404s caused by URL prefix mismatches between frontend and backend.
+// 5. THE FIX: Mount the router to BOTH /api and /
+// This ensures https://.../api/auth/login AND https://.../auth/login both work
 app.use("/api", apiRouter); 
 app.use("/", apiRouter); 
 
 // 6. Start the Server
 const PORT = process.env.PORT || 8080;
-// We add '0.0.0.0' to ensure the app binds to all network interfaces on DigitalOcean
+// Using '0.0.0.0' allows the app to be reachable outside its container
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
