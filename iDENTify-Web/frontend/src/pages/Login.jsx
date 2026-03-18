@@ -224,10 +224,10 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import api from "../api/apiClient"; // Use the 'api' object
+import api from "../api/apiClient"; 
 import useAppStore from "../store/useAppStore";
 import toothLogo from "../assets/toothlogo.svg";
-import "../styles/pages/Login.css";
+import "../styles/pages/LoginPage.css";
 
 function Login() {
     const [role, setRole] = useState("aide"); 
