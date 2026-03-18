@@ -160,7 +160,7 @@ import { useNavigate, Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../api/apiClient";
 import toothLogo from "../assets/toothlogo.svg";
-import "../styles/pages/Login.css";
+import "../styles/pages/LoginPage.css";
 
 function SignUp() {
 	const [firstName, setFirstName] = useState("");
