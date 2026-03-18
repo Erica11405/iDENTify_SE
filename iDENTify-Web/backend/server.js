@@ -69,7 +69,7 @@ const medicationsRoutes = require("./routes/medications");
 const dentistsRoutes = require("./routes/dentists");
 const treatmentsRoutes = require("./routes/treatments");
 const reportsRoutes = require("./routes/reports");
-const authRoutes = require("./routes/auth"); // Handles login and signup
+const authRoutes = require("./routes/auth"); 
 
 const app = express();
 
@@ -78,9 +78,26 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" })); 
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// 3. Route Wrapper
-const apiRouter = express.Router();
+// ==========================================
+// 3. HEALTH CHECKS (Must go BEFORE routers)
+// ==========================================
+// This catches the root ping
+app.get('/', (req, res) => {
+    res.status(200).send('iDENTify API is successfully running!');
+});
 
+// This catches the standard health ping
+app.get('/health', (req, res) => {
+    res.status(200).send('Server is healthy');
+});
+
+// This catches it if DigitalOcean forces the /api routing rule
+app.get('/api/health', (req, res) => {
+    res.status(200).send('API is healthy');
+});
+
+// 4. Route Wrapper
+const apiRouter = express.Router();
 apiRouter.use("/patients", patientsRoutes);
 apiRouter.use("/annual-records", annualRecordsRoutes);
 apiRouter.use("/appointments", appointmentsRoutes);
@@ -91,25 +108,13 @@ apiRouter.use("/medications", medicationsRoutes);
 apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
-apiRouter.use("/auth", authRoutes); // Auth routes applied here
+apiRouter.use("/auth", authRoutes); 
 
-// 4. Apply the Router
+// 5. Apply the Router
 app.use("/api", apiRouter);
 app.use("/", apiRouter);
 
-// 5. Health Checks for DigitalOcean
-// ADDED THIS: Root ping to satisfy DigitalOcean's default deploy checks
-app.get('/', (req, res) => {
-    res.status(200).send('iDENTify API is successfully running!');
-});
-
-// Explicit health check endpoint
-app.get('/health', (req, res) => {
-    res.status(200).send('Server is healthy');
-});
-
 // 6. Start the Server
-// Binds to 0.0.0.0 so DigitalOcean's proxy can successfully route traffic to it
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
