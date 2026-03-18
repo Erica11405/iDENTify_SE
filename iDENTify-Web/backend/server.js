@@ -99,7 +99,6 @@ app.get('/health', (req, res) => {
 });
 
 // 4. API Router Wrapper
-// This centralizes all your /api/... calls
 const apiRouter = express.Router();
 
 apiRouter.use("/patients", patientsRoutes);
@@ -112,12 +111,16 @@ apiRouter.use("/medications", medicationsRoutes);
 apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
-apiRouter.use("/auth", authRoutes); // This creates the path /api/auth/login
+apiRouter.use("/auth", authRoutes); 
 
-// 5. Apply the prefix
+// 5. Apply the prefix AND the fallback
+// This fixes the 404 by allowing requests to both /api/auth/login and /auth/login
 app.use("/api", apiRouter); 
+app.use("/", apiRouter); 
 
+// 6. Start the Server
+// Uses the port from your .env (8080) or defaults to the environment's provided port
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
