@@ -69,10 +69,10 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
-// 1. Import Routes
+// 1. Import All Routes
 const patientsRoutes = require("./routes/patients");
 const annualRecordsRoutes = require("./routes/annual_records");
-const appointmentsRoutes = require("./works/appointments"); 
+const appointmentsRoutes = require("./routes/appointments");
 const queueRoutes = require("./routes/queue");
 const toothConditionsRoutes = require("./routes/tooth_conditions");
 const treatmentTimelineRoutes = require("./routes/treatment_timeline");
@@ -84,8 +84,8 @@ const authRoutes = require("./routes/auth");
 
 const app = express();
 
-// 2. HARDCODED CORS FIX
-// This tells the browser to allow requests from your frontend URL
+// 2. MANUAL CORS FIX (The Dashboard Alternative)
+// This allows your specific frontend to talk to this backend
 app.use(cors({
     origin: "https://identify-app-hth8t.ondigitalocean.app",
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -95,11 +95,11 @@ app.use(cors({
 app.use(express.json({ limit: "50mb" })); 
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// 3. Health Checks (DigitalOcean expects these on port 8080)
+// 3. Health Checks (Keeps your DO status "Healthy")
 app.get('/', (req, res) => res.status(200).send('API is Live'));
 app.get('/health', (req, res) => res.status(200).send('Healthy'));
 
-// 4. API Router
+// 4. API Router Wrapper
 const apiRouter = express.Router();
 apiRouter.use("/auth", authRoutes); 
 apiRouter.use("/patients", patientsRoutes);
@@ -114,12 +114,11 @@ apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
 
 // 5. THE 404 FIX
-// Because your app.yaml has a route for /api, requests might arrive 
-// as "/api/auth/login" or just "/auth/login". This covers both.
+// This handles requests whether they have the /api prefix or not
 app.use("/api", apiRouter); 
 app.use("/", apiRouter); 
 
-// 6. Start Server
+// 6. Start the Server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
