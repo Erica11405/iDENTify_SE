@@ -1,3 +1,28 @@
+# name: identify-app
+# services:
+#   - name: backend
+#     source_dir: iDENTify-Web/backend
+#     run_command: npm start
+#     http_port: 8080
+#     envs:
+#       - key: PORT
+#         scope: RUN_TIME
+#         value: "8080"
+#     routes:
+#       - path: /api
+# static_sites:
+#   - name: frontend
+#     source_dir: iDENTify-Web/frontend
+#     build_command: npm install && npm run build
+#     output_dir: dist
+#     catchall_document: index.html
+#     routes:
+#       - path: /
+#     envs:
+#       - key: VITE_API_BASE
+#         scope: BUILD_TIME
+#         value: "/api"
+
 name: identify-app
 services:
   - name: backend
@@ -8,6 +33,18 @@ services:
       - key: PORT
         scope: RUN_TIME
         value: "8080"
+      - key: DB_HOST
+        scope: RUN_TIME
+        value: "${db-mysql-nyc3-85266-do-user-34120824-0.f.db.ondigitalocean.com}"
+      - key: DB_USER
+        scope: RUN_TIME
+        value: "${doadmin}"
+      - key: DB_PASSWORD
+        scope: RUN_TIME
+        value: "${AVNS_VVO34eTeCdfGMbwshI3}"
+      - key: DB_NAME
+        scope: RUN_TIME
+        value: "${defaultdb}"
     routes:
       - path: /api
 static_sites:
@@ -22,3 +59,4 @@ static_sites:
       - key: VITE_API_BASE
         scope: BUILD_TIME
         value: "/api"
+
