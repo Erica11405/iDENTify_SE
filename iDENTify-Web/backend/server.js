@@ -85,11 +85,12 @@ const authRoutes = require("./routes/auth");
 const app = express();
 
 // 2. Middleware
+// Added specific origin check if needed, but keeping it open for initial fix
 app.use(cors()); 
 app.use(express.json({ limit: "50mb" })); 
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// 3. Health Checks (Must go BEFORE routers)
+// 3. Health Checks (DigitalOcean uses these to confirm the app is live)
 app.get('/', (req, res) => {
     res.status(200).send('iDENTify API is successfully running!');
 });
@@ -98,9 +99,11 @@ app.get('/health', (req, res) => {
     res.status(200).send('Server is healthy');
 });
 
-// 4. API Router Wrapper
+// 4. API Router Setup
 const apiRouter = express.Router();
 
+// All routes are defined here
+apiRouter.use("/auth", authRoutes); // Result: /auth/login
 apiRouter.use("/patients", patientsRoutes);
 apiRouter.use("/annual-records", annualRecordsRoutes);
 apiRouter.use("/appointments", appointmentsRoutes);
@@ -111,15 +114,16 @@ apiRouter.use("/medications", medicationsRoutes);
 apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
-apiRouter.use("/auth", authRoutes); 
 
-// 5. Apply the prefix AND the fallback
-// This fixes the 404 by allowing requests to both /api/auth/login and /auth/login
+// 5. THE FIX: Apply the router to BOTH prefixes
+// This handles https://.../api/auth/login
 app.use("/api", apiRouter); 
+
+// This handles https://.../auth/login as a fallback
 app.use("/", apiRouter); 
 
 // 6. Start the Server
-// Uses the port from your .env (8080) or defaults to the environment's provided port
+// Ensure it listens on 0.0.0.0 for DigitalOcean compatibility
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
