@@ -4,7 +4,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import apiClient from "../../api/apiClient";
 import useApi from "../../hooks/useApi";
 import useAppStore from "../../store/useAppStore";
-import "../../../styles/pages/Reports.css";
+import "../../styles/pages/aide/Reports.css";
 
 function Reports() {
   const api = useApi();

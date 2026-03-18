@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import "../../../styles/pages/Dentists.css";
+import "../../styles/pages/aide/Dentists.css";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
 import toast from "react-hot-toast";

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import "../../../styles/pages/Dashboard.css";
+import "../../styles/pages/aide/Dashboard.css";
 import WeeklyBarChart from "../../components/WeeklyBarChart.jsx";
 import AddWalkInModal from "../../components/AddWalkInModal";
 import useAppStore from "../../store/useAppStore";

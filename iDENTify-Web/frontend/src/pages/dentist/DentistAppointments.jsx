@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import "../../styles/pages/dentist/DentistAppointments.css"; // <-- Import new CSS
+import "../../styles/pages/dentist/DentistAppointments.css";
 
 function DentistAppointments() {
   const navigate = useNavigate();
