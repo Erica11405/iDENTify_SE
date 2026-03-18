@@ -72,7 +72,7 @@ require("dotenv").config();
 // 1. Import Routes
 const patientsRoutes = require("./routes/patients");
 const annualRecordsRoutes = require("./routes/annual_records");
-const appointmentsRoutes = require("./routes/appointments");
+const appointmentsRoutes = require("./works/appointments"); 
 const queueRoutes = require("./routes/queue");
 const toothConditionsRoutes = require("./routes/tooth_conditions");
 const treatmentTimelineRoutes = require("./routes/treatment_timeline");
@@ -84,23 +84,24 @@ const authRoutes = require("./routes/auth");
 
 const app = express();
 
-// 2. Middleware
-app.use(cors()); 
+// 2. HARDCODED CORS FIX
+// This tells the browser to allow requests from your frontend URL
+app.use(cors({
+    origin: "https://identify-app-hth8t.ondigitalocean.app",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
 app.use(express.json({ limit: "50mb" })); 
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// 3. Health Checks (Must go BEFORE routers for DigitalOcean to pass)
-app.get('/', (req, res) => {
-    res.status(200).send('iDENTify API is successfully running!');
-});
+// 3. Health Checks (DigitalOcean expects these on port 8080)
+app.get('/', (req, res) => res.status(200).send('API is Live'));
+app.get('/health', (req, res) => res.status(200).send('Healthy'));
 
-app.get('/health', (req, res) => {
-    res.status(200).send('Server is healthy');
-});
-
-// 4. API Router Wrapper
+// 4. API Router
 const apiRouter = express.Router();
-
+apiRouter.use("/auth", authRoutes); 
 apiRouter.use("/patients", patientsRoutes);
 apiRouter.use("/annual-records", annualRecordsRoutes);
 apiRouter.use("/appointments", appointmentsRoutes);
@@ -111,15 +112,14 @@ apiRouter.use("/medications", medicationsRoutes);
 apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
-apiRouter.use("/auth", authRoutes); 
 
-// 5. THE FIX: Double-mount the router
-// This handles requests if they arrive as /api/auth/login OR /auth/login
+// 5. THE 404 FIX
+// Because your app.yaml has a route for /api, requests might arrive 
+// as "/api/auth/login" or just "/auth/login". This covers both.
 app.use("/api", apiRouter); 
 app.use("/", apiRouter); 
 
-// 6. Start the Server
-// Ensure it uses the PORT from your .env (8080) and listens on 0.0.0.0
+// 6. Start Server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
