@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import "../../styles/pages/Queue.css";
+import "../../../styles/pages/Queue.css";
 import AddWalkInModal from "../../components/AddWalkInModal";
 import StatusBadge from "../../components/StatusBadge";
 import ConfirmationModal from "../../components/ConfirmationModal";

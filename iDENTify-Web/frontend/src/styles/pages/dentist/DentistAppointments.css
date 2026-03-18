@@ -1,0 +1,90 @@
+/* frontend/src/styles/pages/dentist/DentistAppointments.css */
+
+.appointments-container {
+  padding: 2rem;
+  background-color: #f8fafc;
+  min-height: 100vh;
+}
+
+.appointments-header {
+  margin-bottom: 2rem;
+}
+
+.appointments-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.5rem;
+}
+
+.appointments-card {
+  background-color: #ffffff;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+  overflow-x: auto;
+}
+
+.appointments-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.appointments-table th {
+  padding: 1rem;
+  color: #475569;
+  font-weight: 600;
+  background-color: #f8fafc;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.appointments-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.patient-name-cell {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* Status Badges */
+.appt-status-badge {
+  padding: 0.35rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-block;
+  text-align: center;
+}
+
+.appt-status-badge.waiting {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+
+.appt-status-badge.scheduled {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+/* Action Button */
+.review-chart-btn {
+  padding: 0.5rem 1rem;
+  background-color: var(--primary-color, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.review-chart-btn:hover {
+  background-color: #2563eb;
+}

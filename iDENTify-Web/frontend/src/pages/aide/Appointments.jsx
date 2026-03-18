@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import "../../styles/pages/Appointments.css";
+import "../../../styles/pages/Appointments.css";
 import EditAppointmentModal from "../../components/EditAppointmentModal";
 import AddAppointmentModal from "../../components/AddAppointmentModal";
 import StatusBadge from "../../components/StatusBadge";

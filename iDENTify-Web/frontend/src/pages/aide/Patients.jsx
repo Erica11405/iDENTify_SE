@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
 import toast from "react-hot-toast";
-import "../../styles/pages/Patients.css";
+import "../../../styles/pages/Patients.css";
 
 function Patients() {
   const navigate = useNavigate();

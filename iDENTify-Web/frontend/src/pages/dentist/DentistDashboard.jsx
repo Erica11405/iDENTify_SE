@@ -155,7 +155,7 @@
 
 
 import React, { useEffect, useMemo } from "react";
-import "../../styles/pages/Dashboard.css";
+import "../../styles/pages/dentist/DentistDashboard.css";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
 

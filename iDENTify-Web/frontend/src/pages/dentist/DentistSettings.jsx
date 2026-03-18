@@ -145,8 +145,8 @@
 
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import api from "../../api/apiClient"; // IMPORTANT: Connecting to your backend API
-import "../../styles/base.css";
+import api from "../../api/apiClient"; 
+import "../../styles/pages/dentist/DentistSettings.css";
 
 function DentistSettings({ userRole }) {
   const [activeTab, setActiveTab] = useState("aides");

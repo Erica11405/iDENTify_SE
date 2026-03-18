@@ -1,7 +1,7 @@
 // import React, { useState, useEffect, useRef } from "react";
 // import { useNavigate, useParams, useLocation } from "react-router-dom";
 // import toast from "react-hot-toast";
-// import "../../styles/pages/PatientForm.css";
+// import "../../../styles/pages/PatientForm.css";
 // import PatientHistorySidebar from "../../components/PatientHistorySidebar";
 // import XrayViewer from "../../components/XrayViewer";
 // import MedicalAlertBanner from "../../components/MedicalAlertBanner";
@@ -1285,7 +1285,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
-import "../../styles/pages/PatientForm.css";
+import "../../../styles/pages/PatientForm.css";
 import PatientHistorySidebar from "../../components/PatientHistorySidebar";
 import XrayViewer from "../../components/XrayViewer";
 import MedicalAlertBanner from "../../components/MedicalAlertBanner";
