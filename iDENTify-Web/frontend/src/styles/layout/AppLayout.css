@@ -1,6 +1,8 @@
 .layout {
   display: flex;
   height: 100vh;
+  width: 100vw;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -12,6 +14,7 @@
   flex-direction: column;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
   position: relative;
+  z-index: 10;
 }
 
 .sidebar-header {
@@ -160,12 +163,13 @@
 }
 
 .content {
-  flex-grow: 1;
+  flex: 1;
   padding: 2rem;
   overflow-y: auto;
-  background-color: #f9fafb;
+  background-color: #f4f7f6; /* This is the nice light gray from your screenshots */
 }
 
+/* Optional loading overlay styles if you need them later */
 .data-loading-overlay {
   position: fixed;
   inset: 0;
@@ -181,19 +185,4 @@
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   font-weight: 600;
-}
-
-
-.app-container {
-  display: flex;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.main-content-area {
-  flex: 1; /* This forces the dashboard to take up all remaining space */
-  overflow-y: auto;
-  background-color: #f4f7f6; /* Light gray background from your 2nd pic */
-  padding: 2rem;
 }
