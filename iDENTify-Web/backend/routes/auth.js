@@ -160,7 +160,9 @@ router.post('/login', async (req, res) => {
         });
 
     } catch (err) {
-        res.status(500).json({ error: "Server error during login." });
+        console.error("Login Crash Report:", err);
+        // This will send the exact error directly to your frontend screen!
+        res.status(500).json({ error: "Server crash: " + err.message });
     }
 });
 
