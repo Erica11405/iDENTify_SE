@@ -346,23 +346,6 @@
 
 // // export default AppLayout;
 
-// import React from "react";
-// import { Outlet } from "react-router-dom";
-// import Sidebar from "../components/Sidebar"; 
-// import "../styles/layout/AppLayout.css";
-
-// function AppLayout({ userRole }) {
-//   return (
-//     <div className="app-container">
-//       <Sidebar role={userRole} />
-//       <main className="main-content-area">
-//         <Outlet />
-//       </main>
-//     </div>
-//   );
-// }
-
-// export default AppLayout;
 
 import React from "react";
 import { Outlet } from "react-router-dom";
