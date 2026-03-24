@@ -1,7 +1,7 @@
 // import React, { useState, useEffect, useRef } from "react";
 // import { useNavigate, useParams, useLocation } from "react-router-dom";
 // import toast from "react-hot-toast";
-// import "../../styles/pages/PatientForm.css";
+// import "../../styles/pages/aide/PatientForm.css";
 // import PatientHistorySidebar from "../../components/PatientHistorySidebar";
 // import XrayViewer from "../../components/XrayViewer";
 // import MedicalAlertBanner from "../../components/MedicalAlertBanner";
@@ -116,11 +116,15 @@
 // 	);
 // };
 
-// function PatientForm() {
+// // --- WE ADDED userRole AS A PROP HERE ---
+// function PatientForm({ userRole }) {
 // 	const navigate = useNavigate();
 // 	const { id } = useParams();
 // 	const location = useLocation();
 // 	const api = useApi();
+
+//     // --- CHECK IF DENTIST IS REVIEWING ---
+//     const isDentistReviewing = userRole === 'dentist';
 
 // 	const queue = useAppStore((state) => state.queue || []);
 // 	const allAppointments = useAppStore((state) => state.appointments || []);
@@ -242,7 +246,6 @@
 // 		const loadAnnualData = async () => {
 // 			if (!id) return;
 
-// 			// ---> CRITICAL FIX: Reset isYearDone explicitly so the new year chart isn't locked <---
 // 			setIsYearDone(false);
 
 // 			setBoxMarks(Array(64).fill(""));
@@ -750,6 +753,14 @@
 // 					</div>
 // 				</div>
 
+//                 {/* --- DENTIST REVIEW BANNER ADDED HERE --- */}
+//                 {isDentistReviewing && (
+//                     <div className="review-banner" style={{ backgroundColor: "#e0f7fa", color: "#006064", padding: "15px", borderRadius: "8px", marginBottom: "20px", borderLeft: "5px solid #00bcd4" }}>
+//                     <strong style={{ display: "block", fontSize: "1.1em", marginBottom: "5px" }}>Dentist Review Mode</strong>
+//                     <span>Please double-check the patient data, charting, and timeline entered by the Dental Aide to ensure accuracy before beginning treatment.</span>
+//                     </div>
+//                 )}
+
 // 				<div className="sections-container">
 // 					<section className="patient-info-card">
 // 						<h3 className="section-title">Patient Info</h3>
@@ -1244,9 +1255,14 @@
 // 				<div className="form-actions-bottom" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid #e9ecef', paddingTop: '1rem' }}>
 // 					{!isVisitReadOnly ? (
 // 						<>
-// 							<button className="done-btn secondary" onClick={handleSaveAll} disabled={isSaving}>{isSaving ? "Saving..." : "Save Appointment Progress"}</button>
+//                             {/* --- THE BUTTON CHANGES TEXT IF THE DENTIST IS REVIEWING --- */}
+// 							<button className="done-btn secondary" onClick={handleSaveAll} disabled={isSaving}>
+//                                 {isSaving ? "Saving..." : (isDentistReviewing ? "Verify & Save Progress" : "Save Appointment Progress")}
+//                             </button>
 // 							{!isYearDone && (
-// 								<button className="done-btn" onClick={handleDone} disabled={isSaving}>{isSaving ? "Saving..." : `Complete Year ${selectedYear}`}</button>
+// 								<button className="done-btn" onClick={handleDone} disabled={isSaving}>
+//                                     {isSaving ? "Saving..." : `Complete Year ${selectedYear}`}
+//                                 </button>
 // 							)}
 // 						</>
 // 					) : (
@@ -1400,14 +1416,12 @@ const Tooth5Surface = ({ toothNumber, segments, onSegmentClick }) => {
 	);
 };
 
-// --- WE ADDED userRole AS A PROP HERE ---
 function PatientForm({ userRole }) {
 	const navigate = useNavigate();
 	const { id } = useParams();
 	const location = useLocation();
 	const api = useApi();
 
-    // --- CHECK IF DENTIST IS REVIEWING ---
     const isDentistReviewing = userRole === 'dentist';
 
 	const queue = useAppStore((state) => state.queue || []);
@@ -1518,6 +1532,18 @@ function PatientForm({ userRole }) {
 
 				const patientAppts = allAppointments.filter(a => String(a.patient_id) === String(id));
 				setPatientAppointments(patientAppts);
+
+                // FIX: Fetch existing years from the database so tabs stay on page reload
+                const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+                const yearsRes = await fetch(`${API_BASE}/annual-records/years/${id}`);
+                if (yearsRes.ok) {
+                    const yearsData = await yearsRes.json();
+                    if (yearsData && yearsData.length > 0) {
+                        const loadedYears = yearsData.map(y => y.record_year);
+                        setYearsList(loadedYears);
+                        setSelectedYear(Math.max(...loadedYears));
+                    }
+                }
 
 			} catch (err) {
 				console.error("Failed to load global data", err);
@@ -1641,7 +1667,8 @@ function PatientForm({ userRole }) {
 	const maxYear = Math.max(...(yearsList.length > 0 ? yearsList : [1]));
 	const isLatestYear = selectedYear === maxYear;
 
-	const isChartReadOnly = isYearDone || !isLatestYear; 
+    // FIX: The chart is now ALWAYS editable for the active/latest year, regardless of previous visits.
+	const isChartReadOnly = !isLatestYear; 
 	const isVisitReadOnly = !isLatestYear; 
 
 	const getRecommendations = () => {
@@ -1751,7 +1778,7 @@ function PatientForm({ userRole }) {
 				toast.success(`Year ${selectedYear} Completed and Locked. Session moved to History.`);
 			}
 			
-			navigate("/app/history");
+			navigate("/history");
 
 		} catch (error) {
 			console.error(error);
@@ -1956,24 +1983,39 @@ function PatientForm({ userRole }) {
 	};
 
 	const closePanel = () => { setIsPanelOpen(false); setSelected({ kind: null, index: null, boxKind: null, cellKey: null }); };
-	const handleContextMenu = (e, cellKey, boxKind) => { e.preventDefault(); if (isChartReadOnly) return; setContextMenu({ x: e.pageX, y: e.pageY, cellKey, boxKind }); setIsContextMenuOpen(true); };
+	
+    // FIX: Ensure Right-Click properly selects the box so applyCode has a target
+    const handleContextMenu = (e, cellKey, boxKind) => { 
+        e.preventDefault(); 
+        if (isChartReadOnly) return; 
+
+        // Set the selection so applyCode works from the context menu
+        const idx = parseInt(cellKey.split('-')[1], 10);
+        setSelected({ kind: "box", index: idx, boxKind, cellKey });
+
+        setContextMenu({ x: e.pageX, y: e.pageY, cellKey, boxKind }); 
+        setIsContextMenuOpen(true); 
+    };
 	const closeContextMenu = () => { setIsContextMenuOpen(false); setContextMenu(null); };
 	const openXrayViewer = (file) => { setSelectedXray(file); setIsXrayViewerOpen(true); };
 	const closeXrayViewer = () => { setSelectedXray(null); setIsXrayViewerOpen(false); };
 
-	const applyCode = (code) => {
-		if (selected.kind === "box" && selected.index != null) {
-			const newBoxMarks = boxMarks.map((v, i) => (i === selected.index ? code : v));
+    // FIX: Allow direct selection bypass for immediate actions like double-click
+	const applyCode = (code, directSelection = null) => {
+        const targetSelection = directSelection || selected;
+
+		if (targetSelection.kind === "box" && targetSelection.index != null) {
+			const newBoxMarks = boxMarks.map((v, i) => (i === targetSelection.index ? code : v));
 			setBoxMarks(newBoxMarks);
 			apiClient.upsertToothCondition({
 				patient_id: id,
-				cell_key: selected.cellKey,
+				cell_key: targetSelection.cellKey,
 				condition_code: code,
 				status: activeStatus,
 				is_shaded: false,
 				record_year: selectedYear 
 			});
-			const newStatus = { ...toothStatuses, [selected.cellKey]: activeStatus };
+			const newStatus = { ...toothStatuses, [targetSelection.cellKey]: activeStatus };
 			setToothStatuses(newStatus);
 		}
 		closePanel();
@@ -1990,7 +2032,23 @@ function PatientForm({ userRole }) {
 					const cellKey = `box-${idx}`;
 					const statusClass = toothStatuses[cellKey] ? ` tc-status-${toothStatuses[cellKey]}` : "";
 					return (
-						<button key={idx} className={`tc-box-cell${mark ? " tc-has-mark" : ""}${isSelected ? " tc-selected" : ""}${statusClass}`} onClick={() => handleBoxClick(idx)} onContextMenu={(e) => handleContextMenu(e, cellKey, rowIndex === 0 || rowIndex === 3 ? "treatment" : "condition")} onDoubleClick={() => { if (!isChartReadOnly) { setSelected({ kind: "box", index: idx, boxKind: "condition", cellKey }); applyCode("D"); } }} disabled={isChartReadOnly}>{mark}</button>
+						<button 
+                            key={idx} 
+                            className={`tc-box-cell${mark ? " tc-has-mark" : ""}${isSelected ? " tc-selected" : ""}${statusClass}`} 
+                            onClick={() => handleBoxClick(idx)} 
+                            onContextMenu={(e) => handleContextMenu(e, cellKey, rowIndex === 0 || rowIndex === 3 ? "treatment" : "condition")} 
+                            
+                            // FIX: Double click now targets the box directly instead of waiting for async state
+                            onDoubleClick={() => { 
+                                if (!isChartReadOnly) { 
+                                    const directSel = { kind: "box", index: idx, boxKind: "condition", cellKey };
+                                    applyCode("D", directSel); 
+                                } 
+                            }} 
+                            disabled={isChartReadOnly}
+                        >
+                            {mark}
+                        </button>
 					);
 				})}
 			</div>
@@ -2037,7 +2095,6 @@ function PatientForm({ userRole }) {
 					</div>
 				</div>
 
-                {/* --- DENTIST REVIEW BANNER ADDED HERE --- */}
                 {isDentistReviewing && (
                     <div className="review-banner" style={{ backgroundColor: "#e0f7fa", color: "#006064", padding: "15px", borderRadius: "8px", marginBottom: "20px", borderLeft: "5px solid #00bcd4" }}>
                     <strong style={{ display: "block", fontSize: "1.1em", marginBottom: "5px" }}>Dentist Review Mode</strong>
@@ -2539,7 +2596,6 @@ function PatientForm({ userRole }) {
 				<div className="form-actions-bottom" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid #e9ecef', paddingTop: '1rem' }}>
 					{!isVisitReadOnly ? (
 						<>
-                            {/* --- THE BUTTON CHANGES TEXT IF THE DENTIST IS REVIEWING --- */}
 							<button className="done-btn secondary" onClick={handleSaveAll} disabled={isSaving}>
                                 {isSaving ? "Saving..." : (isDentistReviewing ? "Verify & Save Progress" : "Save Appointment Progress")}
                             </button>
