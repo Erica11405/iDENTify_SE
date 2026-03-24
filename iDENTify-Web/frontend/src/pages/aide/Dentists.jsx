@@ -1,314 +1,3 @@
-// // import React, { useEffect, useMemo, useState, useRef } from "react";
-// // import DatePicker from "react-datepicker";
-// // import "react-datepicker/dist/react-datepicker.css";
-// // import "../../styles/pages/aide/Dentists.css";
-// // import useAppStore from "../../store/useAppStore";
-// // import useApi from "../../hooks/useApi";
-// // import toast from "react-hot-toast";
-// // import EditDentistModal from "../../components/EditDentistModal"; 
-
-// // const DAYS = [
-// //   { label: "S", value: 0 },
-// //   { label: "M", value: 1 },
-// //   { label: "T", value: 2 },
-// //   { label: "W", value: 3 },
-// //   { label: "TH", value: 4 },
-// //   { label: "F", value: 5 },
-// //   { label: "S", value: 6 },
-// // ];
-
-// // function Dentists() {
-// //   const api = useApi();
-// //   const dentists = useAppStore((state) => state.dentists);
-// //   const updateDentistInStore = useAppStore((state) => state.updateDentist);
-// //   const appointments = useAppStore((state) => state.appointments);
-
-// //   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-// //   const [editingDentist, setEditingDentist] = useState(null); // State for the Edit Modal
-// //   const [selectedDate, setSelectedDate] = useState(new Date());
-// //   const [filters, setFilters] = useState({
-// //     specialization: "All",
-// //     availability: "All",
-// //     assigned: "All",
-// //   });
-
-// //   const [breakDrafts, setBreakDrafts] = useState({});
-// //   const [leaveDrafts, setLeaveDrafts] = useState({});
-
-// //   const dayIndex = selectedDate.getDay();
-// //   const selectedDateStr = selectedDate.toISOString().split("T")[0];
-
-// //   useEffect(() => {
-// //     api.loadDentists();
-// //   }, []); 
-
-// //   const debounceRef = useRef({});
-
-// //   const saveDentistChanges = async (updatedDentist) => {
-// //     updateDentistInStore(updatedDentist);
-// //     if (debounceRef.current[updatedDentist.id]) {
-// //       clearTimeout(debounceRef.current[updatedDentist.id]);
-// //     }
-// //     debounceRef.current[updatedDentist.id] = setTimeout(async () => {
-// //       try {
-// //         await api.updateDentist(updatedDentist.id, updatedDentist);
-// //         toast.success("Schedule saved");
-// //       } catch (error) {
-// //         toast.error("Failed to save changes");
-// //       } finally {
-// //         delete debounceRef.current[updatedDentist.id];
-// //       }
-// //     }, 1000); 
-// //   };
-
-// //   const handleDeleteDentist = async (id, name) => {
-// //     if (window.confirm(`Are you sure you want to delete Dr. ${name}?`)) {
-// //       try {
-// //         await api.deleteDentist(id);
-// //         toast.success("Dentist removed");
-// //         api.loadDentists(); // Refresh the list
-// //       } catch (error) {
-// //         toast.error("Failed to delete dentist");
-// //       }
-// //     }
-// //   };
-
-// //   const updateOperatingHours = (dentist, field, value) => {
-// //     const currentHours = dentist.operatingHours || { start: "", end: "" };
-// //     const updated = { ...dentist, operatingHours: { ...currentHours, [field]: value } };
-// //     saveDentistChanges(updated);
-// //   };
-
-// //   const updateLunch = (dentist, field, value) => {
-// //     const currentLunch = dentist.lunch || { start: "", end: "" };
-// //     const updated = { ...dentist, lunch: { ...currentLunch, [field]: value } };
-// //     saveDentistChanges(updated);
-// //   };
-
-// //   const toggleWorkingDay = (dentist, dayIdx) => {
-// //     const currentDays = dentist.days || [];
-// //     let newDays;
-// //     const numericDay = Number(dayIdx);
-// //     if (currentDays.includes(numericDay)) newDays = currentDays.filter(d => d !== numericDay);
-// //     else newDays = [...currentDays, numericDay].sort();
-// //     saveDentistChanges({ ...dentist, days: newDays });
-// //   };
-
-// //   const addBreakSlot = (dentist) => {
-// //     const draft = breakDrafts[dentist.id];
-// //     if (!draft?.start || !draft?.end) return;
-// //     const updated = { ...dentist, breaks: [...(dentist.breaks || []), { label: "Break", ...draft }] };
-// //     saveDentistChanges(updated);
-// //     setBreakDrafts((prev) => ({ ...prev, [dentist.id]: { start: "", end: "" } }));
-// //   };
-
-// //   const removeBreakSlot = (dentist, index) => {
-// //     const newBreaks = [...(dentist.breaks || [])];
-// //     newBreaks.splice(index, 1);
-// //     saveDentistChanges({ ...dentist, breaks: newBreaks });
-// //   };
-
-// //   const addLeaveDay = (dentist) => {
-// //     const draft = leaveDrafts[dentist.id];
-// //     if (!draft || (dentist.leaveDays || []).includes(draft)) return;
-// //     saveDentistChanges({ ...dentist, leaveDays: [...(dentist.leaveDays || []), draft] });
-// //     setLeaveDrafts((prev) => ({ ...prev, [dentist.id]: "" }));
-// //   };
-
-// //   const removeLeaveDay = (dentist, day) => {
-// //     saveDentistChanges({ ...dentist, leaveDays: (dentist.leaveDays || []).filter(d => d !== day) });
-// //   };
-
-// //   const toggleStatus = (dentist) => {
-// //     const modes = ["Available", "Off", "Busy"];
-// //     const nextStatus = modes[(modes.indexOf(dentist.status || "Available") + 1) % modes.length];
-// //     saveDentistChanges({ ...dentist, status: nextStatus });
-// //   };
-
-// //   const calculateAvailability = (dentist) => {
-// //     if (dentist.status === "Busy") return "Busy";
-// //     if (dentist.status === "Off") return "Off";
-// //     if ((dentist.leaveDays || []).includes(selectedDateStr)) return "Off (Leave)";
-// //     if (dentist.days && !dentist.days.includes(dayIndex)) return "Off (Sched)";
-// //     return "Available";
-// //   };
-
-// //   const getAssignedCount = (dentistId) => {
-// //     return appointments.filter(a => {
-// //       const datePart = a.appointment_datetime ? a.appointment_datetime.split('T')[0] : "";
-// //       return a.dentist_id === dentistId && datePart === selectedDateStr;
-// //     }).length;
-// //   };
-
-// //   const filteredDentists = useMemo(() =>
-// //     dentists.filter((d) => {
-// //       const computedStatus = calculateAvailability(d);
-// //       const assignedCount = getAssignedCount(d.id);
-// //       return (filters.specialization === "All" || filters.specialization === d.specialization) &&
-// //              (filters.availability === "All" || computedStatus.includes(filters.availability)) &&
-// //              (filters.assigned === "All" || (filters.assigned === "With" && assignedCount > 0) || (filters.assigned === "None" && assignedCount === 0));
-// //     }),
-// //     [dentists, filters, selectedDateStr, appointments]
-// //   );
-
-// //   return (
-// //     <div className="dentists-page">
-// //       <div className="page-header">
-// //         <div className="header-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '20px' }}>
-// //           <h1>Dentist Availability</h1>
-// //           {/* Moved the Add button here so it's not lost */}
-// //           <button 
-// //             onClick={() => setIsAddModalOpen(true)} 
-// //             style={{ padding: '10px 16px', backgroundColor: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-// //           >
-// //             + Add Dentist
-// //           </button>
-// //         </div>
-// //         <div className="schedule-date-container">
-// //           <label>Schedule date</label>
-// //           <DatePicker
-// //             selected={selectedDate}
-// //             onChange={(date) => setSelectedDate(date)}
-// //             className="datepicker-input"
-// //             dateFormat="MM/dd/yyyy"
-// //           />
-// //         </div>
-// //       </div>
-
-// //       <div className="filter-row">
-// //         <div className="filter-group">
-// //           <label>Specialization</label>
-// //           <select value={filters.specialization} onChange={(e) => setFilters(p => ({ ...p, specialization: e.target.value }))}>
-// //             <option value="All">All</option>
-// //             {Array.from(new Set(dentists.map(d => d.specialization))).filter(Boolean).map(s => <option key={s} value={s}>{s}</option>)}
-// //           </select>
-// //         </div>
-
-// //         <div className="filter-group">
-// //           <label>Availability</label>
-// //           <select value={filters.availability} onChange={(e) => setFilters(p => ({ ...p, availability: e.target.value }))}>
-// //             <option value="All">All</option>
-// //             <option value="Available">Available</option>
-// //             <option value="Busy">Busy</option>
-// //             <option value="Off">Off</option>
-// //           </select>
-// //         </div>
-// //       </div>
-
-// //       <div className="dentists-grid">
-// //         {filteredDentists.map((d) => {
-// //           const statusDisplay = calculateAvailability(d);
-// //           const statusClass = statusDisplay.toLowerCase().split(' ')[0];
-
-// //           return (
-// //             <div className="dentist-card" key={d.id}>
-// //               <div className="card-header-row">
-// //                 <span className="specialization-text">{d.specialization || "Unassigned Specialization"}</span>
-// //                 <span className={`status-badge ${statusClass}`} onClick={() => toggleStatus(d)}>
-// //                   {statusDisplay}
-// //                 </span>
-// //               </div>
-// //               <h2 className="dentist-name">Dr. {d.name || `${d.first_name} ${d.last_name}`}</h2>
-// //               <p className="patient-stat">Assigned patients today: {getAssignedCount(d.id)}</p>
-
-// //               <span className="section-label">Working Days</span>
-// //               <div className="days-container">
-// //                 {DAYS.map((day) => (
-// //                   <button
-// //                     key={day.value}
-// //                     className={`day-circle ${d.days?.includes(day.value) ? 'active' : ''}`}
-// //                     onClick={() => toggleWorkingDay(d, day.value)}
-// //                   >
-// //                     {day.label}
-// //                   </button>
-// //                 ))}
-// //               </div>
-
-// //               <span className="section-label">Operating hours</span>
-// //               <div className="time-config-row">
-// //                 <div className="time-input-box"><input type="time" value={d.operatingHours?.start || ""} onChange={(e) => updateOperatingHours(d, "start", e.target.value)} /></div>
-// //                 <span className="time-sep">to</span>
-// //                 <div className="time-input-box"><input type="time" value={d.operatingHours?.end || ""} onChange={(e) => updateOperatingHours(d, "end", e.target.value)} /></div>
-// //               </div>
-
-// //               <span className="section-label">Lunch</span>
-// //               <div className="time-config-row">
-// //                 <div className="time-input-box"><input type="time" value={d.lunch?.start || ""} onChange={(e) => updateLunch(d, "start", e.target.value)} /></div>
-// //                 <span className="time-sep">to</span>
-// //                 <div className="time-input-box"><input type="time" value={d.lunch?.end || ""} onChange={(e) => updateLunch(d, "end", e.target.value)} /></div>
-// //               </div>
-
-// //               <span className="section-label">Breaks</span>
-// //               <div className="chips-display">
-// //                 {(d.breaks || []).map((b, idx) => (
-// //                   <div className="mini-chip" key={idx}>{b.start} - {b.end} <button onClick={() => removeBreakSlot(d, idx)}>&times;</button></div>
-// //                 ))}
-// //               </div>
-// //               <div className="time-config-row">
-// //                 <div className="time-input-box"><input type="time" value={breakDrafts[d.id]?.start || ""} onChange={(e) => setBreakDrafts(p => ({ ...p, [d.id]: { ...p[d.id], start: e.target.value } }))} /></div>
-// //                 <div className="time-input-box"><input type="time" value={breakDrafts[d.id]?.end || ""} onChange={(e) => setBreakDrafts(p => ({ ...p, [d.id]: { ...p[d.id], end: e.target.value } }))} /></div>
-// //                 <button className="btn-blue-add" onClick={() => addBreakSlot(d)}>+</button>
-// //               </div>
-
-// //               <span className="section-label">Leave days</span>
-// //               <div className="chips-display">
-// //                 {(d.leaveDays || []).map(day => (
-// //                   <div className="mini-chip red" key={day}>{day} <button onClick={() => removeLeaveDay(d, day)}>×</button></div>
-// //                 ))}
-// //               </div>
-// //               <div className="time-config-row">
-// //                 <input type="date" className="leave-days-input" value={leaveDrafts[d.id] || ""} onChange={(e) => setLeaveDrafts(p => ({ ...p, [d.id]: e.target.value }))} />
-// //                 <button className="btn-wide-add" onClick={() => addLeaveDay(d)}>Add</button>
-// //               </div>
-
-// //               {/* ACTION BUTTONS (Edit & Delete side by side) */}
-// //               <div className="card-footer-actions" style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-// //                 <button 
-// //                   style={{ flex: 1, padding: '12px', backgroundColor: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-// //                   onClick={() => setEditingDentist(d)}
-// //                 >
-// //                   Edit Profile
-// //                 </button>
-// //                 <button 
-// //                   style={{ flex: 1, padding: '12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
-// //                   onClick={() => handleDeleteDentist(d.id, d.name || `${d.first_name} ${d.last_name}`)}
-// //                 >
-// //                   Delete
-// //                 </button>
-// //               </div>
-// //             </div>
-// //           );
-// //         })}
-// //       </div>
-
-// //       {isAddModalOpen && (
-// //         <AddDentistModal
-// //           onClose={() => setIsAddModalOpen(false)}
-// //           onSuccess={() => {
-// //             setIsAddModalOpen(false);
-// //             api.loadDentists();
-// //             toast.success("Dentist added successfully");
-// //           }}
-// //         />
-// //       )}
-
-// //       {/* RENDER EDIT MODAL IF A DENTIST IS SELECTED */}
-// //       {editingDentist && (
-// //         <EditDentistModal
-// //           dentist={editingDentist}
-// //           onClose={() => setEditingDentist(null)}
-// //           onSuccess={() => {
-// //             setEditingDentist(null);
-// //             api.loadDentists(); // Refresh data to show updated specs/contact info
-// //           }}
-// //         />
-// //       )}
-// //     </div>
-// //   );
-// // }
-
-// // export default Dentists;
-
 // import React, { useEffect, useMemo, useState } from "react";
 // import DatePicker from "react-datepicker";
 // import "react-datepicker/dist/react-datepicker.css";
@@ -538,75 +227,227 @@
 // export default Dentists;
 
 
-import React, { useState, useEffect } from "react";
-import api from "../../api/apiClient";
 
-import EditDentistModal from "../../components/EditDentistModal";
-import ConfirmationModal from "../../components/ConfirmationModal";
-import toast from "react-hot-toast";
+import React, { useEffect, useMemo, useState } from "react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import "../../styles/pages/aide/Dentists.css";
+import useAppStore from "../../store/useAppStore";
+import useApi from "../../hooks/useApi";
+import toast from "react-hot-toast";
+import EditDentistModal from "../../components/EditDentistModal";
+
+const DAYS = [
+  { label: "S", value: 0 },
+  { label: "M", value: 1 },
+  { label: "T", value: 2 },
+  { label: "W", value: 3 },
+  { label: "TH", value: 4 },
+  { label: "F", value: 5 },
+  { label: "S", value: 6 },
+];
 
 function Dentists() {
-  const [dentists, setDentists] = useState([]);
+  const api = useApi();
+  const dentists = useAppStore((state) => state.dentists);
+  const appointments = useAppStore((state) => state.appointments);
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingDentist, setEditingDentist] = useState(null);
-  const [deletingDentistId, setDeletingDentistId] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [filters, setFilters] = useState({
+    specialization: "All",
+    availability: "All",
+    assigned: "All",
+  });
 
-  const fetchDentists = async () => {
-    try {
-      // We fetch all and filter, or use the new query param: api.getDentists('dentist')
-      const data = await api.getDentists();
-      
-      // CRITICAL FILTER: Exclude Dental Aides from this specific view
-      const actualDentists = data.filter(d => d.specialization !== "Dental Aide");
-      
-      setDentists(actualDentists);
-    } catch (error) {
-      toast.error("Failed to load dentists");
-    }
-  };
+  const dayIndex = selectedDate.getDay();
+  const selectedDateStr = selectedDate.toISOString().split("T")[0];
 
   useEffect(() => {
-    fetchDentists();
-  }, []);
+    api.loadDentists();
+  }, []); 
 
-  const handleDelete = async () => {
-    try {
-      await api.deleteDentist(deletingDentistId);
-      toast.success("Dentist removed successfully");
-      setDeletingDentistId(null);
-      fetchDentists();
-    } catch (error) {
-      toast.error("Cannot delete dentist with active records.");
+  const handleDeleteDentist = async (id, name) => {
+    if (window.confirm(`Are you sure you want to delete Dr. ${name}?`)) {
+      try {
+        await api.deleteDentist(id);
+        toast.success("Dentist removed");
+        api.loadDentists(); // Refresh the list
+      } catch (error) {
+        toast.error("Failed to delete dentist");
+      }
     }
   };
 
+  const calculateAvailability = (dentist) => {
+    if (dentist.status === "Busy") return "Busy";
+    if (dentist.status === "Off") return "Off";
+    if ((dentist.leaveDays || []).includes(selectedDateStr)) return "Off (Leave)";
+    if (dentist.days && !dentist.days.includes(dayIndex)) return "Off (Sched)";
+    return "Available";
+  };
+
+  const getAssignedCount = (dentistId) => {
+    return appointments.filter(a => {
+      const datePart = a.appointment_datetime ? a.appointment_datetime.split('T')[0] : "";
+      return a.dentist_id === dentistId && datePart === selectedDateStr;
+    }).length;
+  };
+
+  const filteredDentists = useMemo(() =>
+    dentists.filter((d) => {
+      // CRITICAL FIX: Explicitly exclude Dental Aides from this management view
+      if (d.specialization === "Dental Aide") return false;
+
+      const computedStatus = calculateAvailability(d);
+      const assignedCount = getAssignedCount(d.id);
+      return (filters.specialization === "All" || filters.specialization === d.specialization) &&
+             (filters.availability === "All" || computedStatus.includes(filters.availability)) &&
+             (filters.assigned === "All" || (filters.assigned === "With" && assignedCount > 0) || (filters.assigned === "None" && assignedCount === 0));
+    }),
+    [dentists, filters, selectedDateStr, appointments]
+  );
+
   return (
-    <div className="dentists-container">
+    <div className="dentists-page">
       <div className="page-header">
-        <h2>Dentist Management</h2>
-        <button className="btn-add" onClick={() => setIsAddModalOpen(true)}>+ Add New Dentist</button>
+        <div className="header-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '20px' }}>
+          <h1>Dentist Availability</h1>
+        </div>
+        <div className="schedule-date-container">
+          <label>Schedule date</label>
+          <DatePicker
+            selected={selectedDate}
+            onChange={(date) => setSelectedDate(date)}
+            className="datepicker-input"
+            dateFormat="MM/dd/yyyy"
+          />
+        </div>
       </div>
 
-      <div className="dentist-grid">
-        {dentists.map((dentist) => (
-          <div key={dentist.id} className="dentist-card">
-            <div className="dentist-info">
-              <h3>{dentist.name}</h3>
-              <p className="specialization">{dentist.specialization}</p>
-              <p>{dentist.email}</p>
-            </div>
-            <div className="card-actions">
-              <button onClick={() => setEditingDentist(dentist)}>Edit</button>
-              <button className="delete" onClick={() => setDeletingDentistId(dentist.id)}>Delete</button>
-            </div>
-          </div>
-        ))}
+      <div className="filter-row">
+        <div className="filter-group">
+          <label>Specialization</label>
+          <select value={filters.specialization} onChange={(e) => setFilters(p => ({ ...p, specialization: e.target.value }))}>
+            <option value="All">All</option>
+            {/* Updated mapping to exclude Dental Aide from the filter dropdown as well */}
+            {Array.from(new Set(dentists.filter(d => d.specialization !== "Dental Aide").map(d => d.specialization)))
+              .filter(Boolean)
+              .map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label>Availability</label>
+          <select value={filters.availability} onChange={(e) => setFilters(p => ({ ...p, availability: e.target.value }))}>
+            <option value="All">All</option>
+            <option value="Available">Available</option>
+            <option value="Busy">Busy</option>
+            <option value="Off">Off</option>
+          </select>
+        </div>
       </div>
 
-     
-      {editingDentist && <EditDentistModal dentist={editingDentist} onClose={() => setEditingDentist(null)} onSuccess={fetchDentists} />}
-      {deletingDentistId && <ConfirmationModal title="Remove Dentist?" message="This will also disable their login account." onConfirm={handleDelete} onCancel={() => setDeletingDentistId(null)} />}
+      <div className="dentists-grid">
+        {filteredDentists.map((d) => {
+          const statusDisplay = calculateAvailability(d);
+          const statusClass = statusDisplay.toLowerCase().split(' ')[0];
+
+          return (
+            <div className="dentist-card" key={d.id}>
+              <div className="card-header-row">
+                <span className="specialization-text">{d.specialization || "Unassigned Specialization"}</span>
+                <span className={`status-badge ${statusClass}`} style={{ cursor: 'default' }}>
+                  {statusDisplay}
+                </span>
+              </div>
+              <h2 className="dentist-name">Dr. {d.name || `${d.first_name} ${d.last_name}`}</h2>
+              <p className="patient-stat">Assigned patients today: {getAssignedCount(d.id)}</p>
+
+              <span className="section-label">Working Days</span>
+              <div className="days-container">
+                {DAYS.map((day) => (
+                  <div
+                    key={day.value}
+                    className={`day-circle ${d.days?.includes(day.value) ? 'active' : ''}`}
+                    style={{ cursor: 'default' }}
+                  >
+                    {day.label}
+                  </div>
+                ))}
+              </div>
+
+              <span className="section-label">Operating hours</span>
+              <div className="time-config-row">
+                <div className="time-input-box"><input type="time" value={d.operatingHours?.start || ""} readOnly /></div>
+                <span className="time-sep">to</span>
+                <div className="time-input-box"><input type="time" value={d.operatingHours?.end || ""} readOnly /></div>
+              </div>
+
+              <span className="section-label">Lunch</span>
+              <div className="time-config-row">
+                <div className="time-input-box"><input type="time" value={d.lunch?.start || ""} readOnly /></div>
+                <span className="time-sep">to</span>
+                <div className="time-input-box"><input type="time" value={d.lunch?.end || ""} readOnly /></div>
+              </div>
+
+              <span className="section-label">Breaks</span>
+              <div className="chips-display">
+                {(d.breaks || []).map((b, idx) => (
+                  <div className="mini-chip" key={idx}>{b.start} - {b.end}</div>
+                ))}
+                {(!d.breaks || d.breaks.length === 0) && <span style={{fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic'}}>No breaks scheduled</span>}
+              </div>
+
+              <span className="section-label">Leave days</span>
+              <div className="chips-display">
+                {(d.leaveDays || []).map(day => (
+                  <div className="mini-chip red" key={day}>{day}</div>
+                ))}
+                {(!d.leaveDays || d.leaveDays.length === 0) && <span style={{fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic'}}>No upcoming leaves</span>}
+              </div>
+
+              <div className="card-footer-actions" style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+                <button 
+                  style={{ flex: 1, padding: '12px', backgroundColor: '#0ea5e9', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                  onClick={() => setEditingDentist(d)}
+                >
+                  Edit Profile
+                </button>
+                <button 
+                  style={{ flex: 1, padding: '12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                  onClick={() => handleDeleteDentist(d.id, d.name || `${d.first_name} ${d.last_name}`)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {isAddModalOpen && (
+        <AddDentistModal
+          onClose={() => setIsAddModalOpen(false)}
+          onSuccess={() => {
+            setIsAddModalOpen(false);
+            api.loadDentists();
+            toast.success("Dentist added successfully");
+          }}
+        />
+      )}
+
+      {editingDentist && (
+        <EditDentistModal
+          dentist={editingDentist}
+          onClose={() => setEditingDentist(null)}
+          onSuccess={() => {
+            setEditingDentist(null);
+            api.loadDentists(); 
+          }}
+        />
+      )}
     </div>
   );
 }
