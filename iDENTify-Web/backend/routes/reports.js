@@ -1,50 +1,185 @@
+// const express = require("express");
+// const router = express.Router();
+// const db = require("../db");
+
+
+// router.get("/", async (req, res) => {
+//   try {
+//     const { date } = req.query;
+//     // Default to today if no date is provided
+//     const reportDate = date || new Date().toISOString().split('T')[0];
+
+//     // 1. Daily Summary Queries
+    
+//     // A. Patients Seen (Unique patients with appointments marked 'Done' on the selected date)
+//     const [patientsSeenRes] = await db.query(
+//       `SELECT COUNT(DISTINCT patient_id) as count 
+//        FROM appointments 
+//        WHERE DATE(appointment_datetime) = ? AND status = 'Done'`,
+//       [reportDate]
+//     );
+
+//     // B. Procedures Done (Total 'Done' appointments)
+//     const [proceduresRes] = await db.query(
+//       `SELECT COUNT(*) as count 
+//        FROM appointments 
+//        WHERE DATE(appointment_datetime) = ? AND status = 'Done'`,
+//       [reportDate]
+//     );
+
+//     // C. New Patients (Patients registered on the selected date)
+//     let newPatients = 0;
+//     try {
+//         const [newPatientsRes] = await db.query(
+//             `SELECT COUNT(*) as count FROM patients WHERE DATE(created_at) = ?`,
+//             [reportDate]
+//         );
+//         newPatients = newPatientsRes[0].count;
+//     } catch (e) {
+//         console.warn("Could not query new patients (missing created_at?)", e);
+//     }
+
+//     // D. Average Treatment Duration (Difference between start and end time for Done appts)
+//     const [durationRes] = await db.query(
+//       `SELECT AVG(TIMESTAMPDIFF(MINUTE, appointment_datetime, end_datetime)) as avg_min 
+//        FROM appointments 
+//        WHERE DATE(appointment_datetime) = ? AND status = 'Done' AND end_datetime IS NOT NULL`,
+//       [reportDate]
+//     );
+
+//     // 2. Dentist Performance
+//     const [dentistPerformance] = await db.query(`
+//       SELECT
+//         d.id,
+//         d.name,
+//         COUNT(a.id) AS patientsHandled,
+//         COALESCE(AVG(TIMESTAMPDIFF(MINUTE, a.appointment_datetime, a.end_datetime)), 0) as avgTimePerPatient
+//       FROM dentists d
+//       LEFT JOIN appointments a ON d.id = a.dentist_id 
+//            AND DATE(a.appointment_datetime) = ? 
+//            AND a.status = 'Done'
+//       GROUP BY d.id, d.name
+//     `, [reportDate]);
+
+//     // 3. Treatment Distribution
+//     const [distributionRes] = await db.query(`
+//       SELECT
+//         dentist_id,
+//         reason as treatment,
+//         COUNT(id) as count
+//       FROM appointments
+//       WHERE DATE(appointment_datetime) = ? AND status = 'Done' AND dentist_id IS NOT NULL
+//       GROUP BY dentist_id, reason
+//     `, [reportDate]);
+    
+//     const distributionMap = distributionRes.reduce((acc, row) => {
+//         if (!acc[row.dentist_id]) {
+//             acc[row.dentist_id] = {};
+//         }
+//         const treatmentName = row.treatment || 'Unspecified';
+//         acc[row.dentist_id][treatmentName] = row.count;
+//         return acc;
+//     }, {});
+
+//     dentistPerformance.forEach(dentist => {
+//         dentist.treatmentDistribution = distributionMap[dentist.id] || {};
+//     });
+
+//     res.json({
+//       date: reportDate,
+//       dailySummary: {
+//         patientsSeen: patientsSeenRes[0].count || 0,
+//         proceduresDone: proceduresRes[0].count || 0,
+//         newPatients: newPatients,
+//         avgTreatmentDuration: durationRes[0].avg_min ? `${Math.round(durationRes[0].avg_min)} min` : "0 min",
+//       },
+//       dentistPerformance,
+//     });
+
+//   } catch (err) {
+//     console.error("Reports API Error:", err);
+//     res.status(500).json({ message: "Failed to load reports" });
+//   }
+// });
+
+
+// // Get detailed list of patients for a specific dentist on a specific date
+// router.get("/dentist/:id/patients", async (req, res) => {
+//   const { id } = req.params;
+//   const { date } = req.query;
+//   // Default to today if no date is provided
+//   const reportDate = date || new Date().toISOString().split('T')[0];
+
+//   try {
+//     const query = `
+//       SELECT 
+//         p.full_name, 
+//         a.appointment_datetime,
+//         a.reason
+//       FROM patients p
+//       JOIN appointments a ON p.id = a.patient_id
+//       WHERE a.dentist_id = ? 
+//       AND DATE(a.appointment_datetime) = ?
+//       AND a.status = 'Done'
+//       ORDER BY a.appointment_datetime ASC
+//     `;
+//     const [rows] = await db.query(query, [id, reportDate]);
+//     res.json({ patients: rows });
+//   } catch (error) {
+//     console.error("Error fetching dentist patient details:", error);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
+
+// module.exports = router;
+
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
-
 router.get("/", async (req, res) => {
   try {
-    const { date } = req.query;
-    // Default to today if no date is provided
-    const reportDate = date || new Date().toISOString().split('T')[0];
+    const { startDate, endDate, date } = req.query;
+    // Default to today if no dates are provided (supports legacy 'date' param too)
+    const start = startDate || date || new Date().toISOString().split('T')[0];
+    const end = endDate || start;
 
-    // 1. Daily Summary Queries
+    // 1. Daily/Range Summary Queries
     
-    // A. Patients Seen (Unique patients with appointments marked 'Done' on the selected date)
+    // A. Patients Seen (Unique patients with appointments marked 'Done' in range)
     const [patientsSeenRes] = await db.query(
       `SELECT COUNT(DISTINCT patient_id) as count 
        FROM appointments 
-       WHERE DATE(appointment_datetime) = ? AND status = 'Done'`,
-      [reportDate]
+       WHERE DATE(appointment_datetime) BETWEEN ? AND ? AND status = 'Done'`,
+      [start, end]
     );
 
-    // B. Procedures Done (Total 'Done' appointments)
+    // B. Procedures Done (Total 'Done' appointments in range)
     const [proceduresRes] = await db.query(
       `SELECT COUNT(*) as count 
        FROM appointments 
-       WHERE DATE(appointment_datetime) = ? AND status = 'Done'`,
-      [reportDate]
+       WHERE DATE(appointment_datetime) BETWEEN ? AND ? AND status = 'Done'`,
+      [start, end]
     );
 
-    // C. New Patients (Patients registered on the selected date)
+    // C. New Patients (Patients registered in range)
     let newPatients = 0;
     try {
         const [newPatientsRes] = await db.query(
-            `SELECT COUNT(*) as count FROM patients WHERE DATE(created_at) = ?`,
-            [reportDate]
+            `SELECT COUNT(*) as count FROM patients WHERE DATE(created_at) BETWEEN ? AND ?`,
+            [start, end]
         );
         newPatients = newPatientsRes[0].count;
     } catch (e) {
         console.warn("Could not query new patients (missing created_at?)", e);
     }
 
-    // D. Average Treatment Duration (Difference between start and end time for Done appts)
+    // D. Average Treatment Duration 
     const [durationRes] = await db.query(
       `SELECT AVG(TIMESTAMPDIFF(MINUTE, appointment_datetime, end_datetime)) as avg_min 
        FROM appointments 
-       WHERE DATE(appointment_datetime) = ? AND status = 'Done' AND end_datetime IS NOT NULL`,
-      [reportDate]
+       WHERE DATE(appointment_datetime) BETWEEN ? AND ? AND status = 'Done' AND end_datetime IS NOT NULL`,
+      [start, end]
     );
 
     // 2. Dentist Performance
@@ -56,10 +191,10 @@ router.get("/", async (req, res) => {
         COALESCE(AVG(TIMESTAMPDIFF(MINUTE, a.appointment_datetime, a.end_datetime)), 0) as avgTimePerPatient
       FROM dentists d
       LEFT JOIN appointments a ON d.id = a.dentist_id 
-           AND DATE(a.appointment_datetime) = ? 
+           AND DATE(a.appointment_datetime) BETWEEN ? AND ? 
            AND a.status = 'Done'
       GROUP BY d.id, d.name
-    `, [reportDate]);
+    `, [start, end]);
 
     // 3. Treatment Distribution
     const [distributionRes] = await db.query(`
@@ -68,9 +203,9 @@ router.get("/", async (req, res) => {
         reason as treatment,
         COUNT(id) as count
       FROM appointments
-      WHERE DATE(appointment_datetime) = ? AND status = 'Done' AND dentist_id IS NOT NULL
+      WHERE DATE(appointment_datetime) BETWEEN ? AND ? AND status = 'Done' AND dentist_id IS NOT NULL
       GROUP BY dentist_id, reason
-    `, [reportDate]);
+    `, [start, end]);
     
     const distributionMap = distributionRes.reduce((acc, row) => {
         if (!acc[row.dentist_id]) {
@@ -86,7 +221,8 @@ router.get("/", async (req, res) => {
     });
 
     res.json({
-      date: reportDate,
+      startDate: start,
+      endDate: end,
       dailySummary: {
         patientsSeen: patientsSeenRes[0].count || 0,
         proceduresDone: proceduresRes[0].count || 0,
@@ -102,13 +238,12 @@ router.get("/", async (req, res) => {
   }
 });
 
-
-// Get detailed list of patients for a specific dentist on a specific date
+// Get detailed list of patients for a specific dentist on a specific date range
 router.get("/dentist/:id/patients", async (req, res) => {
   const { id } = req.params;
-  const { date } = req.query;
-  // Default to today if no date is provided
-  const reportDate = date || new Date().toISOString().split('T')[0];
+  const { startDate, endDate, date } = req.query;
+  const start = startDate || date || new Date().toISOString().split('T')[0];
+  const end = endDate || start;
 
   try {
     const query = `
@@ -119,11 +254,11 @@ router.get("/dentist/:id/patients", async (req, res) => {
       FROM patients p
       JOIN appointments a ON p.id = a.patient_id
       WHERE a.dentist_id = ? 
-      AND DATE(a.appointment_datetime) = ?
+      AND DATE(a.appointment_datetime) BETWEEN ? AND ?
       AND a.status = 'Done'
       ORDER BY a.appointment_datetime ASC
     `;
-    const [rows] = await db.query(query, [id, reportDate]);
+    const [rows] = await db.query(query, [id, start, end]);
     res.json({ patients: rows });
   } catch (error) {
     console.error("Error fetching dentist patient details:", error);
