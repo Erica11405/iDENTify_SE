@@ -14,7 +14,7 @@
 .modal {
   background: white;
   padding: 2rem;
-  border-radius: 12px; /* Increased slightly for a smoother, softer look */
+  border-radius: 12px; 
   width: 100%;
   max-width: 600px; /* Matches the slightly wider look */
   max-height: 85vh; /* Restricts the height so it fits on the screen */
