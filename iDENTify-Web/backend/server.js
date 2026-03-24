@@ -38,6 +38,7 @@ app.get('/health', (req, res) => res.status(200).send('Healthy'));
 const apiRouter = express.Router();
 apiRouter.use("/auth", authRoutes); 
 apiRouter.use("/patients", patientsRoutes);
+app.use('/api/services', require('./routes/services'));
 apiRouter.use("/annual-records", annualRecordsRoutes);
 apiRouter.use("/appointments", appointmentsRoutes);
 apiRouter.use("/queue", queueRoutes);
