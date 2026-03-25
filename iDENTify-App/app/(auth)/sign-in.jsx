@@ -400,7 +400,6 @@
 // });
 
 
-
 import { useSignIn, useAuth } from "@clerk/clerk-expo";
 import { Link, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -427,13 +426,11 @@ export default function Page() {
   const [showPassword, setShowPassword] = React.useState(false);
 
   const onSignInPress = async () => {
-    // 1. If Clerk hasn't loaded (usually a missing .env key), alert the user
     if (!isLoaded) {
       Alert.alert("Not Ready", "Authentication is loading. If this persists, check your Clerk Publishable Key in your .env file.");
       return;
     }
 
-    // 2. Prevent sign-in attempt if already signed in
     if (isSignedIn) {
       router.replace("/");
       return;
@@ -451,13 +448,11 @@ export default function Page() {
         await setActive({ session: signInAttempt.createdSessionId });
         router.replace("/");
       } else {
-        // If status is "needs_first_factor" or similar
         console.error("Sign In Incomplete:", signInAttempt);
         Alert.alert("Login Incomplete", `Status: ${signInAttempt.status}. Have you verified your email?`);
       }
     } catch (err) {
       console.error("Sign In Error:", err);
-      // Clerk provides detailed 'longMessage' strings we can show the user
       const errorMessage = err.errors ? err.errors[0].longMessage : err.message || "Something went wrong.";
       Alert.alert("Login Failed", errorMessage);
     }
@@ -476,6 +471,7 @@ export default function Page() {
             keyboardType="email-address"
             value={emailAddress}
             placeholder="Enter email"
+            placeholderTextColor="#9CA3AF"
             style={styles.input}
             onChangeText={setEmailAddress}
           />
@@ -484,6 +480,7 @@ export default function Page() {
             <TextInput
               value={password}
               placeholder="Enter password"
+              placeholderTextColor="#9CA3AF"
               secureTextEntry={!showPassword}
               style={[styles.input, styles.passwordInput]}
               onChangeText={setPassword}
