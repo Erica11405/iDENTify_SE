@@ -1,5 +1,4 @@
 // import React, { useMemo, useState, useEffect } from "react";
-// import { useNavigate } from "react-router-dom";
 // import toast from "react-hot-toast";
 // import "../../styles/pages/aide/Appointments.css";
 // import EditAppointmentModal from "../../components/EditAppointmentModal";
@@ -22,7 +21,6 @@
 // }
 
 // function Appointments() {
-//   const navigate = useNavigate();
 //   const api = useApi();
 
 //   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
@@ -41,7 +39,7 @@
 //       }
 //     };
 //     loadData();
-//   }, []);
+//   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 //   const appointments = useAppStore((state) => state.appointments || []);
 //   const patients = useAppStore((state) => state.patients || []);
@@ -166,23 +164,10 @@
 //     if (!fullPatientData) return;
 //     const isAlreadyInQueue = queue.some((q) => String(q.patient_id) === String(patientId) && q.status !== 'Done' && q.status !== 'Cancelled');
 //     if (isAlreadyInQueue) { toast.error("Patient is already in the active Queue!"); return; }
-    
 //     try {
 //       await api.updateAppointment(appointment.id, { status: 'Checked-In' });
-      
-//       // FIXED: Generate strictly Philippine Time (Asia/Manila)
 //       const now = new Date();
-//       const phTimeStr = now.toLocaleString("en-US", { timeZone: "Asia/Manila", hour12: false });
-//       const phTime = new Date(phTimeStr);
-      
-//       const pad = (n) => (n < 10 ? '0' + n : n);
-//       const mysqlDateTime = phTime.getFullYear() + '-' +
-//              pad(phTime.getMonth() + 1) + '-' +
-//              pad(phTime.getDate()) + ' ' +
-//              pad(phTime.getHours()) + ':' +
-//              pad(phTime.getMinutes()) + ':' +
-//              pad(phTime.getSeconds());
-
+//       const mysqlDateTime = now.toISOString().slice(0, 19).replace('T', ' ');
 //       await api.addQueue({
 //         patient_id: patientId,
 //         appointment_id: appointment.id,
@@ -575,7 +560,9 @@ function Appointments() {
           <label>Dentist</label>
           <select value={filters.dentist} onChange={(e) => handleFilterChange("dentist", e.target.value)}>
             <option value="all">All</option>
-            {dentists.map((d) => (<option key={d.id} value={d.name}>{d.name}</option>))}
+            {dentists
+              .filter(d => d.specialization !== 'Dental Aide' && d.role !== 'aide')
+              .map((d) => (<option key={d.id} value={d.name}>{d.name}</option>))}
           </select>
         </div>
         

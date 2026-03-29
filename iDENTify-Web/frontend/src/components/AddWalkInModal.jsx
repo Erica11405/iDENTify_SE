@@ -2,134 +2,134 @@
 // import toast from 'react-hot-toast';
 // import useAppStore from '../store/useAppStore';
 // import '../styles/components/AddWalkInModal.css';
-// import api from "../api/apiClient"; //
+// import api from "../api/apiClient"; 
 
 // const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
-//   const dentists = useAppStore((state) => state.dentists); //
+//   const dentists = useAppStore((state) => state.dentists); 
 
 //   // --- TABS: NEW vs OLD ---
-//   const [activeTab, setActiveTab] = useState("new"); //
+//   const [activeTab, setActiveTab] = useState("new"); 
 
 //   // --- SEARCH STATE (For Old Patients) ---
-//   const [searchQuery, setSearchQuery] = useState(""); //
-//   const [searchResults, setSearchResults] = useState([]); //
-//   const [isSearching, setIsSearching] = useState(false); //
+//   const [searchQuery, setSearchQuery] = useState(""); 
+//   const [searchResults, setSearchResults] = useState([]); 
+//   const [isSearching, setIsSearching] = useState(false); 
 
 //   // --- FORM STATE ---
-//   const [firstName, setFirstName] = useState(''); //
-//   const [middleName, setMiddleName] = useState(''); //
-//   const [lastName, setLastName] = useState(''); //
+//   const [firstName, setFirstName] = useState(''); 
+//   const [middleName, setMiddleName] = useState(''); 
+//   const [lastName, setLastName] = useState(''); 
 
-//   const [birthday, setBirthday] = useState(''); //
-//   const [calculatedAge, setCalculatedAge] = useState(''); //
+//   const [birthday, setBirthday] = useState(''); 
+//   const [calculatedAge, setCalculatedAge] = useState(''); 
 
-//   const [sex, setSex] = useState(''); //
-//   const [contact, setContact] = useState(''); //
-//   const [dentistName, setDentistName] = useState(''); //
-//   const [dentistId, setDentistId] = useState(''); //
+//   const [sex, setSex] = useState(''); 
+//   const [contact, setContact] = useState(''); 
+//   const [dentistName, setDentistName] = useState(''); 
+//   const [dentistId, setDentistId] = useState(''); 
 
 //   // --- DYNAMIC SERVICES STATE ---
-//   const [availableServices, setAvailableServices] = useState([]); //
-//   const [selectedServices, setSelectedServices] = useState([]); //
-//   const [currentService, setCurrentService] = useState(""); //
+//   const [availableServices, setAvailableServices] = useState([]); 
+//   const [selectedServices, setSelectedServices] = useState([]); 
+//   const [currentService, setCurrentService] = useState(""); 
 
 //   // Fetch Dynamic Services from Database
 //   useEffect(() => {
 //     const fetchServices = async () => {
 //       try {
-//         const data = await api.getServices(); //
-//         setAvailableServices(data); //
+//         const data = await api.getServices(); 
+//         setAvailableServices(data); 
 //       } catch (error) {
-//         console.error("Failed to fetch dynamic services", error); //
+//         console.error("Failed to fetch dynamic services", error); 
 //       }
 //     };
 //     if (isOpen) {
-//         fetchServices(); //
+//         fetchServices(); 
 //     }
 //   }, [isOpen]);
 
 //   // AUTO-CALCULATE AGE LOGIC
 //   useEffect(() => {
 //     if (birthday) {
-//       const dob = new Date(birthday); //
-//       const today = new Date(); //
-//       let age = today.getFullYear() - dob.getFullYear(); //
-//       const m = today.getMonth() - dob.getMonth(); //
+//       const dob = new Date(birthday); 
+//       const today = new Date(); 
+//       let age = today.getFullYear() - dob.getFullYear(); 
+//       const m = today.getMonth() - dob.getMonth(); 
 //       if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-//         age--; //
+//         age--; 
 //       }
-//       setCalculatedAge(age >= 0 ? age : 0); //
+//       setCalculatedAge(age >= 0 ? age : 0); 
 //     } else {
-//       setCalculatedAge(''); //
+//       setCalculatedAge(''); 
 //     }
 //   }, [birthday]);
 
 //   // SEARCH LOGIC
 //   const handleSearch = async () => {
-//     if (!searchQuery.trim()) return; //
-//     setIsSearching(true); //
+//     if (!searchQuery.trim()) return; 
+//     setIsSearching(true); 
 //     try {
-//       const data = await api.searchPatients(searchQuery); //
-//       setSearchResults(data); //
-//       if (data.length === 0) toast.error("No patient found."); //
+//       const data = await api.searchPatients(searchQuery); 
+//       setSearchResults(data); 
+//       if (data.length === 0) toast.error("No patient found."); 
 //     } catch (error) {
-//       console.error(error); //
-//       toast.error("Search failed."); //
+//       console.error(error); 
+//       toast.error("Search failed."); 
 //     } finally {
-//       setIsSearching(false); //
+//       setIsSearching(false); 
 //     }
 //   };
 
 //   const handleSelectOldPatient = (patient) => {
-//     setFirstName(patient.first_name || patient.full_name || ""); //
-//     setMiddleName(patient.middle_name || ""); //
-//     setLastName(patient.last_name || ""); //
+//     setFirstName(patient.first_name || patient.full_name || ""); 
+//     setMiddleName(patient.middle_name || ""); 
+//     setLastName(patient.last_name || ""); 
 
-//     setBirthday(patient.birthdate ? patient.birthdate.split('T')[0] : ""); //
-//     setSex(patient.gender || patient.sex || ""); //
-//     setContact(patient.contact_number || patient.contact || ""); //
-//     setCalculatedAge((patient.vitals?.age || patient.age || "").toString()); //
+//     setBirthday(patient.birthdate ? patient.birthdate.split('T')[0] : ""); 
+//     setSex(patient.gender || patient.sex || ""); 
+//     setContact(patient.contact_number || patient.contact || ""); 
+//     setCalculatedAge((patient.vitals?.age || patient.age || "").toString()); 
 
-//     toast.success("Patient selected!"); //
-//     setSearchResults([]); //
-//     setSearchQuery(""); //
+//     toast.success("Patient selected!"); 
+//     setSearchResults([]); 
+//     setSearchQuery(""); 
 //   };
 
 //   const handleDentistChange = (e) => {
-//     const selectedId = e.target.value; //
-//     const selectedDentist = dentists.find(d => String(d.id) === String(selectedId)); //
-//     setDentistId(selectedId); //
-//     setDentistName(selectedDentist ? selectedDentist.name : ''); //
+//     const selectedId = e.target.value; 
+//     const selectedDentist = dentists.find(d => String(d.id) === String(selectedId)); 
+//     setDentistId(selectedId); 
+//     setDentistName(selectedDentist ? selectedDentist.name : ''); 
 //   };
 
 //   const handleAddService = () => {
-//     if (!currentService) return; //
+//     if (!currentService) return; 
 //     if (selectedServices.includes(currentService)) {
-//       toast.error("Service already selected"); //
+//       toast.error("Service already selected"); 
 //       return;
 //     }
-//     setSelectedServices([...selectedServices, currentService]); //
-//     setCurrentService(""); //
+//     setSelectedServices([...selectedServices, currentService]); 
+//     setCurrentService(""); 
 //   };
 
 //   const handleRemoveService = (serviceToRemove) => {
-//     setSelectedServices(selectedServices.filter(s => s !== serviceToRemove)); //
+//     setSelectedServices(selectedServices.filter(s => s !== serviceToRemove)); 
 //   };
 
 //   const handleSubmit = (e) => {
-//     e.preventDefault(); //
+//     e.preventDefault(); 
 
 //     if (!firstName.trim()) {
-//       toast.error('First Name is required.'); //
+//       toast.error('First Name is required.'); 
 //       return;
 //     }
 //     if (selectedServices.length === 0) {
-//       toast.error('Please select at least one Reason for Visit.'); //
+//       toast.error('Please select at least one Reason for Visit.'); 
 //       return;
 //     }
 
-//     const reasonString = selectedServices.join(", "); //
-//     const fullNameCombined = `${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`.trim(); //
+//     const reasonString = selectedServices.join(", "); 
+//     const fullNameCombined = `${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`.trim(); 
 
 //     onAddPatient({
 //       first_name: firstName,
@@ -147,7 +147,7 @@
 //       status: 'Checked-In',
 //       time: new Date().toLocaleTimeString(),
 //       isNewPatient: activeTab === "new"
-//     }); //
+//     }); 
 
 //     // Reset Form
 //     setFirstName('');
@@ -161,10 +161,10 @@
 //     setDentistName('');
 //     setDentistId('');
 //     setActiveTab("new");
-//     onClose(); //
+//     onClose(); 
 //   };
 
-//   if (!isOpen) return null; //
+//   if (!isOpen) return null; 
 
 //   return (
 //     <div className="modal-overlay">
@@ -322,6 +322,7 @@
 // };
 
 // export default AddWalkInModal;
+
 
 
 import React, { useState, useEffect } from 'react';
@@ -630,7 +631,9 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
             <label>Assigned Dentist</label>
             <select value={dentistId || ""} onChange={handleDentistChange}>
               <option value="">Select Dentist</option>
-              {dentists.map((d) => {
+              {dentists
+                .filter(d => d.specialization !== 'Dental Aide' && d.role !== 'aide')
+                .map((d) => {
                 const isUnavailable = d.status === "Off" || d.status === "Busy";
                 return <option key={d.id} value={d.id} disabled={d.status === "Off"}>{d.name} {isUnavailable ? `(${d.status})` : ""}</option>;
               })}

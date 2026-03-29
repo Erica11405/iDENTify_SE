@@ -1,7 +1,6 @@
 // import React, { useState, useMemo, useEffect } from "react";
 // import toast from "react-hot-toast";
-// import "../styles/components/AddWalkInModal.css"; // Using Walk-In CSS for matching UI
-// import { dentalServices } from "../data/services";
+// import "../styles/components/AddWalkInModal.css"; 
 // import api from "../api/apiClient";
 
 // // --- HELPERS ---
@@ -61,6 +60,22 @@
 //   const [selectedServices, setSelectedServices] = useState([]);
 //   const [currentService, setCurrentService] = useState("");
 //   const [isSaving, setIsSaving] = useState(false);
+//   const [availableServices, setAvailableServices] = useState([]);
+
+//   // Fetch Dynamic Services from Database
+//   useEffect(() => {
+//     const fetchServices = async () => {
+//       try {
+//         const data = await api.getServices();
+//         setAvailableServices(data);
+//       } catch (error) {
+//         console.error("Failed to fetch dynamic services", error);
+//       }
+//     };
+//     if (isOpen) {
+//         fetchServices();
+//     }
+//   }, [isOpen]);
 
 //   // 2. AVAILABILITY & SLOTS STATE
 //   const [availability, setAvailability] = useState({ count: 0, limit: 5, isFull: false, checked: false });
@@ -483,8 +498,10 @@
 //             <div className="service-input-group">
 //               <select value={currentService} onChange={(e) => setCurrentService(e.target.value)}>
 //                 <option value="">Select a service...</option>
-//                 {dentalServices.map((service, index) => (
-//                   <option key={index} value={service.name}>{service.name} ({service.price})</option>
+//                 {availableServices.map((service) => (
+//                   <option key={service.id} value={service.name}>
+//                     {service.name} (₱{service.min_price} - ₱{service.max_price})
+//                   </option>
 //                 ))}
 //               </select>
 //               <button type="button" className="add-service-btn" onClick={handleAddService}>+</button>
@@ -523,7 +540,6 @@
 // }
 
 // export default AddAppointmentModal;
-
 
 
 
@@ -961,7 +977,9 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
               <label>Dentist</label>
               <select name="dentist_id" value={form.dentist_id || ""} onChange={handleChange}>
                 <option value="">Select dentist</option>
-                {dentists.map((d) => (
+                {dentists
+                  .filter(d => d.specialization !== 'Dental Aide' && d.role !== 'aide')
+                  .map((d) => (
                   <option key={d.id} value={d.id} disabled={d.status === "Off"}>
                     {d.name} {d.status === "Off" ? "(Off)" : d.status === "Busy" ? "(Busy)" : ""}
                   </option>
