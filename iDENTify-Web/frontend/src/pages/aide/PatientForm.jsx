@@ -106,7 +106,7 @@
 // 					<path d="M 0,0 L 100,0 L 50,50 Z" fill={getColor(segments?.top)} className="tooth-poly" onClick={(e) => handleClick(e, 'top')} />
 // 					<path d="M 100,0 L 100,100 L 50,50 Z" fill={getColor(segments?.right)} className="tooth-poly" onClick={(e) => handleClick(e, 'right')} />
 // 					<path d="M 100,100 L 0,100 L 50,50 Z" fill={getColor(segments?.bottom)} className="tooth-poly" onClick={(e) => handleClick(e, 'bottom')} />
-// 					<path d="M 0,100 L 0,0 L 50,50 Z" fill={getColor(segments?.left)} className="tooth-poly" onClick={(e) => handleClick(e, 'left')} />
+// 					<path d="M 0,100 L 0,100 L 0,0 L 50,50 Z" fill={getColor(segments?.left)} className="tooth-poly" onClick={(e) => handleClick(e, 'left')} />
 // 					<circle cx="50" cy="50" r="25" fill={getColor(segments?.center) || "white"} stroke="#000" strokeWidth="2" className="tooth-poly" onClick={(e) => handleClick(e, 'center')} />
 // 				</svg>
 // 			</div>
@@ -299,7 +299,7 @@
 // 				const meds = await apiClient.getMedications(id, selectedYear);
 // 				setMedications(meds || []);
 
-//                 // --- SMART AUTO-POPULATION LOGIC (FIXED FOR DATABASE REASON COLUMN) ---
+//                 // --- SMART AUTO-POPULATION LOGIC ---
 // 				if ((timeline || []).length === 0) {
 //                     let dbAppointments = allAppointments;
 //                     if (!dbAppointments || dbAppointments.length === 0) {
@@ -331,7 +331,6 @@
 //                     const cleanTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 // 					if (linkedAppointment) {
-//                         // FIX: Explicitly check 'reason' from your database table
 //                         let procData = 
 //                             linkedAppointment.reason || 
 //                             linkedAppointment.procedure || 
@@ -379,10 +378,16 @@
 // 		loadAnnualData();
 // 	}, [id, selectedYear, location.state, allAppointments, queue]);
 
+//     // --- FIX: READ ONLY LOGIC ---
 // 	const maxYear = Math.max(...(yearsList.length > 0 ? yearsList : [1]));
 // 	const isLatestYear = selectedYear === maxYear;
-// 	const isChartReadOnly = !isLatestYear; 
-// 	const isVisitReadOnly = !isLatestYear; 
+    
+//     // Check if the record was opened from the History page (status is Done)
+//     const isHistoryView = location.state?.status === "Done";
+
+//     // Enforce read-only if it's an old year OR if the entire appointment/visit is already "Done"
+// 	const isChartReadOnly = !isLatestYear || isHistoryView; 
+// 	const isVisitReadOnly = !isLatestYear || isHistoryView; 
 
 // 	const getRecommendations = () => {
 // 		const issues = [];
@@ -498,6 +503,7 @@
 // 	};
 
 // 	const handleAddAlert = () => {
+//         if (isVisitReadOnly) return;
 // 		if (!alertInput.trim()) return;
 // 		const currentAlerts = patient.medicalAlerts || [];
 // 		if (currentAlerts.includes(alertInput.trim())) return;
@@ -507,6 +513,7 @@
 // 	};
 
 // 	const handleRemoveAlert = (alertToRemove) => {
+//         if (isVisitReadOnly) return;
 // 		const updatedAlerts = patient.medicalAlerts.filter(a => a !== alertToRemove);
 // 		setPatient(prev => ({ ...prev, medicalAlerts: updatedAlerts }));
 // 	};
@@ -645,10 +652,17 @@
 // 					</div>
 // 				</div>
 
-//                 {isDentistReviewing && (
+//                 {isDentistReviewing && !isHistoryView && (
 //                     <div className="review-banner" style={{ backgroundColor: "#e0f7fa", color: "#006064", padding: "15px", borderRadius: "8px", marginBottom: "20px", borderLeft: "5px solid #00bcd4" }}>
 //                         <strong style={{ display: "block", fontSize: "1.1em", marginBottom: "5px" }}>Dentist Review Mode</strong>
 //                         <span>Please double-check the patient data, charting, and timeline entered by the Dental Aide to ensure accuracy before beginning treatment.</span>
+//                     </div>
+//                 )}
+                
+//                 {isHistoryView && (
+//                     <div className="review-banner" style={{ backgroundColor: "#f0fdf4", color: "#166534", padding: "15px", borderRadius: "8px", marginBottom: "20px", borderLeft: "5px solid #22c55e" }}>
+//                         <strong style={{ display: "block", fontSize: "1.1em", marginBottom: "5px" }}>Historical Record</strong>
+//                         <span>This appointment has been completed. The chart is currently in read-only mode for viewing purposes.</span>
 //                     </div>
 //                 )}
 
@@ -699,14 +713,16 @@
 
 // 				<section style={{ marginTop: '20px', padding: '15px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
 // 					<h3 className="section-title">Medical Alerts & Allergies (Global)</h3>
-// 					<div className="medical-alert-input-group">
-// 						<input className="pill-input-input" placeholder="Type allergy (e.g. Asthma, Penicillin)" value={alertInput} onChange={(e) => setAlertInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddAlert()} />
-// 						<button className="small-btn" style={{ background: '#ef4444', minWidth: '60px' }} onClick={handleAddAlert}>+ Add</button>
-// 					</div>
-// 					<div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: '20px' }}>
+// 					{!isVisitReadOnly && (
+//                         <div className="medical-alert-input-group">
+//                             <input className="pill-input-input" placeholder="Type allergy (e.g. Asthma, Penicillin)" value={alertInput} onChange={(e) => setAlertInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddAlert()} />
+//                             <button className="small-btn" style={{ background: '#ef4444', minWidth: '60px' }} onClick={handleAddAlert}>+ Add</button>
+//                         </div>
+//                     )}
+// 					<div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: '20px', marginTop: isVisitReadOnly ? '10px' : '0' }}>
 // 						{(patient.medicalAlerts && patient.medicalAlerts.length > 0) ? (
 // 							patient.medicalAlerts.map((alert, i) => (
-// 								<span key={i} className="alert-chip">{alert}<button onClick={() => handleRemoveAlert(alert)}>×</button></span>
+// 								<span key={i} className="alert-chip">{alert}{!isVisitReadOnly && <button onClick={() => handleRemoveAlert(alert)}>×</button>}</span>
 // 							))
 // 						) : ( <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.9rem' }}>No active alerts.</span> )}
 // 					</div>
@@ -719,7 +735,7 @@
 // 							{recommendations.map((rec, i) => (
 // 								<div key={i} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '8px', background: '#fff', borderRadius: '6px', border: '1px solid #fed7aa' }}>
 // 									<div><strong style={{ color: '#9a3412' }}>{rec.tooth}</strong>: {rec.condition}<div style={{ fontSize: '0.9rem', color: '#431407', marginTop: '4px' }}>Suggest: {rec.treatments.join(", ")}</div></div>
-// 									<div style={{ display: 'flex', gap: '5px' }}>{rec.treatments.map((tx, idx) => ( <button key={idx} className="small-btn" style={{ fontSize: '0.75rem', padding: '4px 8px', background: '#f97316' }} onClick={() => handleApplyRecommendation(tx)} disabled={isVisitReadOnly}>+ {tx}</button> ))}</div>
+// 									<div style={{ display: 'flex', gap: '5px' }}>{rec.treatments.map((tx, idx) => ( <button key={idx} className="small-btn" style={{ fontSize: '0.75rem', padding: '4px 8px', background: isVisitReadOnly ? '#fdba74' : '#f97316', cursor: isVisitReadOnly ? 'not-allowed' : 'pointer' }} onClick={() => handleApplyRecommendation(tx)} disabled={isVisitReadOnly}>+ {tx}</button> ))}</div>
 // 								</div>
 // 							))}
 // 						</div>
@@ -730,10 +746,10 @@
 // 					<h3 className="section-title">Oral Health Condition</h3>
 // 					<div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
 // 						{yearsList.map(year => ( <button key={year} onClick={() => handleYearChange(year)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', backgroundColor: selectedYear === year ? '#2563eb' : '#e2e8f0', color: selectedYear === year ? 'white' : '#475569', boxShadow: selectedYear === year ? '0 2px 4px rgba(37,99,235,0.3)' : 'none', transition: 'all 0.2s' }}>Year {year}</button> ))}
-// 						<button onClick={handleAddYear} style={{ padding: '8px 12px', borderRadius: '20px', border: '2px dashed #cbd5e1', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', backgroundColor: 'transparent', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Add Next Year">+</button>
+// 						{!isHistoryView && <button onClick={handleAddYear} style={{ padding: '8px 12px', borderRadius: '20px', border: '2px dashed #cbd5e1', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', backgroundColor: 'transparent', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Add Next Year">+</button>}
 // 					</div>
 // 					<div className="status-palette">
-// 						{["issue", "planned", "completed"].map((status) => ( <button key={status} className={`status-pill${activeStatus === status ? " active" : ""}`} onClick={() => setActiveStatus(status)}><span className={`status-dot ${status}`}></span>{status === "issue" ? "Issue (red)" : status === "planned" ? "Planned (blue)" : "Completed (green)"}</button> ))}
+// 						{["issue", "planned", "completed"].map((status) => ( <button key={status} className={`status-pill${activeStatus === status ? " active" : ""}`} onClick={() => !isChartReadOnly && setActiveStatus(status)} disabled={isChartReadOnly}><span className={`status-dot ${status}`}></span>{status === "issue" ? "Issue (red)" : status === "planned" ? "Planned (blue)" : "Completed (green)"}</button> ))}
 // 					</div>
 // 					<div className="tooth-chart-container">
 // 						<div className="tooth-inner-panel">
@@ -795,7 +811,7 @@
 // 					)}
 
 // 					<div className="timeline-list-compact" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-// 						{(timelineEntries || []).map((entry) => (
+// 						{(timelineEntries || []).length === 0 ? <div className="muted-text">No timeline entries.</div> : (timelineEntries || []).map((entry) => (
 // 							<div key={entry.id} className="timeline-item-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 18px', background: '#fff', border: '1px solid #edf2f7', borderRadius: '8px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
 // 								<div style={{ display: 'flex', flex: 1, gap: '25px', alignItems: 'center' }}>
 //                                     <div style={{ minWidth: '140px' }}>
@@ -837,7 +853,7 @@
 // 						</div>
 // 					)}
 // 					<div className="medication-list">
-// 						{(medications || []).map((m) => (
+// 						{(medications || []).length === 0 ? <div className="muted-text">No medications listed.</div> : (medications || []).map((m) => (
 // 							<div key={m.id} className="medication-entry"><strong>{m.medicine}</strong> — {m.dosage || ""} — {m.frequency || ""}<div className="muted-text">{m.notes}</div>{!isVisitReadOnly && <div className="medication-entry-actions"><button className="small-btn danger" onClick={() => deleteMedication(m.id)}>Delete</button></div>}</div>
 // 						))}
 // 					</div>
@@ -859,7 +875,9 @@
 //                             {isSaving ? "Saving..." : (isDentistReviewing ? "Verify & Save Progress" : "Save Appointment Progress")}
 //                         </button>
 //                     ) : ( 
-//                         <div style={{ color: 'green', fontWeight: 'bold' }}>Year {selectedYear} is Historical (Read-Only)</div> 
+//                         <div style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+//                             ✓ {isHistoryView ? "Completed Appointment Record (Read-Only)" : `Year ${selectedYear} is Historical (Read-Only)`}
+//                         </div> 
 //                     )}
 //                 </div>
 
@@ -884,6 +902,7 @@
 // }
 
 // export default PatientForm;
+
 
 
 
@@ -1189,75 +1208,78 @@ function PatientForm({ userRole }) {
 				setMedications(meds || []);
 
                 // --- SMART AUTO-POPULATION LOGIC ---
-				if ((timeline || []).length === 0) {
-                    let dbAppointments = allAppointments;
-                    if (!dbAppointments || dbAppointments.length === 0) {
-                        try {
-                            const API_BASE = import.meta.env.VITE_API_BASE || "/api";
-                            const res = await fetch(`${API_BASE}/appointments`);
-                            if (res.ok) dbAppointments = await res.json();
-                        } catch (e) { console.error("Failed to fetch appointments", e); }
-                    }
+				let dbAppointments = allAppointments;
+				if (!dbAppointments || dbAppointments.length === 0) {
+					try {
+						const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+						const res = await fetch(`${API_BASE}/appointments`);
+						if (res.ok) dbAppointments = await res.json();
+					} catch (e) { console.error("Failed to fetch appointments", e); }
+				}
 
-					let linkedAppointment = location.state?.appointment;
-					if (!linkedAppointment && dbAppointments) {
-						linkedAppointment = dbAppointments.find(a => 
-                            String(a.patient_id) === String(id) && 
-                            a.status?.toLowerCase() !== "done" && 
-                            a.status?.toLowerCase() !== "cancelled"
-                        );
-					}
-					if (!linkedAppointment && queue) {
-						linkedAppointment = queue.find(q => 
-                            String(q.patient_id) === String(id) && 
-                            q.status?.toLowerCase() !== "done" && 
-                            q.status?.toLowerCase() !== "cancelled"
-                        );
-					}
+				let linkedAppointment = location.state?.appointment;
+				if (!linkedAppointment && dbAppointments) {
+					linkedAppointment = dbAppointments.find(a => 
+						String(a.patient_id) === String(id) && 
+						a.status?.toLowerCase() !== "done" && 
+						a.status?.toLowerCase() !== "cancelled"
+					);
+				}
+				if (!linkedAppointment && queue) {
+					linkedAppointment = queue.find(q => 
+						String(q.patient_id) === String(id) && 
+						q.status?.toLowerCase() !== "done" && 
+						q.status?.toLowerCase() !== "cancelled"
+					);
+				}
 
-                    const now = new Date();
-                    const cleanDate = now.toLocaleDateString();
-                    const cleanTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+				const now = new Date();
+				const cleanDate = now.toLocaleDateString();
+				const cleanTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-					if (linkedAppointment) {
-                        let procData = 
-                            linkedAppointment.reason || 
-                            linkedAppointment.procedure || 
-                            linkedAppointment.procedures || 
-                            linkedAppointment.service || 
-                            linkedAppointment.services || 
-                            linkedAppointment.dental_service || 
-                            "";
-						
-                        if (typeof procData === 'string' && procData.trim() !== "") {
+				if (linkedAppointment) {
+					let procData = 
+						linkedAppointment.reason || 
+						linkedAppointment.procedure || 
+						linkedAppointment.procedures || 
+						linkedAppointment.service || 
+						linkedAppointment.services || 
+						linkedAppointment.dental_service || 
+						"";
+					
+					if (typeof procData === 'string' && procData.trim() !== "") {
+						try {
+							// Parse in case procedure is a JSON array from DB
+							const parsed = JSON.parse(procData);
+							if (Array.isArray(parsed)) {
+								setSelectedTimelineServices(parsed);
+							} else {
+								setSelectedTimelineServices(procData.split(',').map(s => s.trim()).filter(Boolean));
+							}
+						} catch (e) {
+							// Standard comma separated fallback
 							const procedures = procData.split(',').map(s => s.trim()).filter(Boolean);
 							setSelectedTimelineServices(procedures);
-						} else if (Array.isArray(procData) && procData.length > 0) {
-                            setSelectedTimelineServices(procData);
-                        } else {
-                            setSelectedTimelineServices([]);
-                        }
-                        
-						let formattedStart = "";
-						if (linkedAppointment.appointment_datetime) {
-							const dateObj = new Date(linkedAppointment.appointment_datetime);
-							formattedStart = `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-						} else if (linkedAppointment.timeStart || linkedAppointment.time) {
-                            const timeStr = linkedAppointment.timeStart || linkedAppointment.time;
-							formattedStart = `${cleanDate} ${timeStr}`;
-						} else { 
-                            formattedStart = `${cleanDate} ${cleanTime}`; 
-                        }
-
-						setTimelineForm(prev => ({ ...prev, start_time: formattedStart }));
+						}
+					} else if (Array.isArray(procData) && procData.length > 0) {
+						setSelectedTimelineServices(procData);
 					} else {
-                        setTimelineForm({ start_time: `${cleanDate} ${cleanTime}` });
-					    setSelectedTimelineServices([]);
-                    }
+						setSelectedTimelineServices([]);
+					}
+					
+					let formattedStart = "";
+					if (linkedAppointment.appointment_datetime) {
+						const dateObj = new Date(linkedAppointment.appointment_datetime);
+						formattedStart = `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+					} else if (linkedAppointment.timeStart || linkedAppointment.time) {
+						const timeStr = linkedAppointment.timeStart || linkedAppointment.time;
+						formattedStart = `${cleanDate} ${timeStr}`;
+					} else { 
+						formattedStart = `${cleanDate} ${cleanTime}`; 
+					}
+
+					setTimelineForm(prev => ({ ...prev, start_time: formattedStart }));
 				} else {
-                    const now = new Date();
-                    const cleanDate = now.toLocaleDateString();
-                    const cleanTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 					setTimelineForm({ start_time: `${cleanDate} ${cleanTime}` });
 					setSelectedTimelineServices([]);
 				}
