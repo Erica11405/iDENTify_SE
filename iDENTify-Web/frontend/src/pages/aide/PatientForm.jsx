@@ -300,75 +300,78 @@
 // 				setMedications(meds || []);
 
 //                 // --- SMART AUTO-POPULATION LOGIC ---
-// 				if ((timeline || []).length === 0) {
-//                     let dbAppointments = allAppointments;
-//                     if (!dbAppointments || dbAppointments.length === 0) {
-//                         try {
-//                             const API_BASE = import.meta.env.VITE_API_BASE || "/api";
-//                             const res = await fetch(`${API_BASE}/appointments`);
-//                             if (res.ok) dbAppointments = await res.json();
-//                         } catch (e) { console.error("Failed to fetch appointments", e); }
-//                     }
+// 				let dbAppointments = allAppointments;
+// 				if (!dbAppointments || dbAppointments.length === 0) {
+// 					try {
+// 						const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+// 						const res = await fetch(`${API_BASE}/appointments`);
+// 						if (res.ok) dbAppointments = await res.json();
+// 					} catch (e) { console.error("Failed to fetch appointments", e); }
+// 				}
 
-// 					let linkedAppointment = location.state?.appointment;
-// 					if (!linkedAppointment && dbAppointments) {
-// 						linkedAppointment = dbAppointments.find(a => 
-//                             String(a.patient_id) === String(id) && 
-//                             a.status?.toLowerCase() !== "done" && 
-//                             a.status?.toLowerCase() !== "cancelled"
-//                         );
-// 					}
-// 					if (!linkedAppointment && queue) {
-// 						linkedAppointment = queue.find(q => 
-//                             String(q.patient_id) === String(id) && 
-//                             q.status?.toLowerCase() !== "done" && 
-//                             q.status?.toLowerCase() !== "cancelled"
-//                         );
-// 					}
+// 				let linkedAppointment = location.state?.appointment;
+// 				if (!linkedAppointment && dbAppointments) {
+// 					linkedAppointment = dbAppointments.find(a => 
+// 						String(a.patient_id) === String(id) && 
+// 						a.status?.toLowerCase() !== "done" && 
+// 						a.status?.toLowerCase() !== "cancelled"
+// 					);
+// 				}
+// 				if (!linkedAppointment && queue) {
+// 					linkedAppointment = queue.find(q => 
+// 						String(q.patient_id) === String(id) && 
+// 						q.status?.toLowerCase() !== "done" && 
+// 						q.status?.toLowerCase() !== "cancelled"
+// 					);
+// 				}
 
-//                     const now = new Date();
-//                     const cleanDate = now.toLocaleDateString();
-//                     const cleanTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+// 				const now = new Date();
+// 				const cleanDate = now.toLocaleDateString();
+// 				const cleanTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-// 					if (linkedAppointment) {
-//                         let procData = 
-//                             linkedAppointment.reason || 
-//                             linkedAppointment.procedure || 
-//                             linkedAppointment.procedures || 
-//                             linkedAppointment.service || 
-//                             linkedAppointment.services || 
-//                             linkedAppointment.dental_service || 
-//                             "";
-						
-//                         if (typeof procData === 'string' && procData.trim() !== "") {
+// 				if (linkedAppointment) {
+// 					let procData = 
+// 						linkedAppointment.reason || 
+// 						linkedAppointment.procedure || 
+// 						linkedAppointment.procedures || 
+// 						linkedAppointment.service || 
+// 						linkedAppointment.services || 
+// 						linkedAppointment.dental_service || 
+// 						"";
+					
+// 					if (typeof procData === 'string' && procData.trim() !== "") {
+// 						try {
+// 							// Parse in case procedure is a JSON array from DB
+// 							const parsed = JSON.parse(procData);
+// 							if (Array.isArray(parsed)) {
+// 								setSelectedTimelineServices(parsed);
+// 							} else {
+// 								setSelectedTimelineServices(procData.split(',').map(s => s.trim()).filter(Boolean));
+// 							}
+// 						} catch (e) {
+// 							// Standard comma separated fallback
 // 							const procedures = procData.split(',').map(s => s.trim()).filter(Boolean);
 // 							setSelectedTimelineServices(procedures);
-// 						} else if (Array.isArray(procData) && procData.length > 0) {
-//                             setSelectedTimelineServices(procData);
-//                         } else {
-//                             setSelectedTimelineServices([]);
-//                         }
-                        
-// 						let formattedStart = "";
-// 						if (linkedAppointment.appointment_datetime) {
-// 							const dateObj = new Date(linkedAppointment.appointment_datetime);
-// 							formattedStart = `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-// 						} else if (linkedAppointment.timeStart || linkedAppointment.time) {
-//                             const timeStr = linkedAppointment.timeStart || linkedAppointment.time;
-// 							formattedStart = `${cleanDate} ${timeStr}`;
-// 						} else { 
-//                             formattedStart = `${cleanDate} ${cleanTime}`; 
-//                         }
-
-// 						setTimelineForm(prev => ({ ...prev, start_time: formattedStart }));
+// 						}
+// 					} else if (Array.isArray(procData) && procData.length > 0) {
+// 						setSelectedTimelineServices(procData);
 // 					} else {
-//                         setTimelineForm({ start_time: `${cleanDate} ${cleanTime}` });
-// 					    setSelectedTimelineServices([]);
-//                     }
+// 						setSelectedTimelineServices([]);
+// 					}
+					
+// 					let formattedStart = "";
+// 					if (linkedAppointment.appointment_datetime) {
+// 						const dateObj = new Date(linkedAppointment.appointment_datetime);
+// 						formattedStart = `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+// 					} else if (linkedAppointment.timeStart || linkedAppointment.time) {
+// 						const timeStr = linkedAppointment.timeStart || linkedAppointment.time;
+// 						formattedStart = `${cleanDate} ${timeStr}`;
+// 					} else { 
+// 						formattedStart = `${cleanDate} ${cleanTime}`; 
+// 					}
+
+// 					setTimelineForm(prev => ({ ...prev, start_time: formattedStart }));
 // 				} else {
-//                     const now = new Date();
-//                     const cleanDate = now.toLocaleDateString();
-//                     const cleanTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 // 					setTimelineForm({ start_time: `${cleanDate} ${cleanTime}` });
 // 					setSelectedTimelineServices([]);
 // 				}

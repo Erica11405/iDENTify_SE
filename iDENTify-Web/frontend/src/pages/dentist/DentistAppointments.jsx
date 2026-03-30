@@ -225,7 +225,7 @@ function DentistAppointments() {
                         className="review-chart-btn"
                         onClick={() => navigate(`/patients/${appt.patient_id}`)} 
                       >
-                        Review Chart
+                        Review Form
                       </button>
                     </td>
                   </tr>

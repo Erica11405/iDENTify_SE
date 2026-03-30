@@ -432,7 +432,9 @@
 //               <label>Dentist</label>
 //               <select name="dentist_id" value={form.dentist_id || ""} onChange={handleChange}>
 //                 <option value="">Select dentist</option>
-//                 {dentists.map((d) => (
+//                 {dentists
+//                   .filter(d => d.specialization !== 'Dental Aide' && d.role !== 'aide')
+//                   .map((d) => (
 //                   <option key={d.id} value={d.id} disabled={d.status === "Off"}>
 //                     {d.name} {d.status === "Off" ? "(Off)" : d.status === "Busy" ? "(Busy)" : ""}
 //                   </option>
@@ -540,7 +542,6 @@
 // }
 
 // export default AddAppointmentModal;
-
 
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -704,18 +705,28 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
 
     const dayAppts = appointments.filter(a => {
       if (!a.appointment_datetime) return false;
-      const aDate = a.appointment_datetime.includes("T")
-        ? a.appointment_datetime.split("T")[0]
-        : a.appointment_datetime.split(" ")[0];
+
+      let aDate;
+      if (a.appointment_datetime.includes("T")) {
+        const d = new Date(a.appointment_datetime);
+        aDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      } else {
+        aDate = a.appointment_datetime.split(" ")[0];
+      }
       return aDate === form.appointmentDate;
+
     }).map(a => {
-      let timePart = "";
-      if (a.appointment_datetime.includes("T")) timePart = a.appointment_datetime.split("T")[1];
-      else timePart = a.appointment_datetime.split(" ")[1];
+      let h, m;
+      if (a.appointment_datetime.includes("T")) {
+        const d = new Date(a.appointment_datetime);
+        h = d.getHours();
+        m = d.getMinutes();
+      } else {
+        const timePart = a.appointment_datetime.split(" ")[1];
+        if (!timePart) return { start: -1, end: -1 };
+        [h, m] = timePart.split(':').map(Number);
+      }
 
-      if (!timePart) return { start: -1, end: -1 };
-
-      const [h, m] = timePart.split(':').map(Number);
       const startMins = h * 60 + m;
       return { start: startMins, end: startMins + 30 };
     });
