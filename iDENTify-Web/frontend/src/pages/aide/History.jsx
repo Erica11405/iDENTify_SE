@@ -137,7 +137,7 @@
 //             timeStart: queueItem.time_added ? new Date(queueItem.time_added).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""
 //         };
 
-//         navigate(`/app/patient/${queueItem.patient_id}/`, {
+//         navigate(`/patients/${queueItem.patient_id}`, {
 //             state: {
 //                 dentistId: queueItem.dentist_id,
 //                 status: queueItem.status,
@@ -318,7 +318,6 @@
 
 
 
-
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -339,7 +338,6 @@ function History() {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState(null);
 
-    const [search, setSearch] = useState("");
     const [filters, setFilters] = useState({
         dentist: "all",
         procedure: "all",
@@ -409,12 +407,6 @@ function History() {
 
     const filteredHistory = useMemo(() => {
         return baseHistoryList.filter((item) => {
-            const searchLower = search.toLowerCase();
-            const matchesSearch =
-                item.name.toLowerCase().includes(searchLower) ||
-                item.assignedDentist.toLowerCase().includes(searchLower) ||
-                item.procedureDisplay.toLowerCase().includes(searchLower);
-
             const matchesDentist = filters.dentist === "all" || item.assignedDentist === filters.dentist;
             const matchesProcedure = filters.procedure === "all" || item.procedureDisplay === filters.procedure;
 
@@ -428,9 +420,9 @@ function History() {
                 matchesDate = itemDateStr === filters.date;
             }
 
-            return matchesSearch && matchesDentist && matchesProcedure && matchesDate;
+            return matchesDentist && matchesProcedure && matchesDate;
         }).map((item, i) => ({ ...item, number: i + 1 }));
-    }, [baseHistoryList, search, filters]);
+    }, [baseHistoryList, filters]);
 
     const indexOfLastItem = currentPage * rowsPerPage;
     const indexOfFirstItem = indexOfLastItem - rowsPerPage;
@@ -496,17 +488,6 @@ function History() {
         <div className="history-page">
             <div className="history-header">
                 <h2 className="history-title">Patient History</h2>
-                <div className="history-search">
-                    <input
-                        type="text"
-                        placeholder="Search patient, dentist, or procedure..."
-                        value={search}
-                        onChange={(e) => {
-                            setSearch(e.target.value);
-                            setCurrentPage(1);
-                        }}
-                    />
-                </div>
             </div>
 
             <div className="history-filters">
@@ -549,7 +530,7 @@ function History() {
                     </select>
                 </div>
 
-                {(filters.date || filters.dentist !== 'all' || filters.procedure !== 'all' || search) && (
+                {(filters.date || filters.dentist !== 'all' || filters.procedure !== 'all') && (
                     <div className="filter-group" style={{ justifyContent: 'flex-end' }}>
                         <label>&nbsp;</label>
                         <button
@@ -557,7 +538,6 @@ function History() {
                             style={{ margin: 0 }}
                             onClick={() => {
                                 setFilters({ dentist: "all", procedure: "all", date: "" });
-                                setSearch("");
                             }}
                         >
                             Reset

@@ -2,6 +2,9 @@
 // const cors = require("cors");
 // require("dotenv").config();
 
+// // Force Node.js to run in Philippine Standard Time
+// process.env.TZ = "Asia/Manila";
+
 // // 1. Import Routes - FIXED: changed from "./works/appointments" to "./routes/appointments"
 // const patientsRoutes = require("./routes/patients");
 // const annualRecordsRoutes = require("./routes/annual_records");
