@@ -535,4 +535,21 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+
+// DELETE PATIENT (Family Member)
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const [result] = await db.query("DELETE FROM patients WHERE id = ?", [id]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Patient not found" });
+    }
+
+    res.json({ message: "Family member deleted successfully" });
+  } catch (error) {
+    console.error("Delete failed:", error);
+    res.status(500).json({ message: "Delete failed", error: error.message });
+  }
+});
 module.exports = router;
