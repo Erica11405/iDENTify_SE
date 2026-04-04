@@ -69,7 +69,7 @@ require("dotenv").config();
 // Force Node.js to run in Philippine Standard Time
 process.env.TZ = "Asia/Manila";
 
-// 1. Import Routes - FIXED: changed from "./works/appointments" to "./routes/appointments"
+// 1. Import Routes
 const patientsRoutes = require("./routes/patients");
 const annualRecordsRoutes = require("./routes/annual_records");
 const appointmentsRoutes = require("./routes/appointments"); 
@@ -81,6 +81,7 @@ const dentistsRoutes = require("./routes/dentists");
 const treatmentsRoutes = require("./routes/treatments");
 const reportsRoutes = require("./routes/reports");
 const authRoutes = require("./routes/auth"); 
+const clinicMedicationsRoutes = require("./routes/clinic_medications"); // Added dynamic medications route
 
 const app = express();
 
@@ -106,6 +107,7 @@ const apiRouter = express.Router();
 apiRouter.use("/auth", authRoutes); 
 apiRouter.use("/patients", patientsRoutes);
 app.use('/api/services', require('./routes/services'));
+app.use('/api/clinic-medications', clinicMedicationsRoutes); // Added dynamic medications
 apiRouter.use("/annual-records", annualRecordsRoutes);
 apiRouter.use("/appointments", appointmentsRoutes);
 apiRouter.use("/queue", queueRoutes);

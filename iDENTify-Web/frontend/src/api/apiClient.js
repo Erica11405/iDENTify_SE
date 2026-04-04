@@ -250,13 +250,12 @@
 //     getQueue, addQueueItem, updateQueueItem, deleteQueueItem,
 //     getAppointments, updateAppointment,
 //     getReports, getDentistPatientsForReport, get,
-//     getServices, createService, deleteService, // Added these back to fix the error
+//     getServices, createService, deleteService,
 //     getAnnualRecord, saveAnnualRecord, getToothConditions, upsertToothCondition,
 //     getTreatmentTimeline, addTreatmentTimelineEntry, getMedications, addMedication
 // };
 
 // export default api;
-
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
@@ -436,8 +435,46 @@ export const createService = async (payload) => {
     return handleResponse(res);
 };
 
+export const updateService = async (id, payload) => {
+    const res = await fetch(`${API_BASE}/services/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
 export const deleteService = async (id) => {
     const res = await fetch(`${API_BASE}/services/${id}`, { method: 'DELETE' });
+    return handleResponse(res);
+};
+
+/* --- Clinic Medications Master List --- */
+export const getClinicMedications = async () => {
+    const res = await fetch(`${API_BASE}/clinic-medications`);
+    return handleResponse(res);
+};
+
+export const createClinicMedication = async (payload) => {
+    const res = await fetch(`${API_BASE}/clinic-medications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const updateClinicMedication = async (id, payload) => {
+    const res = await fetch(`${API_BASE}/clinic-medications/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const deleteClinicMedication = async (id) => {
+    const res = await fetch(`${API_BASE}/clinic-medications/${id}`, { method: 'DELETE' });
     return handleResponse(res);
 };
 
@@ -498,7 +535,6 @@ export const addMedication = async (payload) => {
     return handleResponse(res);
 };
 
-// Generic GET for dynamic queries used in Reports
 export const get = async (url) => {
     const res = await fetch(`${API_BASE}${url}`);
     return handleResponse(res);
@@ -510,7 +546,8 @@ const api = {
     getQueue, addQueueItem, updateQueueItem, deleteQueueItem,
     getAppointments, updateAppointment,
     getReports, getDentistPatientsForReport, get,
-    getServices, createService, deleteService,
+    getServices, createService, updateService, deleteService,
+    getClinicMedications, createClinicMedication, updateClinicMedication, deleteClinicMedication,
     getAnnualRecord, saveAnnualRecord, getToothConditions, upsertToothCondition,
     getTreatmentTimeline, addTreatmentTimelineEntry, getMedications, addMedication
 };

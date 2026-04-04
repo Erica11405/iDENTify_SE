@@ -10,17 +10,16 @@
 // import { dentalServices } from "../../data/services";
 
 // const COMMON_MEDICINES = [
-// 	"Amoxicillin 500mg",
-// 	"Amoxicillin 250mg",
-// 	"Mefenamic Acid 500mg",
-// 	"Paracetamol 500mg",
-// 	"Ibuprofen 400mg",
-// 	"Tranexamic Acid 500mg",
-// 	"Erythromycin 500mg",
-// 	"Clindamycin 300mg",
-// 	"Co-Amoxiclav 625mg",
-// 	"Celecoxib 200mg",
-// 	"Keterolac 10mg",
+// 	"Amoxicillin",
+// 	"Mefenamic Acid",
+// 	"Paracetamol",
+// 	"Ibuprofen",
+// 	"Tranexamic Acid",
+// 	"Erythromycin",
+// 	"Clindamycin",
+// 	"Co-Amoxiclav",
+// 	"Celecoxib",
+// 	"Keterolac",
 // 	"Chlorhexidine Mouthwash",
 // 	"Benzydamine Hcl (Difflam)"
 // ];
@@ -849,8 +848,17 @@
 // 							<div style={{ position: 'relative' }}>
 // 								<SearchableInput options={COMMON_MEDICINES || []} value={medicationForm.medicine} onChange={(val) => updateMedicationForm("medicine", val)} placeholder="Medicine (e.g. Amoxicillin)" />
 // 							</div>
-// 							<input className="pill-input-input" placeholder="Dosage" value={medicationForm.dosage} onChange={(e) => updateMedicationForm("dosage", e.target.value)} />
-// 							<input className="pill-input-input" placeholder="Frequency" value={medicationForm.frequency} onChange={(e) => updateMedicationForm("frequency", e.target.value)} />
+// 							<input className="pill-input-input" placeholder="Dosage (e.g., 500mg)" value={medicationForm.dosage} onChange={(e) => updateMedicationForm("dosage", e.target.value)} />
+// 							<select className="pill-input-input" value={medicationForm.frequency} onChange={(e) => updateMedicationForm("frequency", e.target.value)}>
+// 								<option value="" disabled>Select Frequency</option>
+// 								<option value="Daily">Daily</option>
+// 								<option value="Twice a day">Twice a day</option>
+// 								<option value="Three times a day">Three times a day</option>
+// 								<option value="Every 4 hours">Every 4 hours</option>
+// 								<option value="Every 6 hours">Every 6 hours</option>
+// 								<option value="Every 8 hours">Every 8 hours</option>
+// 								<option value="As needed">As needed</option>
+// 							</select>
 // 							<input className="pill-input-input" placeholder="Notes" value={medicationForm.notes} onChange={(e) => updateMedicationForm("notes", e.target.value)} />
 // 							<div className="medication-actions"><button className="small-btn" onClick={addMedication}>Add</button></div>
 // 						</div>
@@ -918,21 +926,6 @@ import apiClient from "../../api/apiClient";
 import useAppStore from "../../store/useAppStore";
 import { dentalServices } from "../../data/services";
 
-const COMMON_MEDICINES = [
-	"Amoxicillin",
-	"Mefenamic Acid",
-	"Paracetamol",
-	"Ibuprofen",
-	"Tranexamic Acid",
-	"Erythromycin",
-	"Clindamycin",
-	"Co-Amoxiclav",
-	"Celecoxib",
-	"Keterolac",
-	"Chlorhexidine Mouthwash",
-	"Benzydamine Hcl (Difflam)"
-];
-
 const SearchableInput = ({ options, value, onChange, placeholder, disabled, renderOption }) => {
 	const [isOpen, setIsOpen] = useState(false);
 	const [search, setSearch] = useState(value || "");
@@ -985,7 +978,7 @@ const SearchableInput = ({ options, value, onChange, placeholder, disabled, rend
 				<ul className="searchable-input-dropdown">
 					{filteredOptions.map((item, index) => (
 						<li key={index} onClick={() => handleSelect(item)}>
-							{renderOption ? renderOption(item) : item}
+							{renderOption ? renderOption(item) : (typeof item === 'object' ? item.name : item)}
 						</li>
 					))}
 				</ul>
@@ -1057,6 +1050,7 @@ function PatientForm({ userRole }) {
 	const [toothStatuses, setToothStatuses] = useState({});
 	const [timelineEntries, setTimelineEntries] = useState([]);
 	const [medications, setMedications] = useState([]);
+    const [clinicMedicationsList, setClinicMedicationsList] = useState([]); // Added state for dynamic meds
 	const [vitals, setVitals] = useState({ bp: "", pulse: "", temp: "" });
 	const [uploadedFiles, setUploadedFiles] = useState([]);
 
@@ -1108,6 +1102,14 @@ function PatientForm({ userRole }) {
 			try {
 				const dentistsData = await api.loadDentists();
 				setDentists(dentistsData || []);
+
+                // Fetch dynamic medications list
+                try {
+                    const meds = await apiClient.getClinicMedications();
+                    setClinicMedicationsList(meds || []);
+                } catch (e) {
+                    console.error("Failed to load clinic medications list", e);
+                }
 
 				const patientData = await apiClient.getPatientById(id);
 				
@@ -1207,7 +1209,6 @@ function PatientForm({ userRole }) {
 				const meds = await apiClient.getMedications(id, selectedYear);
 				setMedications(meds || []);
 
-                // --- SMART AUTO-POPULATION LOGIC ---
 				let dbAppointments = allAppointments;
 				if (!dbAppointments || dbAppointments.length === 0) {
 					try {
@@ -1249,7 +1250,6 @@ function PatientForm({ userRole }) {
 					
 					if (typeof procData === 'string' && procData.trim() !== "") {
 						try {
-							// Parse in case procedure is a JSON array from DB
 							const parsed = JSON.parse(procData);
 							if (Array.isArray(parsed)) {
 								setSelectedTimelineServices(parsed);
@@ -1257,7 +1257,6 @@ function PatientForm({ userRole }) {
 								setSelectedTimelineServices(procData.split(',').map(s => s.trim()).filter(Boolean));
 							}
 						} catch (e) {
-							// Standard comma separated fallback
 							const procedures = procData.split(',').map(s => s.trim()).filter(Boolean);
 							setSelectedTimelineServices(procedures);
 						}
@@ -1289,14 +1288,11 @@ function PatientForm({ userRole }) {
 		loadAnnualData();
 	}, [id, selectedYear, location.state, allAppointments, queue]);
 
-    // --- FIX: READ ONLY LOGIC ---
 	const maxYear = Math.max(...(yearsList.length > 0 ? yearsList : [1]));
 	const isLatestYear = selectedYear === maxYear;
     
-    // Check if the record was opened from the History page (status is Done)
     const isHistoryView = location.state?.status === "Done";
 
-    // Enforce read-only if it's an old year OR if the entire appointment/visit is already "Done"
 	const isChartReadOnly = !isLatestYear || isHistoryView; 
 	const isVisitReadOnly = !isLatestYear || isHistoryView; 
 
@@ -1458,7 +1454,21 @@ function PatientForm({ userRole }) {
 		try { await apiClient.deleteTreatmentTimelineEntry(entryId); setTimelineEntries(prev => (prev || []).filter(entry => entry.id !== entryId)); } catch (error) { console.error(error); }
 	};
 
-	const updateMedicationForm = (field, value) => setMedicationForm((prev) => ({ ...prev, [field]: value }));
+    // Modified to auto-fill dosage
+	const updateMedicationForm = (field, value) => {
+        setMedicationForm((prev) => {
+            const updated = { ...prev, [field]: value };
+            
+            if (field === "medicine") {
+                const selectedMed = clinicMedicationsList.find(m => m.name === value);
+                if (selectedMed && selectedMed.default_dosage) {
+                    updated.dosage = selectedMed.default_dosage;
+                }
+            }
+            return updated;
+        });
+    };
+
 	const addMedication = async () => {
 		if (!medicationForm.medicine) return;
 		try {
@@ -1755,7 +1765,12 @@ function PatientForm({ userRole }) {
 					{!isVisitReadOnly && (
 						<div className="medication-form">
 							<div style={{ position: 'relative' }}>
-								<SearchableInput options={COMMON_MEDICINES || []} value={medicationForm.medicine} onChange={(val) => updateMedicationForm("medicine", val)} placeholder="Medicine (e.g. Amoxicillin)" />
+								<SearchableInput 
+                                    options={clinicMedicationsList || []} 
+                                    value={medicationForm.medicine} 
+                                    onChange={(val) => updateMedicationForm("medicine", val)} 
+                                    placeholder="Medicine (e.g. Amoxicillin)" 
+                                />
 							</div>
 							<input className="pill-input-input" placeholder="Dosage (e.g., 500mg)" value={medicationForm.dosage} onChange={(e) => updateMedicationForm("dosage", e.target.value)} />
 							<select className="pill-input-input" value={medicationForm.frequency} onChange={(e) => updateMedicationForm("frequency", e.target.value)}>

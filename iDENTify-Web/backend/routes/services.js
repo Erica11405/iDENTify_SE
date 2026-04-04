@@ -14,11 +14,12 @@
 
 // // ADD a new service
 // router.post('/', async (req, res) => {
-//     const { name, minPrice, maxPrice } = req.body;
+//     const { name, minPrice, maxPrice, estimated_duration } = req.body;
 //     try {
 //         const [result] = await db.query(
-//             'INSERT INTO clinic_services (name, min_price, max_price) VALUES (?, ?, ?)', 
-//             [name, minPrice, maxPrice]
+//             // Make sure the estimated_duration column exists in your clinic_services table
+//             'INSERT INTO clinic_services (name, min_price, max_price, estimated_duration) VALUES (?, ?, ?, ?)', 
+//             [name, minPrice, maxPrice, estimated_duration]
 //         );
 //         res.status(201).json({ id: result.insertId, message: 'Service added successfully' });
 //     } catch (err) {
@@ -58,11 +59,24 @@ router.post('/', async (req, res) => {
     const { name, minPrice, maxPrice, estimated_duration } = req.body;
     try {
         const [result] = await db.query(
-            // Make sure the estimated_duration column exists in your clinic_services table
             'INSERT INTO clinic_services (name, min_price, max_price, estimated_duration) VALUES (?, ?, ?, ?)', 
             [name, minPrice, maxPrice, estimated_duration]
         );
         res.status(201).json({ id: result.insertId, message: 'Service added successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// UPDATE an existing service
+router.put('/:id', async (req, res) => {
+    const { name, minPrice, maxPrice, estimated_duration } = req.body;
+    try {
+        await db.query(
+            'UPDATE clinic_services SET name = ?, min_price = ?, max_price = ?, estimated_duration = ? WHERE id = ?',
+            [name, minPrice, maxPrice, estimated_duration, req.params.id]
+        );
+        res.json({ message: 'Service updated successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
