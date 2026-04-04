@@ -256,7 +256,9 @@
 //           <label>Dentist</label>
 //           <select value={filters.dentist} onChange={(e) => handleFilterChange("dentist", e.target.value)}>
 //             <option value="all">All</option>
-//             {dentists.map((d) => (<option key={d.id} value={d.name}>{d.name}</option>))}
+//             {dentists
+//               .filter(d => d.specialization !== 'Dental Aide' && d.role !== 'aide')
+//               .map((d) => (<option key={d.id} value={d.name}>{d.name}</option>))}
 //           </select>
 //         </div>
         
@@ -514,7 +516,8 @@ function Appointments() {
     try {
       let finalPatientId = data.patient_id;
 
-      if (data.isNewPatient) {
+      // MODIFIED: Only create a new database record if it is explicitly a New Patient or ID is missing
+      if (data.isNewPatient || !finalPatientId) {
         const newPatientRes = await api.createPatient({
           first_name: data.first_name,
           last_name: data.last_name,
@@ -529,12 +532,14 @@ function Appointments() {
         finalPatientId = newPatientRes.id || newPatientRes.data?.id || newPatientRes.patientId; 
       }
 
+      if (!finalPatientId) throw new Error("Failed to resolve patient ID.");
+
       await api.createAppointment({
         ...data,
         patient_id: finalPatientId
       });
 
-      toast.success("Appointment successfully added!");
+      toast.success(data.isNewPatient ? "New patient and appointment added!" : "Appointment scheduled for existing patient.");
       setIsAddModalOpen(false);
       api.loadAppointments();
       if (data.isNewPatient) {
