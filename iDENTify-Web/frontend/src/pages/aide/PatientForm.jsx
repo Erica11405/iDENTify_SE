@@ -907,8 +907,6 @@
 // export default PatientForm;
 
 
-
-
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -921,17 +919,16 @@ import useAppStore from "../../store/useAppStore";
 import { dentalServices } from "../../data/services";
 
 const COMMON_MEDICINES = [
-	"Amoxicillin 500mg",
-	"Amoxicillin 250mg",
-	"Mefenamic Acid 500mg",
-	"Paracetamol 500mg",
-	"Ibuprofen 400mg",
-	"Tranexamic Acid 500mg",
-	"Erythromycin 500mg",
-	"Clindamycin 300mg",
-	"Co-Amoxiclav 625mg",
-	"Celecoxib 200mg",
-	"Keterolac 10mg",
+	"Amoxicillin",
+	"Mefenamic Acid",
+	"Paracetamol",
+	"Ibuprofen",
+	"Tranexamic Acid",
+	"Erythromycin",
+	"Clindamycin",
+	"Co-Amoxiclav",
+	"Celecoxib",
+	"Keterolac",
 	"Chlorhexidine Mouthwash",
 	"Benzydamine Hcl (Difflam)"
 ];
@@ -1760,8 +1757,17 @@ function PatientForm({ userRole }) {
 							<div style={{ position: 'relative' }}>
 								<SearchableInput options={COMMON_MEDICINES || []} value={medicationForm.medicine} onChange={(val) => updateMedicationForm("medicine", val)} placeholder="Medicine (e.g. Amoxicillin)" />
 							</div>
-							<input className="pill-input-input" placeholder="Dosage" value={medicationForm.dosage} onChange={(e) => updateMedicationForm("dosage", e.target.value)} />
-							<input className="pill-input-input" placeholder="Frequency" value={medicationForm.frequency} onChange={(e) => updateMedicationForm("frequency", e.target.value)} />
+							<input className="pill-input-input" placeholder="Dosage (e.g., 500mg)" value={medicationForm.dosage} onChange={(e) => updateMedicationForm("dosage", e.target.value)} />
+							<select className="pill-input-input" value={medicationForm.frequency} onChange={(e) => updateMedicationForm("frequency", e.target.value)}>
+								<option value="" disabled>Select Frequency</option>
+								<option value="Daily">Daily</option>
+								<option value="Twice a day">Twice a day</option>
+								<option value="Three times a day">Three times a day</option>
+								<option value="Every 4 hours">Every 4 hours</option>
+								<option value="Every 6 hours">Every 6 hours</option>
+								<option value="Every 8 hours">Every 8 hours</option>
+								<option value="As needed">As needed</option>
+							</select>
 							<input className="pill-input-input" placeholder="Notes" value={medicationForm.notes} onChange={(e) => updateMedicationForm("notes", e.target.value)} />
 							<div className="medication-actions"><button className="small-btn" onClick={addMedication}>Add</button></div>
 						</div>

@@ -159,18 +159,28 @@
 
 //     const dayAppts = appointments.filter(a => {
 //       if (!a.appointment_datetime) return false;
-//       const aDate = a.appointment_datetime.includes("T")
-//         ? a.appointment_datetime.split("T")[0]
-//         : a.appointment_datetime.split(" ")[0];
+
+//       let aDate;
+//       if (a.appointment_datetime.includes("T")) {
+//         const d = new Date(a.appointment_datetime);
+//         aDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+//       } else {
+//         aDate = a.appointment_datetime.split(" ")[0];
+//       }
 //       return aDate === form.appointmentDate;
+
 //     }).map(a => {
-//       let timePart = "";
-//       if (a.appointment_datetime.includes("T")) timePart = a.appointment_datetime.split("T")[1];
-//       else timePart = a.appointment_datetime.split(" ")[1];
+//       let h, m;
+//       if (a.appointment_datetime.includes("T")) {
+//         const d = new Date(a.appointment_datetime);
+//         h = d.getHours();
+//         m = d.getMinutes();
+//       } else {
+//         const timePart = a.appointment_datetime.split(" ")[1];
+//         if (!timePart) return { start: -1, end: -1 };
+//         [h, m] = timePart.split(':').map(Number);
+//       }
 
-//       if (!timePart) return { start: -1, end: -1 };
-
-//       const [h, m] = timePart.split(':').map(Number);
 //       const startMins = h * 60 + m;
 //       return { start: startMins, end: startMins + 30 };
 //     });
@@ -588,6 +598,7 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
   const [isSearching, setIsSearching] = useState(false);
 
   const [form, setForm] = useState({
+    patient_id: null, // ADDED: Explicitly track existing patient ID
     first_name: "",
     last_name: "",
     middle_name: "",
@@ -831,7 +842,8 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
       if (!form.first_name || !form.last_name) return toast.error("First and Last name are required.");
       finalName = `${form.first_name} ${form.middle_name ? form.middle_name + ' ' : ''}${form.last_name}`.trim();
     } else {
-      if (!form.patient_name) return toast.error("Please select an existing patient.");
+      // ADDED: Strict check to ensure an old patient was actually selected
+      if (!form.patient_name || !form.patient_id) return toast.error("Please search and select an existing patient.");
     }
 
     if (!form.dentist_id) return toast.error("Please select a dentist.");
@@ -871,7 +883,7 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
         <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
           <button
             type="button"
-            onClick={() => setPatientType("new")}
+            onClick={() => { setPatientType("new"); setForm(prev => ({...prev, patient_id: null, patient_name: ""})); }}
             style={{
               flex: 1, padding: '10px', borderRadius: '8px', border: 'none',
               background: patientType === "new" ? '#2563eb' : '#e2e8f0',

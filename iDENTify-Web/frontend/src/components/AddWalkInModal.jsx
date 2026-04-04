@@ -304,7 +304,9 @@
 //             <label>Assigned Dentist</label>
 //             <select value={dentistId || ""} onChange={handleDentistChange}>
 //               <option value="">Select Dentist</option>
-//               {dentists.map((d) => {
+//               {dentists
+//                 .filter(d => d.specialization !== 'Dental Aide' && d.role !== 'aide')
+//                 .map((d) => {
 //                 const isUnavailable = d.status === "Off" || d.status === "Busy";
 //                 return <option key={d.id} value={d.id} disabled={d.status === "Off"}>{d.name} {isUnavailable ? `(${d.status})` : ""}</option>;
 //               })}
@@ -324,7 +326,6 @@
 // export default AddWalkInModal;
 
 
-
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import useAppStore from '../store/useAppStore';
@@ -341,6 +342,7 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
   const [searchQuery, setSearchQuery] = useState(""); 
   const [searchResults, setSearchResults] = useState([]); 
   const [isSearching, setIsSearching] = useState(false); 
+  const [selectedPatientId, setSelectedPatientId] = useState(null); // ADDED: Store existing ID
 
   // --- FORM STATE ---
   const [firstName, setFirstName] = useState(''); 
@@ -408,6 +410,8 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
   };
 
   const handleSelectOldPatient = (patient) => {
+    setSelectedPatientId(patient.id); // ADDED: Save the ID of the selected patient
+    
     setFirstName(patient.first_name || patient.full_name || ""); 
     setMiddleName(patient.middle_name || ""); 
     setLastName(patient.last_name || ""); 
@@ -454,11 +458,16 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
       toast.error('Please select at least one Reason for Visit.'); 
       return;
     }
+    if (activeTab === "old" && !selectedPatientId) {
+      toast.error('Please search and select an old patient from the list.');
+      return;
+    }
 
     const reasonString = selectedServices.join(", "); 
     const fullNameCombined = `${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`.trim(); 
 
     onAddPatient({
+      patientId: activeTab === "old" ? selectedPatientId : null, // ADDED: Send existing ID if old patient
       first_name: firstName,
       middle_name: middleName,
       last_name: lastName,
@@ -487,6 +496,7 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
     setSelectedServices([]);
     setDentistName('');
     setDentistId('');
+    setSelectedPatientId(null); // ADDED: Clear ID on reset
     setActiveTab("new");
     onClose(); 
   };
@@ -501,7 +511,7 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
         <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
           <button
             type="button"
-            onClick={() => setActiveTab("new")}
+            onClick={() => { setActiveTab("new"); setSelectedPatientId(null); }}
             style={{
               flex: 1, padding: '10px', borderRadius: '8px', border: 'none',
               background: activeTab === "new" ? '#2563eb' : '#e2e8f0',
