@@ -1,10 +1,103 @@
+// const express = require('express');
+// const router = express.Router();
+// const db = require('../db'); 
+// const bcrypt = require('bcrypt');
+
+// // --- DENTIST SIGN UP ---
+// // This remains public for new dentists to join the system.
+// router.post('/signup/dentist', async (req, res) => {
+//     const { firstName, surname, email, password } = req.body;
+
+//     try {
+//         const [existingUser] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+//         if (existingUser.length > 0) {
+//             return res.status(400).json({ error: "Email is already registered." });
+//         }
+
+//         const fullName = `${firstName} ${surname}`;
+//         const salt = await bcrypt.genSalt(10);
+//         const hashedPassword = await bcrypt.hash(password, salt);
+
+//         // Insert into dentists table first
+//         const dentistSql = `INSERT INTO dentists (name, first_name, last_name, email, status) VALUES (?, ?, ?, ?, 'Available')`;
+//         const [dentistResult] = await db.query(dentistSql, [fullName, firstName, surname, email]);
+//         const newDentistId = dentistResult.insertId;
+
+//         // Insert into users table with 'dentist' role
+//         const userSql = `INSERT INTO users (email, password_hash, full_name, role, dentist_id, is_verified) VALUES (?, ?, ?, 'dentist', ?, 1)`;
+//         await db.query(userSql, [email, hashedPassword, fullName, newDentistId]);
+
+//         res.status(201).json({ message: "Dentist account created successfully!" });
+//     } catch (err) {
+//         if (err.code === 'ER_DUP_ENTRY') {
+//             return res.status(400).json({ error: "This email is already taken in the system." });
+//         }
+//         res.status(500).json({ error: "Server error during sign up." });
+//     }
+// });
+
+// // --- UNIVERSAL LOGIN (Dentists & Aides) ---
+// router.post('/login', async (req, res) => {
+//     const { email, password, role } = req.body;
+
+//     try {
+//         const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+        
+//         if (users.length === 0) {
+//             return res.status(404).json({ error: "Account not found." });
+//         }
+
+//         const userRecord = users[0];
+
+//         if (role) {
+//             if (!userRecord.role || userRecord.role.toLowerCase() !== role.toLowerCase()) {
+//                 return res.status(401).json({ error: "Incorrect role selected for this account." });
+//             }
+//         }
+
+//         const isMatch = await bcrypt.compare(password, userRecord.password_hash);
+        
+//         if (!isMatch) {
+//             return res.status(401).json({ error: "Invalid password." });
+//         }
+
+//         res.status(200).json({ 
+//             message: "Login successful", 
+//             user: {
+//                 id: userRecord.id,
+//                 name: userRecord.full_name,
+//                 email: userRecord.email,
+//                 role: userRecord.role,
+//                 dentist_id: userRecord.dentist_id
+//             } 
+//         });
+
+//     } catch (err) {
+//         console.error("Login Crash Report:", err);
+//         // This will send the exact error directly to your frontend screen!
+//         res.status(500).json({ error: "Server crash: " + err.message });
+//     }
+// });
+
+// module.exports = router;
+
+
 const express = require('express');
 const router = express.Router();
 const db = require('../db'); 
 const bcrypt = require('bcrypt');
+const nodemailer = require('nodemailer');
+
+// Configure your email transporter
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER || 'ericaaquino0114@gmail.com', 
+        pass: process.env.EMAIL_PASS || 'seumvvibmpgzzseg' 
+    }
+});
 
 // --- DENTIST SIGN UP ---
-// This remains public for new dentists to join the system.
 router.post('/signup/dentist', async (req, res) => {
     const { firstName, surname, email, password } = req.body;
 
@@ -36,7 +129,7 @@ router.post('/signup/dentist', async (req, res) => {
     }
 });
 
-// --- UNIVERSAL LOGIN (Dentists & Aides) ---
+// --- INITIAL LOGIN (Verifies password, sends OTP) ---
 router.post('/login', async (req, res) => {
     const { email, password, role } = req.body;
 
@@ -61,6 +154,67 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: "Invalid password." });
         }
 
+        // Generate a 6-digit OTP
+        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Set expiration time to 10 minutes from now
+        const expiresAt = new Date(Date.now() + 10 * 60000); 
+        
+        // Save OTP to database
+        await db.query(
+            'UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE id = ?', 
+            [otpCode, expiresAt, userRecord.id]
+        );
+
+        // Send the OTP via Email
+        const mailOptions = {
+            from: 'iDENTify Clinic <your_clinic_email@gmail.com>',
+            to: email,
+            subject: 'Your iDENTify Login Verification Code',
+            text: `Hello ${userRecord.full_name},\n\nYour login verification code is: ${otpCode}\n\nThis code will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        res.status(200).json({ 
+            message: "OTP sent to your email", 
+            requireOtp: true,
+            email: email,
+            role: role
+        });
+
+    } catch (err) {
+        console.error("Login Crash Report:", err);
+        res.status(500).json({ error: "Server crash: " + err.message });
+    }
+});
+
+// --- VERIFY OTP (Completes the login) ---
+router.post('/verify-otp', async (req, res) => {
+    const { email, otp, role } = req.body;
+
+    try {
+        const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+        
+        if (users.length === 0) {
+            return res.status(404).json({ error: "Account not found." });
+        }
+
+        const userRecord = users[0];
+
+        // Check if OTP matches and is not expired
+        if (!userRecord.otp_code || userRecord.otp_code !== otp) {
+            return res.status(400).json({ error: "Invalid verification code." });
+        }
+
+        if (new Date() > new Date(userRecord.otp_expires_at)) {
+            return res.status(400).json({ error: "Verification code has expired. Please log in again." });
+        }
+
+        // Clear the OTP from the database now that it's used
+        await db.query('UPDATE users SET otp_code = NULL, otp_expires_at = NULL WHERE id = ?', [userRecord.id]);
+
+        // Send the final login payload
         res.status(200).json({ 
             message: "Login successful", 
             user: {
@@ -73,9 +227,8 @@ router.post('/login', async (req, res) => {
         });
 
     } catch (err) {
-        console.error("Login Crash Report:", err);
-        // This will send the exact error directly to your frontend screen!
-        res.status(500).json({ error: "Server crash: " + err.message });
+        console.error("OTP Verification Error:", err);
+        res.status(500).json({ error: "Server crash during OTP verification: " + err.message });
     }
 });
 
