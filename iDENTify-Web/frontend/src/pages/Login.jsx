@@ -182,9 +182,16 @@ function Login() {
 
         try {
             const response = await api.login({ email, password, role });
+            
             if (response.requireOtp) {
+                // Aide flow: Require OTP
                 toast.success(response.message || "OTP sent to your email!");
                 setIsOtpStep(true); 
+            } else {
+                // Dentist flow: Instant Login
+                setUser(response.user); 
+                toast.success(response.message || "Welcome back!");
+                navigate("/dashboard");
             }
         } catch (error) {
             setErrors({ form: error.message || "Invalid credentials." });
@@ -192,7 +199,7 @@ function Login() {
         }
     };
 
-    // Submitting the OTP Code
+    // Submitting the OTP Code (Only Aides will see this)
     const handleOtpSubmit = async (e) => {
         e.preventDefault();
         if (!otpCode.trim()) {

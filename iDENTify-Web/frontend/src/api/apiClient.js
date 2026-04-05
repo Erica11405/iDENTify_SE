@@ -339,6 +339,15 @@ export const verifyOtp = async (payload) => {
     return handleResponse(res);
 };
 
+export const sendSignupOtp = async (payload) => {
+    const res = await fetch(`${API_BASE}/auth/signup/dentist/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
 export const signupDentist = async (payload) => {
     const res = await fetch(`${API_BASE}/auth/signup/dentist`, {
         method: 'POST',
@@ -588,7 +597,7 @@ export const get = async (url) => {
 };
 
 const api = {
-    login, verifyOtp, signupDentist, getDentists, createDentist, updateDentist, deleteDentist,
+    login, verifyOtp, sendSignupOtp, signupDentist, getDentists, createDentist, updateDentist, deleteDentist,
     getPatients, getPatientById, createPatient, updatePatient, searchPatients,
     getQueue, addQueueItem, updateQueueItem, deleteQueueItem,
     getAppointments, updateAppointment,
