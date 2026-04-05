@@ -628,7 +628,6 @@
 //   },
 // });
 
-
 import { useState } from "react";
 import {
   Text,
@@ -654,6 +653,9 @@ export default function SignUpScreen() {
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
+  
+  // New Birthdate State
+  const [birthdate, setBirthdate] = useState("");
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -668,6 +670,35 @@ export default function SignUpScreen() {
     if (!firstName.trim() || !lastName.trim()) {
       Alert.alert("Error", "Please enter your first and last name.");
       return;
+    }
+
+    if (!birthdate.trim()) {
+      Alert.alert("Error", "Please enter your birthdate.");
+      return;
+    }
+
+    // Validate Date Format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(birthdate.trim())) {
+      Alert.alert("Invalid Format", "Please enter your birthdate in YYYY-MM-DD format (e.g., 1995-08-25).");
+      return;
+    }
+
+    // Calculate Age
+    const today = new Date();
+    const birthDateObj = new Date(birthdate.trim());
+    let age = today.getFullYear() - birthDateObj.getFullYear();
+    const monthDifference = today.getMonth() - birthDateObj.getMonth();
+    
+    // Adjust age if the birthday hasn't occurred yet this year
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDateObj.getDate())) {
+        age--;
+    }
+
+    // Age Requirement Check (Must be 18 or older)
+    if (age < 18) {
+        Alert.alert("Age Requirement", "You must be at least 18 years old to create an account.");
+        return;
     }
 
     try {
@@ -710,6 +741,7 @@ export default function SignUpScreen() {
               middle_name: middleName.trim(),
               last_name: lastName.trim(),
               email: emailAddress.trim(),
+              birthdate: birthdate.trim(), // Sent to your database
               address: "Update your profile",
               contact_number: "",
               gender: "Unspecified"
@@ -799,6 +831,15 @@ export default function SignUpScreen() {
             placeholderTextColor="#9CA3AF"
             onChangeText={setLastName}
             style={styles.input}
+          />
+
+          <TextInput
+            value={birthdate}
+            placeholder="Birthdate (YYYY-MM-DD)"
+            placeholderTextColor="#9CA3AF"
+            onChangeText={setBirthdate}
+            style={styles.input}
+            keyboardType="numbers-and-punctuation"
           />
 
           <TextInput
