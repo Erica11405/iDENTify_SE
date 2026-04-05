@@ -2,7 +2,6 @@
 // const router = express.Router();
 // const db = require("../db");
 
-
 // function parseTime(dateTimeStr) {
 //   if (!dateTimeStr) return null;
 //   let parts = dateTimeStr.match(/(\d{4})-(\d{2})-(\d{2}) (\d{1,2}):(\d{2}) (AM|PM)/);
@@ -76,15 +75,30 @@
 
 //   if (!appointment_datetime) return res.status(400).json({ message: "Invalid time format" });
 
-//   // Merge selected services into a string
-//   let finalReason = procedure || "";
-//   if (services && Array.isArray(services)) {
-//     finalReason = services.join(", ");
-//   } else if (services) {
-//     finalReason = services;
-//   }
-
 //   try {
+//     // --- OVERLAP CONFLICT CHECK ---
+//     // Check if the dentist already has a non-cancelled appointment at this exact time
+//     const [existingConflict] = await db.query(
+//       `SELECT id FROM appointments 
+//        WHERE dentist_id = ? 
+//        AND appointment_datetime = ? 
+//        AND status NOT IN ('Cancelled', 'Declined')`,
+//       [dentist_id, appointment_datetime]
+//     );
+
+//     if (existingConflict.length > 0) {
+//       return res.status(409).json({ message: "This time slot is already booked for this dentist. Please select another time." });
+//     }
+//     // -------------------------------
+
+//     // Merge selected services into a string
+//     let finalReason = procedure || "";
+//     if (services && Array.isArray(services)) {
+//       finalReason = services.join(", ");
+//     } else if (services) {
+//       finalReason = services;
+//     }
+
 //     const [result] = await db.query(
 //       `INSERT INTO appointments (patient_id, dentist_id, appointment_datetime, reason, notes, status)
 //        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -113,27 +127,55 @@
 //   const setClauses = [];
 //   const values = [];
 
-//   if (fields.timeStart) {
-//     const parsed = parseTime(fields.timeStart);
-//     if (parsed) { setClauses.push("appointment_datetime = ?"); values.push(parsed); }
-//   }
-//   if (fields.dentist_id) { setClauses.push("dentist_id = ?"); values.push(fields.dentist_id); }
-//   if (fields.procedure || fields.services) {
-//     const updatedProc = fields.services ? (Array.isArray(fields.services) ? fields.services.join(", ") : fields.services) : fields.procedure;
-//     setClauses.push("reason = ?"); 
-//     values.push(updatedProc);
-//   }
-//   if (fields.notes) { setClauses.push("notes = ?"); values.push(fields.notes); }
-//   if (fields.status) { setClauses.push("status = ?"); values.push(fields.status); }
-
-//   if (setClauses.length === 0) return res.status(400).json({ message: "No valid updates" });
-
 //   try {
+//     // --- OVERLAP CONFLICT CHECK (For Updates) ---
+//     // Only perform the check if they are trying to change the time or the assigned dentist
+//     if (fields.timeStart || fields.dentist_id) {
+//         const [currentAppt] = await db.query(`SELECT dentist_id, appointment_datetime FROM appointments WHERE id = ?`, [id]);
+        
+//         if (currentAppt.length > 0) {
+//             // Determine the final time and dentist we need to check against
+//             const checkTime = fields.timeStart ? parseTime(fields.timeStart) : currentAppt[0].appointment_datetime;
+//             const checkDentistId = fields.dentist_id ? fields.dentist_id : currentAppt[0].dentist_id;
+
+//             // Check for overlaps, ensuring we don't accidentally match the appointment we are currently editing (id != ?)
+//             const [existingConflict] = await db.query(
+//               `SELECT id FROM appointments 
+//                WHERE dentist_id = ? 
+//                AND appointment_datetime = ? 
+//                AND status NOT IN ('Cancelled', 'Declined') 
+//                AND id != ?`,
+//               [checkDentistId, checkTime, id]
+//             );
+
+//             if (existingConflict.length > 0) {
+//               return res.status(409).json({ message: "This time slot is already booked for this dentist. Please select another time." });
+//             }
+//         }
+//     }
+//     // -------------------------------
+
+//     if (fields.timeStart) {
+//       const parsed = parseTime(fields.timeStart);
+//       if (parsed) { setClauses.push("appointment_datetime = ?"); values.push(parsed); }
+//     }
+//     if (fields.dentist_id) { setClauses.push("dentist_id = ?"); values.push(fields.dentist_id); }
+//     if (fields.procedure || fields.services) {
+//       const updatedProc = fields.services ? (Array.isArray(fields.services) ? fields.services.join(", ") : fields.services) : fields.procedure;
+//       setClauses.push("reason = ?"); 
+//       values.push(updatedProc);
+//     }
+//     if (fields.notes) { setClauses.push("notes = ?"); values.push(fields.notes); }
+//     if (fields.status) { setClauses.push("status = ?"); values.push(fields.status); }
+
+//     if (setClauses.length === 0) return res.status(400).json({ message: "No valid updates provided." });
+
 //     values.push(id);
 //     await db.query(`UPDATE appointments SET ${setClauses.join(", ")} WHERE id = ?`, values);
 //     const [rows] = await db.query("SELECT * FROM appointments WHERE id = ?", [id]);
 //     res.json(rows[0]);
 //   } catch (err) {
+//     console.error("Update error:", err);
 //     res.status(500).json({ message: "Update failed" });
 //   }
 // });
@@ -149,6 +191,7 @@
 // });
 
 // module.exports = router;
+
 
 const express = require("express");
 const router = express.Router();
@@ -183,12 +226,30 @@ router.get("/check-limit", async (req, res) => {
   }
 });
 
-// --- GET ALL APPOINTMENTS ---
+// --- GET ALL APPOINTMENTS (UPDATED WITH PATIENT FILTER) ---
 router.get("/", async (req, res) => {
-  const { date } = req.query;
+  const { date, patient_id } = req.query; 
   let query = `SELECT a.*, a.reason AS \`procedure\`, p.full_name FROM appointments a JOIN patients p ON a.patient_id = p.id`;
+  
   const params = [];
-  if (date) { query += " WHERE DATE(a.appointment_datetime) = ?"; params.push(date); }
+  const whereClauses = [];
+
+  if (date) { 
+    whereClauses.push("DATE(a.appointment_datetime) = ?"); 
+    params.push(date); 
+  }
+  
+  // Add the patient_id filter to strictly return only requested appointments
+  if (patient_id) { 
+    whereClauses.push("a.patient_id = ?"); 
+    params.push(patient_id); 
+  }
+
+  // Combine where clauses dynamically if any exist
+  if (whereClauses.length > 0) {
+    query += " WHERE " + whereClauses.join(" AND ");
+  }
+
   query += " ORDER BY a.appointment_datetime ASC";
 
   try {
@@ -229,7 +290,6 @@ router.post("/", async (req, res) => {
 
   try {
     // --- OVERLAP CONFLICT CHECK ---
-    // Check if the dentist already has a non-cancelled appointment at this exact time
     const [existingConflict] = await db.query(
       `SELECT id FROM appointments 
        WHERE dentist_id = ? 
@@ -257,7 +317,6 @@ router.post("/", async (req, res) => {
       [patient_id, dentist_id, appointment_datetime, finalReason, notes || "", status || 'Scheduled']
     );
     
-    // IMPORTANT: Return 'full_name' so React can close the modal and update the row
     const [rows] = await db.query(
         `SELECT a.*, a.reason AS \`procedure\`, p.full_name 
          FROM appointments a 
@@ -281,16 +340,13 @@ router.put("/:id", async (req, res) => {
 
   try {
     // --- OVERLAP CONFLICT CHECK (For Updates) ---
-    // Only perform the check if they are trying to change the time or the assigned dentist
     if (fields.timeStart || fields.dentist_id) {
         const [currentAppt] = await db.query(`SELECT dentist_id, appointment_datetime FROM appointments WHERE id = ?`, [id]);
         
         if (currentAppt.length > 0) {
-            // Determine the final time and dentist we need to check against
             const checkTime = fields.timeStart ? parseTime(fields.timeStart) : currentAppt[0].appointment_datetime;
             const checkDentistId = fields.dentist_id ? fields.dentist_id : currentAppt[0].dentist_id;
 
-            // Check for overlaps, ensuring we don't accidentally match the appointment we are currently editing (id != ?)
             const [existingConflict] = await db.query(
               `SELECT id FROM appointments 
                WHERE dentist_id = ? 
