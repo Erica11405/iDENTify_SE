@@ -473,7 +473,13 @@ function Appointments() {
     try {
       await api.updateAppointment(appointment.id, { status: 'Checked-In' });
       const now = new Date();
-      const mysqlDateTime = now.toISOString().slice(0, 19).replace('T', ' ');
+      const pad = (n) => (n < 10 ? '0' + n : n);
+      const mysqlDateTime = now.getFullYear() + '-' +
+             pad(now.getMonth() + 1) + '-' +
+             pad(now.getDate()) + ' ' +
+             pad(now.getHours()) + ':' +
+             pad(now.getMinutes()) + ':' +
+             pad(now.getSeconds());
       await api.addQueue({
         patient_id: patientId,
         appointment_id: appointment.id,
