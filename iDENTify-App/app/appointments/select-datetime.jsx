@@ -181,12 +181,28 @@
 
 //     const todayAppts = appointments.filter(a => {
 //       if (!a.appointment_datetime) return false;
-//       const aDate = a.appointment_datetime.includes("T") ? a.appointment_datetime.split("T")[0] : a.appointment_datetime.split(" ")[0];
+
+//       let aDate;
+//       if (a.appointment_datetime.includes("T")) {
+//         const d = new Date(a.appointment_datetime);
+//         aDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+//       } else {
+//         aDate = a.appointment_datetime.split(" ")[0];
+//       }
 //       return aDate === selectedDate;
+
 //     }).map(a => {
-//       let timePart = a.appointment_datetime.includes("T") ? a.appointment_datetime.split("T")[1] : a.appointment_datetime.split(" ")[1];
-//       if (!timePart) return { start: -1, end: -1 };
-//       const [h, m] = timePart.split(':').map(Number);
+//       let h, m;
+//       if (a.appointment_datetime.includes("T")) {
+//         const d = new Date(a.appointment_datetime);
+//         h = d.getHours();
+//         m = d.getMinutes();
+//       } else {
+//         const timePart = a.appointment_datetime.split(" ")[1];
+//         if (!timePart) return { start: -1, end: -1 };
+//         [h, m] = timePart.split(':').map(Number);
+//       }
+
 //       const startMins = h * 60 + m;
 //       return { start: startMins, end: startMins + 30 };
 //     });
@@ -515,6 +531,7 @@
 // });
 
 
+
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView, Modal, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState, useEffect, useMemo } from "react";
@@ -783,7 +800,8 @@ export default function ConfirmAppointment() {
       });
 
       if (res.ok) {
-        Alert.alert("Success", `Appointment booked for ${selectedPatient.full_name}!`, [
+        const patientName = selectedPatient.full_name || `${selectedPatient.first_name || ''} ${selectedPatient.last_name || ''}`.trim();
+        Alert.alert("Success", `Appointment booked for ${patientName}!`, [
           { text: "OK", onPress: () => router.replace("/(tabs)/appointments") }
         ]);
       } else {
@@ -827,7 +845,7 @@ export default function ConfirmAppointment() {
         <View style={{ flex: 1 }}>
           <Text style={styles.selectorLabel}>Booking For</Text>
           <Text style={styles.selectorValue}>
-            {selectedPatient ? selectedPatient.full_name : "Loading..."}
+            {selectedPatient ? (selectedPatient.full_name || `${selectedPatient.first_name || ''} ${selectedPatient.last_name || ''}`.trim()) : "Loading..."}
           </Text>
         </View>
         <Ionicons name="chevron-down" size={20} color="#64748B" />
@@ -919,7 +937,7 @@ export default function ConfirmAppointment() {
                 <View style={[styles.optionIcon, { backgroundColor: '#E0F2FE' }]}>
                   <Ionicons name="person" size={20} color="#0284C7" />
                 </View>
-                <Text style={styles.optionText}>Myself ({mainProfile.full_name.split(' ')[0]})</Text>
+                <Text style={styles.optionText}>Myself ({mainProfile.first_name || (mainProfile.full_name ? mainProfile.full_name.split(' ')[0] : 'Patient')})</Text>
                 {selectedPatient?.id === mainProfile.id && <Ionicons name="checkmark" size={20} color="#0284C7" />}
               </TouchableOpacity>
             )}
@@ -933,7 +951,7 @@ export default function ConfirmAppointment() {
                 <View style={[styles.optionIcon, { backgroundColor: '#FCE7F3' }]}>
                   <Ionicons name="people" size={20} color="#DB2777" />
                 </View>
-                <Text style={styles.optionText}>{member.full_name}</Text>
+                <Text style={styles.optionText}>{member.full_name || `${member.first_name || ''} ${member.last_name || ''}`.trim()}</Text>
                 {selectedPatient?.id === member.id && <Ionicons name="checkmark" size={20} color="#DB2777" />}
               </TouchableOpacity>
             ))}
