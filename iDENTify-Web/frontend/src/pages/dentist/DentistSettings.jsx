@@ -826,8 +826,14 @@ function DentistSettings() {
         {activeTab === "aides" && (
           <div className="animation-fade-in">
             <div className={`settings-form-card ${editingAideId ? 'editing' : ''}`}>
-                <h3>{editingAideId ? "Edit Dental Aide" : "Add New Dental Aide"}</h3>
-                <form onSubmit={handleSaveAide}>
+                <h3>
+                    {editingAideId ? "Edit Dental Aide" : "Add New Dental Aide"}
+                    <span className="helper-text">(Press Enter to save, Esc to cancel)</span>
+                </h3>
+                <form 
+                    onSubmit={handleSaveAide} 
+                    onKeyDown={(e) => e.key === 'Escape' && cancelAideEdit()}
+                >
                     <div className="form-row">
                         <div className="form-group">
                             <label>First Name *</label>
@@ -857,15 +863,9 @@ function DentistSettings() {
                                 <input type="password" placeholder="••••••••" value={newAide.password} onChange={(e) => setNewAide({ ...newAide, password: e.target.value })} />
                             </div>
                         )}
-                        <div className="form-actions">
-                            <button type="submit" className="btn-primary">
-                                {editingAideId ? "Update Account" : "Add Account"}
-                            </button>
-                            {editingAideId && (
-                                <button type="button" onClick={cancelAideEdit} className="btn-secondary">Cancel</button>
-                            )}
-                        </div>
                     </div>
+                    {/* Hidden submit ensures 'Enter' key works */}
+                    <button type="submit" style={{ display: 'none' }}>Submit</button>
                 </form>
             </div>
 
@@ -899,8 +899,14 @@ function DentistSettings() {
         {activeTab === "services" && (
           <div className="animation-fade-in">
             <div className={`settings-form-card ${editingServiceId ? 'editing' : ''}`}>
-                <h3>{editingServiceId ? "Edit Service" : "Add New Service"}</h3>
-                <form onSubmit={handleSaveService}>
+                <h3>
+                    {editingServiceId ? "Edit Service" : "Add New Service"}
+                    <span className="helper-text">(Press Enter to save, Esc to cancel)</span>
+                </h3>
+                <form 
+                    onSubmit={handleSaveService}
+                    onKeyDown={(e) => e.key === 'Escape' && cancelServiceEdit()}
+                >
                     <div className="form-row form-row-bottom">
                         <div className="form-group flex-2">
                             <label>Service Name *</label>
@@ -929,16 +935,9 @@ function DentistSettings() {
                             <label>Max Price (₱) *</label>
                             <input type="number" placeholder="1500" value={newService.maxPrice} onChange={(e) => setNewService({ ...newService, maxPrice: e.target.value })} />
                         </div>
-                        
-                        <div className="form-actions">
-                            <button type="submit" className="btn-primary">
-                                {editingServiceId ? "Update" : "Add Service"}
-                            </button>
-                            {editingServiceId && (
-                                <button type="button" onClick={cancelServiceEdit} className="btn-secondary">Cancel</button>
-                            )}
-                        </div>
                     </div>
+                    {/* Hidden submit ensures 'Enter' key works */}
+                    <button type="submit" style={{ display: 'none' }}>Submit</button>
                 </form>
             </div>
 
@@ -976,8 +975,14 @@ function DentistSettings() {
         {activeTab === "medications" && (
           <div className="animation-fade-in">
             <div className={`settings-form-card ${editingMedicationId ? 'editing' : ''}`}>
-                <h3>{editingMedicationId ? "Edit Medication" : "Add Medication to Master List"}</h3>
-                <form onSubmit={handleSaveMedication}>
+                <h3>
+                    {editingMedicationId ? "Edit Medication" : "Add Medication to Master List"}
+                    <span className="helper-text">(Press Enter to save, Esc to cancel)</span>
+                </h3>
+                <form 
+                    onSubmit={handleSaveMedication}
+                    onKeyDown={(e) => e.key === 'Escape' && cancelMedicationEdit()}
+                >
                     <div className="form-row form-row-bottom">
                         <div className="form-group flex-2">
                             <label>Medicine Name *</label>
@@ -987,16 +992,9 @@ function DentistSettings() {
                             <label>Default Dosage</label>
                             <input type="text" placeholder="e.g., 500mg" value={newMedication.defaultDosage} onChange={(e) => setNewMedication({ ...newMedication, defaultDosage: e.target.value })} />
                         </div>
-                        
-                        <div className="form-actions">
-                            <button type="submit" className="btn-primary">
-                                {editingMedicationId ? "Update" : "Add Medicine"}
-                            </button>
-                            {editingMedicationId && (
-                                <button type="button" onClick={cancelMedicationEdit} className="btn-secondary">Cancel</button>
-                            )}
-                        </div>
                     </div>
+                    {/* Hidden submit ensures 'Enter' key works */}
+                    <button type="submit" style={{ display: 'none' }}>Submit</button>
                 </form>
             </div>
 

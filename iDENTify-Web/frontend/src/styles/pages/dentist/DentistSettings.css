@@ -42,7 +42,7 @@
     background: none;
     cursor: pointer;
     transition: all 0.2s ease;
-    margin-bottom: -2px; /* Pull down to overlap the border */
+    margin-bottom: -2px; 
 }
   
 .settings-tabs button:hover {
@@ -74,10 +74,24 @@
     margin-bottom: 1rem;
     color: #334155;
     font-size: 1.1rem;
+    display: flex;
+    align-items: center;
 }
 
 .settings-form-card.editing h3 {
     color: #1d4ed8;
+}
+
+/* Helper text for Enter/Esc */
+.helper-text {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    font-weight: 500;
+    margin-left: 12px;
+}
+
+.settings-form-card.editing .helper-text {
+    color: #93c5fd;
 }
 
 /* Form Grid System */
@@ -88,7 +102,6 @@
     margin-bottom: 1rem;
 }
 
-/* Forces items to align at the baseline (bottom of inputs/buttons) */
 .form-row-bottom {
     align-items: flex-end;
     margin-bottom: 0;
@@ -123,7 +136,7 @@
     font-size: 0.95rem;
     background-color: #ffffff;
     outline: none;
-    height: 42px; /* Ensure exact uniform height */
+    height: 42px; 
     box-sizing: border-box;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -132,54 +145,6 @@
 .form-group select:focus {
     border-color: var(--primary-color, #1B93D5);
     box-shadow: 0 0 0 3px rgba(27, 147, 213, 0.1);
-}
-
-/* Fix Action Buttons to sit perfectly inline with inputs */
-.form-actions {
-    display: flex;
-    gap: 0.5rem;
-    flex: 0 1 auto; /* Stops the button from stretching awkwardly */
-    min-width: 140px; 
-}
-
-.btn-primary {
-    flex: 1;
-    padding: 0 1rem;
-    height: 42px; /* Match input height perfectly */
-    background-color: var(--primary-color, #1B93D5);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.2s ease;
-}
-
-.btn-primary:hover {
-    background-color: #0284c7;
-}
-
-.btn-secondary {
-    flex: 1;
-    padding: 0 1rem;
-    height: 42px; /* Match input height perfectly */
-    background-color: #e2e8f0;
-    color: #475569;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.2s ease;
-}
-
-.btn-secondary:hover {
-    background-color: #cbd5e1;
 }
 
 /* Data Tables */
