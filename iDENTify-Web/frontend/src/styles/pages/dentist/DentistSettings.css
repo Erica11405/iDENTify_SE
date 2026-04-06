@@ -88,6 +88,7 @@
     margin-bottom: 1rem;
 }
 
+/* Forces items to align at the baseline (bottom of inputs/buttons) */
 .form-row-bottom {
     align-items: flex-end;
     margin-bottom: 0;
@@ -112,6 +113,7 @@
     margin-bottom: 0.4rem;
 }
 
+/* Standardize input/select sizes */
 .form-group input,
 .form-group select {
     width: 100%;
@@ -121,6 +123,8 @@
     font-size: 0.95rem;
     background-color: #ffffff;
     outline: none;
+    height: 42px; /* Ensure exact uniform height */
+    box-sizing: border-box;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -130,23 +134,27 @@
     box-shadow: 0 0 0 3px rgba(27, 147, 213, 0.1);
 }
 
-/* Buttons */
+/* Fix Action Buttons to sit perfectly inline with inputs */
 .form-actions {
     display: flex;
     gap: 0.5rem;
-    flex: 1;
-    min-width: 200px;
+    flex: 0 1 auto; /* Stops the button from stretching awkwardly */
+    min-width: 140px; 
 }
 
 .btn-primary {
     flex: 1;
-    padding: 0.7rem 1rem;
+    padding: 0 1rem;
+    height: 42px; /* Match input height perfectly */
     background-color: var(--primary-color, #1B93D5);
     color: white;
     border: none;
     border-radius: 6px;
     font-weight: 600;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: background-color 0.2s ease;
 }
 
@@ -156,13 +164,17 @@
 
 .btn-secondary {
     flex: 1;
-    padding: 0.7rem 1rem;
+    padding: 0 1rem;
+    height: 42px; /* Match input height perfectly */
     background-color: #e2e8f0;
     color: #475569;
     border: none;
     border-radius: 6px;
     font-weight: 600;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: background-color 0.2s ease;
 }
 
@@ -243,7 +255,7 @@
     font-size: 0.9rem;
 }
 
-/* Action Buttons */
+/* Action Buttons inside Table */
 .action-buttons {
     display: flex;
     gap: 0.5rem;
@@ -279,72 +291,4 @@
 
 .btn-delete:hover {
     background-color: #fee2e2;
-}
-
-/* Medication Specific Theme (Purple) */
-.form-purple {
-    background-color: #fdf4ff;
-    border-color: #fbcfe8;
-}
-
-.editing-purple {
-    background-color: #fdf4ff;
-    border-color: #d946ef;
-}
-
-.form-purple h3, .editing-purple h3 {
-    color: #a21caf;
-}
-
-.form-purple label, .editing-purple label {
-    color: #86198f;
-}
-
-.input-purple:focus {
-    border-color: #d946ef !important;
-    box-shadow: 0 0 0 3px rgba(217, 70, 239, 0.1) !important;
-}
-
-.btn-primary-purple {
-    flex: 1;
-    padding: 0.7rem 1rem;
-    background-color: #c026d3;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.btn-primary-purple:hover {
-    background-color: #a21caf;
-}
-
-.btn-secondary-purple {
-    flex: 1;
-    padding: 0.7rem 1rem;
-    background-color: #f3e8ff;
-    color: #a21caf;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.row-highlight-purple {
-    background-color: #faf5ff !important;
-}
-
-.btn-edit-purple {
-    padding: 0.4rem 0.75rem;
-    background-color: #fae8ff;
-    color: #9333ea;
-    border: 1px solid #f3e8ff;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
 }

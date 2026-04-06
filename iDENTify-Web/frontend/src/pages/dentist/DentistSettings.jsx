@@ -975,25 +975,25 @@ function DentistSettings() {
         {/* --- MEDICATIONS TAB --- */}
         {activeTab === "medications" && (
           <div className="animation-fade-in">
-            <div className={`settings-form-card ${editingMedicationId ? 'editing-purple' : 'form-purple'}`}>
+            <div className={`settings-form-card ${editingMedicationId ? 'editing' : ''}`}>
                 <h3>{editingMedicationId ? "Edit Medication" : "Add Medication to Master List"}</h3>
                 <form onSubmit={handleSaveMedication}>
                     <div className="form-row form-row-bottom">
                         <div className="form-group flex-2">
                             <label>Medicine Name *</label>
-                            <input type="text" placeholder="e.g., Amoxicillin" value={newMedication.name} onChange={(e) => setNewMedication({ ...newMedication, name: e.target.value })} className="input-purple" />
+                            <input type="text" placeholder="e.g., Amoxicillin" value={newMedication.name} onChange={(e) => setNewMedication({ ...newMedication, name: e.target.value })} />
                         </div>
-                        <div className="form-group">
+                        <div className="form-group flex-2">
                             <label>Default Dosage</label>
-                            <input type="text" placeholder="e.g., 500mg" value={newMedication.defaultDosage} onChange={(e) => setNewMedication({ ...newMedication, defaultDosage: e.target.value })} className="input-purple" />
+                            <input type="text" placeholder="e.g., 500mg" value={newMedication.defaultDosage} onChange={(e) => setNewMedication({ ...newMedication, defaultDosage: e.target.value })} />
                         </div>
                         
                         <div className="form-actions">
-                            <button type="submit" className="btn-primary-purple">
+                            <button type="submit" className="btn-primary">
                                 {editingMedicationId ? "Update" : "Add Medicine"}
                             </button>
                             {editingMedicationId && (
-                                <button type="button" onClick={cancelMedicationEdit} className="btn-secondary-purple">Cancel</button>
+                                <button type="button" onClick={cancelMedicationEdit} className="btn-secondary">Cancel</button>
                             )}
                         </div>
                     </div>
@@ -1007,12 +1007,12 @@ function DentistSettings() {
                 <tbody>
                     {clinicMedications.length === 0 ? (<tr><td colSpan="3" className="empty-state">No medications added to the master list yet.</td></tr>) : (
                         clinicMedications.map((med) => (
-                            <tr key={med.id} className={editingMedicationId === med.id ? "row-highlight-purple" : ""}>
+                            <tr key={med.id} className={editingMedicationId === med.id ? "row-highlight" : ""}>
                                 <td className="font-semibold">{med.name}</td>
                                 <td>{med.default_dosage || "N/A"}</td>
                                 <td>
                                     <div className="action-buttons">
-                                        <button onClick={() => handleEditMedicationClick(med)} className="btn-edit-purple">Edit</button>
+                                        <button onClick={() => handleEditMedicationClick(med)} className="btn-edit">Edit</button>
                                         <button onClick={() => handleDeleteMedication(med.id)} className="btn-delete">Remove</button>
                                     </div>
                                 </td>
