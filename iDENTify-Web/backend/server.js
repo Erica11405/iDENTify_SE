@@ -5,7 +5,7 @@
 // // Force Node.js to run in Philippine Standard Time
 // process.env.TZ = "Asia/Manila";
 
-// // 1. Import Routes - FIXED: changed from "./works/appointments" to "./routes/appointments"
+// // 1. Import Routes
 // const patientsRoutes = require("./routes/patients");
 // const annualRecordsRoutes = require("./routes/annual_records");
 // const appointmentsRoutes = require("./routes/appointments"); 
@@ -17,6 +17,7 @@
 // const treatmentsRoutes = require("./routes/treatments");
 // const reportsRoutes = require("./routes/reports");
 // const authRoutes = require("./routes/auth"); 
+// const clinicMedicationsRoutes = require("./routes/clinic_medications"); // Added dynamic medications route
 
 // const app = express();
 
@@ -42,6 +43,7 @@
 // apiRouter.use("/auth", authRoutes); 
 // apiRouter.use("/patients", patientsRoutes);
 // app.use('/api/services', require('./routes/services'));
+// app.use('/api/clinic-medications', clinicMedicationsRoutes); // Added dynamic medications
 // apiRouter.use("/annual-records", annualRecordsRoutes);
 // apiRouter.use("/appointments", appointmentsRoutes);
 // apiRouter.use("/queue", queueRoutes);
@@ -69,7 +71,7 @@ require("dotenv").config();
 // Force Node.js to run in Philippine Standard Time
 process.env.TZ = "Asia/Manila";
 
-// 1. Import Routes
+// 1. Import ALL Routes cleanly at the top
 const patientsRoutes = require("./routes/patients");
 const annualRecordsRoutes = require("./routes/annual_records");
 const appointmentsRoutes = require("./routes/appointments"); 
@@ -81,11 +83,14 @@ const dentistsRoutes = require("./routes/dentists");
 const treatmentsRoutes = require("./routes/treatments");
 const reportsRoutes = require("./routes/reports");
 const authRoutes = require("./routes/auth"); 
-const clinicMedicationsRoutes = require("./routes/clinic_medications"); // Added dynamic medications route
+
+// FIXED: Import new routes properly alongside the others
+const servicesRoutes = require("./routes/services"); 
+const clinicMedicationsRoutes = require("./routes/clinic_medications"); 
 
 const app = express();
 
-// 2. CORS - Ensure this matches your DigitalOcean Frontend URL AND Local testing URL
+// 2. CORS - Allow Production and Local Vite URLs
 app.use(cors({
     origin: [
         "https://identify-app-hth8t.ondigitalocean.app", // Production URL
@@ -102,12 +107,13 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.get('/', (req, res) => res.status(200).send('API is Live'));
 app.get('/health', (req, res) => res.status(200).send('Healthy'));
 
-// 4. Router setup
+// 4. Router setup - FIXED: Unified everything under apiRouter
 const apiRouter = express.Router();
+
 apiRouter.use("/auth", authRoutes); 
 apiRouter.use("/patients", patientsRoutes);
-app.use('/api/services', require('./routes/services'));
-app.use('/api/clinic-medications', clinicMedicationsRoutes); // Added dynamic medications
+apiRouter.use("/services", servicesRoutes); // Mounted safely
+apiRouter.use("/clinic-medications", clinicMedicationsRoutes); // Mounted safely
 apiRouter.use("/annual-records", annualRecordsRoutes);
 apiRouter.use("/appointments", appointmentsRoutes);
 apiRouter.use("/queue", queueRoutes);
@@ -118,6 +124,7 @@ apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
 
+// Apply the unified router to the app
 app.use("/api", apiRouter); 
 app.use("/", apiRouter); 
 
