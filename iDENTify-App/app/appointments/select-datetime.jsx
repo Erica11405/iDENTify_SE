@@ -577,28 +577,37 @@ export default function ConfirmAppointment() {
         // 1. Load Dentist & Appointments
         const resDentists = await fetch(`${API.dentists}`);
         const allDentists = await resDentists.json();
-        const selected = allDentists.find(d => String(d.id) === String(docId));
+        const selected = Array.isArray(allDentists) ? allDentists.find(d => String(d.id) === String(docId)) : null;
         setDentist(selected);
 
         const resAppts = await fetch(`${API.appointments}`);
         const allAppts = await resAppts.json();
-        const dentistAppts = allAppts.filter(a =>
-          String(a.dentist_id) === String(docId) && a.status !== 'Cancelled'
-        );
-        setAppointments(dentistAppts);
+        if (Array.isArray(allAppts)) {
+          const dentistAppts = allAppts.filter(a =>
+            String(a.dentist_id) === String(docId) && a.status !== 'Cancelled'
+          );
+          setAppointments(dentistAppts);
+        }
 
         // 2. Load User Profile & Family
         if (user?.primaryEmailAddress?.emailAddress) {
-          const parent = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
+          let parent = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
+          
+          // SAFEGUARD: Extract object if returned as an array
+          if (Array.isArray(parent)) parent = parent[0];
 
-          if (parent) {
+          if (parent && parent.id) {
             setMainProfile(parent);
             setSelectedPatient(parent);
 
-            const familyRes = await fetch(`${API.patients}/${parent.id}/family`);
-            if (familyRes.ok) {
-              const familyData = await familyRes.json();
-              setFamilyMembers(familyData);
+            try {
+              const familyRes = await fetch(`${API.patients}/${parent.id}/family`);
+              if (familyRes.ok) {
+                const familyData = await familyRes.json();
+                setFamilyMembers(Array.isArray(familyData) ? familyData : []);
+              }
+            } catch (err) {
+              console.log("No family data found");
             }
           }
         }
@@ -775,8 +784,8 @@ export default function ConfirmAppointment() {
   }, [dentist, selectedDate, appointments]);
 
   const bookAppointment = async (timeSlot) => {
-    if (!selectedPatient) {
-      Alert.alert("Error", "Please select who this appointment is for.");
+    if (!selectedPatient || !selectedPatient.id) {
+      Alert.alert("Error", "Could not identify the patient profile. Please ensure your profile is setup.");
       return;
     }
 
@@ -800,7 +809,7 @@ export default function ConfirmAppointment() {
       });
 
       if (res.ok) {
-        const patientName = selectedPatient.full_name || `${selectedPatient.first_name || ''} ${selectedPatient.last_name || ''}`.trim();
+        const patientName = selectedPatient.full_name || `${selectedPatient.first_name || ''} ${selectedPatient.last_name || ''}`.trim() || "Patient";
         Alert.alert("Success", `Appointment booked for ${patientName}!`, [
           { text: "OK", onPress: () => router.replace("/(tabs)/appointments") }
         ]);
@@ -823,7 +832,6 @@ export default function ConfirmAppointment() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
 
-      {/* HEADER WITH BACK BUTTON */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1E293B" />
@@ -836,7 +844,13 @@ export default function ConfirmAppointment() {
 
       <TouchableOpacity
         style={styles.patientSelector}
-        onPress={() => setShowPatientModal(true)}
+        onPress={() => {
+          if (!mainProfile) {
+            Alert.alert("Profile Missing", "We couldn't load your profile. Please check your network or setup your profile.");
+          } else {
+            setShowPatientModal(true);
+          }
+        }}
         activeOpacity={0.8}
       >
         <View style={styles.selectorIcon}>
@@ -845,7 +859,9 @@ export default function ConfirmAppointment() {
         <View style={{ flex: 1 }}>
           <Text style={styles.selectorLabel}>Booking For</Text>
           <Text style={styles.selectorValue}>
-            {selectedPatient ? (selectedPatient.full_name || `${selectedPatient.first_name || ''} ${selectedPatient.last_name || ''}`.trim()) : "Loading..."}
+            {selectedPatient 
+              ? (selectedPatient.full_name || `${selectedPatient.first_name || ''} ${selectedPatient.last_name || ''}`.trim() || "Unknown") 
+              : "Profile Not Found"}
           </Text>
         </View>
         <Ionicons name="chevron-down" size={20} color="#64748B" />
@@ -972,53 +988,20 @@ const styles = StyleSheet.create({
   contentContainer: { padding: 24, paddingTop: 40 },
   loadingCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { marginBottom: 20 },
-
-  // Back Button Styles
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginBottom: 16,
-    paddingRight: 10,
-    marginLeft: -4
-  },
-  backText: {
-    fontSize: 16,
-    color: "#1E293B",
-    marginLeft: 6,
-    fontWeight: "600"
-  },
-
+  backButton: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 16, paddingRight: 10, marginLeft: -4 },
+  backText: { fontSize: 16, color: "#1E293B", marginLeft: 6, fontWeight: "600" },
   title: { fontSize: 28, fontWeight: "800", color: "#1E293B", marginBottom: 4, letterSpacing: -0.5 },
   subtitle: { fontSize: 16, color: "#64748B", fontWeight: "500" },
-
-  patientSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 20,
-    shadowColor: "#64748B",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
+  patientSelector: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 20, shadowColor: "#64748B", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   selectorIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F0F9FF', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   selectorLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase' },
   selectorValue: { fontSize: 16, color: '#1E293B', fontWeight: '700' },
-
   summaryCard: { backgroundColor: "white", borderRadius: 20, padding: 20, shadowColor: "#64748B", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: "#F1F5F9", marginBottom: 24 },
   summaryItem: { flexDirection: "row", alignItems: "center" },
   iconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#F0F9FF", justifyContent: "center", alignItems: "center", marginRight: 16 },
   summaryLabel: { fontSize: 12, color: "#94A3B8", fontWeight: "600", textTransform: "uppercase", marginBottom: 2 },
   summaryValue: { fontSize: 16, fontWeight: "700", color: "#1E293B" },
-
   sectionTitle: { fontSize: 14, fontWeight: "700", color: "#94A3B8", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
-
   calendarContainer: { backgroundColor: 'white', borderRadius: 16, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
   calendarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   monthTitle: { fontSize: 16, fontWeight: '700', color: '#1E293B' },
@@ -1039,7 +1022,6 @@ const styles = StyleSheet.create({
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dotLegend: { width: 8, height: 8, borderRadius: 4 },
   legendText: { fontSize: 12, color: '#64748B' },
-
   timeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
   timeButton: { width: '30%', backgroundColor: "white", borderRadius: 12, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 8 },
   bookedTimeButton: { backgroundColor: "#F1F5F9", borderColor: "#F1F5F9" },
@@ -1048,12 +1030,10 @@ const styles = StyleSheet.create({
   timeText: { fontSize: 14, fontWeight: "600", color: "#334155" },
   noSlotsBox: { padding: 20, alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 12 },
   noSlotsText: { color: '#64748B', fontStyle: 'italic', textAlign: 'center' },
-
   loadContainer: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, marginBottom: 24, borderWidth: 1 },
   loadAvailable: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
   loadFull: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
   loadText: { fontWeight: '700', marginLeft: 8, fontSize: 14 },
-
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#1E293B', marginBottom: 20, textAlign: 'center' },
