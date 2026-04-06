@@ -917,17 +917,18 @@ export default function ConfirmAppointment() {
             <ActivityIndicator size="large" color="#1B93D5" style={{ marginVertical: 20 }} />
           ) : (
             availableSlots.map((slot, i) => {
+              const isBooked = slot.type === 'booked';
               const isDisabled = slot.type !== 'open' || isLimitReached;
               const isLabel = slot.type === 'lunch' || slot.type === 'break';
               return (
                 <TouchableOpacity
                   key={i}
-                  style={[styles.timeButton, isDisabled && styles.bookedTimeButton]}
+                  style={[styles.timeButton, isBooked && styles.bookedTimeButton]}
                   onPress={() => bookAppointment(slot)}
                   activeOpacity={0.7}
                   disabled={isDisabled}
                 >
-                  <Text style={[styles.timeText, isDisabled && styles.bookedTimeText, isLabel && styles.labelTimeText]}>{slot.label}</Text>
+                  <Text style={[styles.timeText, isBooked && styles.bookedTimeText, isLabel && styles.labelTimeText]}>{slot.label}</Text>
                 </TouchableOpacity>
               );
             })

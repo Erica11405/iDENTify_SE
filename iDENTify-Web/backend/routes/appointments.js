@@ -438,7 +438,7 @@ router.get("/check-limit", async (req, res) => {
 router.get("/", async (req, res) => {
   const { date, patient_id } = req.query; 
   // ADDED: LEFT JOIN to fetch the dentist's name
-  let query = `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.full_name AS dentist_name 
+  let query = `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name 
                FROM appointments a 
                JOIN patients p ON a.patient_id = p.id 
                LEFT JOIN dentists d ON a.dentist_id = d.id`;
@@ -475,7 +475,7 @@ router.get("/:id", async (req, res) => {
   try {
     // ADDED: LEFT JOIN to fetch the dentist's name
     const [rows] = await db.query(
-      `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.full_name AS dentist_name 
+      `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name 
        FROM appointments a 
        JOIN patients p ON a.patient_id = p.id 
        LEFT JOIN dentists d ON a.dentist_id = d.id
@@ -527,7 +527,7 @@ router.post("/", async (req, res) => {
     );
     
     const [rows] = await db.query(
-        `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.full_name AS dentist_name  
+      `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name  
          FROM appointments a 
          JOIN patients p ON a.patient_id = p.id 
          LEFT JOIN dentists d ON a.dentist_id = d.id
@@ -591,7 +591,7 @@ router.put("/:id", async (req, res) => {
     
     // ADDED: LEFT JOIN to return the updated dentist name instantly
     const [rows] = await db.query(
-      `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.full_name AS dentist_name 
+      `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name 
        FROM appointments a 
        JOIN patients p ON a.patient_id = p.id 
        LEFT JOIN dentists d ON a.dentist_id = d.id
