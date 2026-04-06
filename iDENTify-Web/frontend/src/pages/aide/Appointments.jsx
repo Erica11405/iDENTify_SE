@@ -167,7 +167,13 @@
 //     try {
 //       await api.updateAppointment(appointment.id, { status: 'Checked-In' });
 //       const now = new Date();
-//       const mysqlDateTime = now.toISOString().slice(0, 19).replace('T', ' ');
+//       const pad = (n) => (n < 10 ? '0' + n : n);
+//       const mysqlDateTime = now.getFullYear() + '-' +
+//              pad(now.getMonth() + 1) + '-' +
+//              pad(now.getDate()) + ' ' +
+//              pad(now.getHours()) + ':' +
+//              pad(now.getMinutes()) + ':' +
+//              pad(now.getSeconds());
 //       await api.addQueue({
 //         patient_id: patientId,
 //         appointment_id: appointment.id,
@@ -210,7 +216,8 @@
 //     try {
 //       let finalPatientId = data.patient_id;
 
-//       if (data.isNewPatient) {
+//       // MODIFIED: Only create a new database record if it is explicitly a New Patient or ID is missing
+//       if (data.isNewPatient || !finalPatientId) {
 //         const newPatientRes = await api.createPatient({
 //           first_name: data.first_name,
 //           last_name: data.last_name,
@@ -225,12 +232,14 @@
 //         finalPatientId = newPatientRes.id || newPatientRes.data?.id || newPatientRes.patientId; 
 //       }
 
+//       if (!finalPatientId) throw new Error("Failed to resolve patient ID.");
+
 //       await api.createAppointment({
 //         ...data,
 //         patient_id: finalPatientId
 //       });
 
-//       toast.success("Appointment successfully added!");
+//       toast.success(data.isNewPatient ? "New patient and appointment added!" : "Appointment scheduled for existing patient.");
 //       setIsAddModalOpen(false);
 //       api.loadAppointments();
 //       if (data.isNewPatient) {
@@ -487,7 +496,7 @@ function Appointments() {
         source: "appointment",
         status: "Checked-In",
         notes: appointment.procedure || appointment.reason || "",
-        time_added: mysqlDateTime,
+        time_added: mysqlDateTime, // This successfully passes local time
       });
       toast.success("Added to Queue.");
       api.loadAppointments();
@@ -522,7 +531,6 @@ function Appointments() {
     try {
       let finalPatientId = data.patient_id;
 
-      // MODIFIED: Only create a new database record if it is explicitly a New Patient or ID is missing
       if (data.isNewPatient || !finalPatientId) {
         const newPatientRes = await api.createPatient({
           first_name: data.first_name,
