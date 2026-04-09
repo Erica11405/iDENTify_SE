@@ -52,7 +52,10 @@
 //     const dayIndex = today.getDay(); 
 //     const todayKey = today.toLocaleDateString('en-CA'); 
 
-//     return dentists.map((dentist) => {
+//     // FILTER OUT DENTAL AIDES
+//     const actualDentists = dentists.filter(d => d.specialization !== 'Dental Aide' && d.role !== 'aide');
+
+//     return actualDentists.map((dentist) => {
 //       let scheduleStatus = "Available";
 //       const isOnLeave = (dentist.leaveDays || []).includes(todayKey);
 //       const isWorkingDay = (dentist.days || []).includes(dayIndex);
@@ -272,12 +275,11 @@
 // export default Dashboard;
 
 
-
-
 import React, { useState, useEffect, useMemo } from "react";
 import "../../styles/pages/aide/Dashboard.css";
 import WeeklyBarChart from "../../components/WeeklyBarChart.jsx";
 import AddWalkInModal from "../../components/AddWalkInModal";
+import AddAppointmentModal from "../../components/AddAppointmentModal";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
 import { useNavigate } from "react-router-dom";
@@ -289,7 +291,9 @@ function Dashboard() {
   const appointments = useAppStore((s) => s.appointments);
   const dentists = useAppStore((s) => s.dentists);
   const patients = useAppStore((s) => s.patients);
+  
   const [isAddWalkInOpen, setIsAddWalkInOpen] = useState(false);
+  const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
 
   useEffect(() => {
     const loadAll = async () => {
@@ -310,7 +314,7 @@ function Dashboard() {
 
   const inTreatmentStatuses = ["On Chair", "In Treatment", "Treatment", "With patient"];
 
-  // Helper from src2 to sort appointments by time string
+  // Helper to sort appointments by time string
   const toMinutes = (timeString) => {
     if (!timeString) return 0;
     const [time, meridiem] = timeString.split(" ");
@@ -322,7 +326,7 @@ function Dashboard() {
     return hour * 60 + minute;
   };
 
-  // 1. CALCULATE DENTIST STATUS (Advanced logic from src)
+  // 1. CALCULATE DENTIST STATUS 
   const dentistsWithStatus = useMemo(() => {
     const today = new Date();
     const dayIndex = today.getDay(); 
@@ -361,7 +365,7 @@ function Dashboard() {
     });
   }, [dentists, queue]);
 
-  // 2. TODAY'S APPOINTMENTS (Mapping logic from src2)
+  // 2. TODAY'S APPOINTMENTS 
   const todaysAppointmentsEnriched = useMemo(() => {
     const todayKey = new Date().toLocaleDateString('en-CA');
 
@@ -479,13 +483,13 @@ function Dashboard() {
           <h3 className="dashboard-subtitle">Quick Actions</h3>
           <div className="quick-actions">
             <button className="quick-action-btn" onClick={() => setIsAddWalkInOpen(true)}>Add Walk-In Patient</button>
-            <button className="quick-action-btn" onClick={() => navigate('/app/appointments')}>Add Appointment</button>
-            <button className="quick-action-btn" onClick={() => navigate('/app/queue')}>Open Queue</button>
-            <button className="quick-action-btn" onClick={() => navigate('/app/reports')}>View Summary</button>
+            <button className="quick-action-btn" onClick={() => setIsAddAppointmentOpen(true)}>Add Appointment</button>
+            <button className="quick-action-btn" onClick={() => navigate('/queue')}>Open Queue</button>
+            <button className="quick-action-btn" onClick={() => navigate('/reports')}>View Summary</button>
           </div>
         </div>
 
-        {/* TODAY'S APPOINTMENTS TABLE - Enhanced with src2 lookup logic */}
+        {/* TODAY'S APPOINTMENTS TABLE */}
         <div className="dashboard-section full-width">
           <h3 className="dashboard-subtitle">Today's Appointments</h3>
           <div style={{ overflowX: 'auto', background: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
@@ -543,6 +547,11 @@ function Dashboard() {
         isOpen={isAddWalkInOpen}
         onClose={() => setIsAddWalkInOpen(false)}
         onAddPatient={async (p) => { /* logic remains standard */ }}
+      />
+      
+      <AddAppointmentModal 
+        isOpen={isAddAppointmentOpen} 
+        onClose={() => setIsAddAppointmentOpen(false)} 
       />
     </div>
   );
