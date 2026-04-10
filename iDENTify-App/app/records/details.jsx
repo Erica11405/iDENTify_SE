@@ -113,13 +113,11 @@ export default function RecordDetails() {
         const data = await res.json();
         setRecord(data);
 
-        // Fetch Medications using the patient_id from the record
-        if (data.patient_id) {
-          const medsRes = await fetch(`${API.medications}/${data.patient_id}`);
-          if (medsRes.ok) {
-            const medsData = await medsRes.json();
-            setMedications(medsData);
-          }
+        // Fetch Medications using the specific record ID
+        const medsRes = await fetch(`${API.medications}/record/${id}`);
+        if (medsRes.ok) {
+          const medsData = await medsRes.json();
+          setMedications(medsData);
         }
       } catch (error) {
         console.error("Error:", error);
