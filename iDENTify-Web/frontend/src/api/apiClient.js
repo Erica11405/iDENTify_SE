@@ -33,6 +33,24 @@
 //     return handleResponse(res);
 // };
 
+// export const verifyOtp = async (payload) => {
+//     const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(payload),
+//     });
+//     return handleResponse(res);
+// };
+
+// export const sendSignupOtp = async (payload) => {
+//     const res = await fetch(`${API_BASE}/auth/signup/dentist/send-otp`, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(payload),
+//     });
+//     return handleResponse(res);
+// };
+
 // export const signupDentist = async (payload) => {
 //     const res = await fetch(`${API_BASE}/auth/signup/dentist`, {
 //         method: 'POST',
@@ -282,7 +300,7 @@
 // };
 
 // const api = {
-//     login, signupDentist, getDentists, createDentist, updateDentist, deleteDentist,
+//     login, verifyOtp, sendSignupOtp, signupDentist, getDentists, createDentist, updateDentist, deleteDentist,
 //     getPatients, getPatientById, createPatient, updatePatient, searchPatients,
 //     getQueue, addQueueItem, updateQueueItem, deleteQueueItem,
 //     getAppointments, updateAppointment,
@@ -294,6 +312,7 @@
 // };
 
 // export default api;
+
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
@@ -591,6 +610,11 @@ export const addMedication = async (payload) => {
     return handleResponse(res);
 };
 
+export const deleteMedication = async (id) => {
+    const res = await fetch(`${API_BASE}/medications/${id}`, { method: 'DELETE' });
+    return handleResponse(res);
+};
+
 export const get = async (url) => {
     const res = await fetch(`${API_BASE}${url}`);
     return handleResponse(res);
@@ -605,7 +629,7 @@ const api = {
     getServices, createService, updateService, deleteService,
     getClinicMedications, createClinicMedication, updateClinicMedication, deleteClinicMedication,
     getAnnualRecord, saveAnnualRecord, getToothConditions, upsertToothCondition,
-    getTreatmentTimeline, addTreatmentTimelineEntry, getMedications, addMedication
+    getTreatmentTimeline, addTreatmentTimelineEntry, getMedications, addMedication, deleteMedication
 };
 
 export default api;
