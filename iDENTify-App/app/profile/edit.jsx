@@ -1035,7 +1035,7 @@ export default function EditProfile() {
           setLastName(user.lastName || "");
           setEmail(userEmail);
         }
-      } catch (error) {
+      } catch (_error) {
         Alert.alert("Error", "Could not load profile.");
       } finally {
         setLoading(false);
@@ -1114,7 +1114,7 @@ export default function EditProfile() {
 
       Alert.alert("Success", "Your profile has been updated.");
       router.back();
-    } catch (error) {
+    } catch (_error) {
       Alert.alert("Error", "Failed to save changes.");
     } finally {
       setLoading(false);

@@ -811,7 +811,8 @@ import { useEffect, useState } from "react";
 import { API } from "../../constants/Api";
 
 export default function SelectDoctor() {
-  const { service } = useLocalSearchParams();
+  const { service, serviceName, serviceId, serviceDuration, servicePrice } = useLocalSearchParams();
+  const selectedServiceName = String(serviceName || service || "");
   const router = useRouter();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -867,7 +868,7 @@ export default function SelectDoctor() {
         </TouchableOpacity>
 
         <Text style={styles.title}>Choose a Specialist</Text>
-        <Text style={styles.subtitle}>for {service || "Appointment"}</Text>
+        <Text style={styles.subtitle}>for {selectedServiceName || "Appointment"}</Text>
       </View>
 
       {loading ? (
@@ -886,9 +887,18 @@ export default function SelectDoctor() {
               style={styles.card}
               activeOpacity={0.7}
               onPress={() =>
-                router.push(
-                  `/appointments/select-datetime?doctor=${doc.name}&docId=${doc.id}&service=${service}`
-                )
+                router.push({
+                  pathname: "/appointments/select-datetime",
+                  params: {
+                    doctor: String(doc.name || ""),
+                    docId: String(doc.id),
+                    service: selectedServiceName,
+                    serviceName: selectedServiceName,
+                    serviceId: String(serviceId || ""),
+                    serviceDuration: String(serviceDuration || "30"),
+                    servicePrice: String(servicePrice || ""),
+                  },
+                })
               }
             >
               <View style={styles.avatarContainer}>

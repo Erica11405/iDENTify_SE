@@ -910,6 +910,17 @@ import toast from "react-hot-toast";
 import api from "../../api/apiClient"; 
 import "../../styles/pages/dentist/DentistSettings.css";
 
+const COMMON_FREQUENCY_OPTIONS = [
+    "Daily",
+    "Twice a day",
+    "Three times a day",
+    "Every 4 hours",
+    "Every 6 hours",
+    "Every 8 hours",
+    "Every 12 hours",
+    "As needed",
+];
+
 function DentistSettings() {
   const [activeTab, setActiveTab] = useState("aides");
 
@@ -925,7 +936,7 @@ function DentistSettings() {
 
   // --- MEDICATIONS STATE ---
   const [clinicMedications, setClinicMedications] = useState([]);
-  const [newMedication, setNewMedication] = useState({ name: "", defaultDosage: "" });
+    const [newMedication, setNewMedication] = useState({ name: "", defaultDosage: "", defaultFrequency: "" });
   const [editingMedicationId, setEditingMedicationId] = useState(null);
 
   // Fetch data when the page loads
@@ -1045,7 +1056,7 @@ function DentistSettings() {
             toast.success("Service added successfully!");
         }
         cancelServiceEdit();
-    } catch (error) {
+    } catch {
         toast.error("Failed to save service");
     }
   };
@@ -1070,7 +1081,7 @@ function DentistSettings() {
         await api.deleteService(id);
         setServices(services.filter(service => service.id !== id));
         toast.success("Service removed.");
-    } catch (error) {
+        } catch {
         toast.error("Failed to delete service.");
     }
   };
@@ -1084,21 +1095,32 @@ function DentistSettings() {
 
     const payload = {
         name: newMedication.name,
-        default_dosage: newMedication.defaultDosage
+        default_dosage: newMedication.defaultDosage,
+        default_frequency: newMedication.defaultFrequency,
     };
 
     try {
         if (editingMedicationId) {
             await api.updateClinicMedication(editingMedicationId, payload);
-            setClinicMedications(clinicMedications.map(m => m.id === editingMedicationId ? { ...m, name: payload.name, default_dosage: payload.default_dosage } : m));
+                        setClinicMedications(clinicMedications.map(m => m.id === editingMedicationId ? {
+                            ...m,
+                            name: payload.name,
+                            default_dosage: payload.default_dosage,
+                            default_frequency: payload.default_frequency,
+                        } : m));
             toast.success("Medication updated successfully!");
         } else {
             const createdMed = await api.createClinicMedication(payload);
-            setClinicMedications([...clinicMedications, { id: createdMed.id, name: payload.name, default_dosage: payload.default_dosage }]);
+                        setClinicMedications([...clinicMedications, {
+                            id: createdMed.id,
+                            name: payload.name,
+                            default_dosage: payload.default_dosage,
+                            default_frequency: payload.default_frequency,
+                        }]);
             toast.success("Medication added successfully!");
         }
         cancelMedicationEdit();
-    } catch (error) {
+    } catch {
         toast.error("Failed to save medication");
     }
   };
@@ -1107,13 +1129,14 @@ function DentistSettings() {
       setEditingMedicationId(med.id);
       setNewMedication({
           name: med.name,
-          defaultDosage: med.default_dosage || ""
+          defaultDosage: med.default_dosage || "",
+          defaultFrequency: med.default_frequency || "",
       });
   };
 
   const cancelMedicationEdit = () => {
       setEditingMedicationId(null);
-      setNewMedication({ name: "", defaultDosage: "" });
+      setNewMedication({ name: "", defaultDosage: "", defaultFrequency: "" });
   };
 
   const handleDeleteMedication = async (id) => {
@@ -1121,7 +1144,7 @@ function DentistSettings() {
         await api.deleteClinicMedication(id);
         setClinicMedications(clinicMedications.filter(med => med.id !== id));
         toast.success("Medication removed.");
-    } catch (error) {
+        } catch {
         toast.error("Failed to delete medication.");
     }
   };
@@ -1337,6 +1360,21 @@ function DentistSettings() {
                                 <option value="N/A">N/A</option>
                             </select>
                         </div>
+                        <div className="form-group flex-2">
+                            <label>Default Frequency</label>
+                            <input
+                                type="text"
+                                list="default-frequency-options"
+                                placeholder="e.g., Every 8 hours"
+                                value={newMedication.defaultFrequency}
+                                onChange={(e) => setNewMedication({ ...newMedication, defaultFrequency: e.target.value })}
+                            />
+                            <datalist id="default-frequency-options">
+                                {COMMON_FREQUENCY_OPTIONS.map((option) => (
+                                    <option key={option} value={option} />
+                                ))}
+                            </datalist>
+                        </div>
                     </div>
                     
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '15px' }}>
@@ -1349,13 +1387,14 @@ function DentistSettings() {
             <h3 className="table-title">Current Available Medications</h3>
             <div className="table-container">
                 <table className="settings-table">
-                <thead><tr><th>Medicine Name</th><th>Default Dosage</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Medicine Name</th><th>Default Dosage</th><th>Default Frequency</th><th>Actions</th></tr></thead>
                 <tbody>
-                    {clinicMedications.length === 0 ? (<tr><td colSpan="3" className="empty-state">No medications added to the master list yet.</td></tr>) : (
+                    {clinicMedications.length === 0 ? (<tr><td colSpan="4" className="empty-state">No medications added to the master list yet.</td></tr>) : (
                         clinicMedications.map((med) => (
                             <tr key={med.id} className={editingMedicationId === med.id ? "row-highlight" : ""}>
                                 <td className="font-semibold">{med.name}</td>
                                 <td>{med.default_dosage || "N/A"}</td>
+                                <td>{med.default_frequency || "N/A"}</td>
                                 <td>
                                     <div className="action-buttons">
                                         <button onClick={() => handleEditMedicationClick(med)} className="btn-edit">Edit</button>

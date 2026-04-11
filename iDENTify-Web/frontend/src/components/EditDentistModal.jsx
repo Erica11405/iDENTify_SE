@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import '../styles/components/EditDentistModal.css'; 
 import api from '../api/apiClient';
 import toast from 'react-hot-toast';
@@ -26,9 +26,6 @@ const EditDentistModal = ({ dentist, onClose, onSuccess }) => {
     status: dentist?.status || "Available"
   });
 
-  const [breakDraft, setBreakDraft] = useState({ start: "", end: "" });
-  const [leaveDraft, setLeaveDraft] = useState("");
-
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const toggleWorkingDay = (dayValue) => {
@@ -41,26 +38,6 @@ const EditDentistModal = ({ dentist, onClose, onSuccess }) => {
 
   const handleTimeChange = (section, field, value) => {
     setFormData(prev => ({ ...prev, [section]: { ...prev[section], [field]: value } }));
-  };
-
-  const addBreak = () => {
-    if (!breakDraft.start || !breakDraft.end) return;
-    setFormData(prev => ({ ...prev, breaks: [...prev.breaks, { label: "Break", ...breakDraft }] }));
-    setBreakDraft({ start: "", end: "" });
-  };
-
-  const removeBreak = (index) => {
-    setFormData(prev => ({ ...prev, breaks: prev.breaks.filter((_, i) => i !== index) }));
-  };
-
-  const addLeaveDay = () => {
-    if (!leaveDraft || formData.leaveDays.includes(leaveDraft)) return;
-    setFormData(prev => ({ ...prev, leaveDays: [...prev.leaveDays, leaveDraft] }));
-    setLeaveDraft("");
-  };
-
-  const removeLeaveDay = (dayToRemove) => {
-    setFormData(prev => ({ ...prev, leaveDays: prev.leaveDays.filter(d => d !== dayToRemove) }));
   };
 
   const handleSubmit = async (e) => {

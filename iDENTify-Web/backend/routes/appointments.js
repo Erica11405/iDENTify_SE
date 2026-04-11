@@ -405,6 +405,8 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
+const DEFAULT_DURATION_MINUTES = 30;
+
 function parseTime(dateTimeStr) {
   if (!dateTimeStr) return null;
   let parts = dateTimeStr.match(/(\d{4})-(\d{2})-(\d{2}) (\d{1,2}):(\d{2}) (AM|PM)/);
@@ -416,6 +418,98 @@ function parseTime(dateTimeStr) {
     return `${year}-${month}-${day} ${hourInt.toString().padStart(2, '0')}:${minute}:00`;
   }
   return dateTimeStr; 
+}
+
+function toPositiveInt(value) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+function toDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const normalized = String(value).replace(" ", "T");
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatSqlDateTime(value) {
+  const date = toDate(value);
+  if (!date) return null;
+
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function addMinutes(sqlDateTime, minutes) {
+  const date = toDate(sqlDateTime);
+  if (!date) return null;
+
+  const ms = Number(minutes || 0) * 60 * 1000;
+  const next = new Date(date.getTime() + ms);
+  return formatSqlDateTime(next);
+}
+
+function splitServiceNames(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+}
+
+function buildReasonText(services, procedure) {
+  if (Array.isArray(services) && services.length > 0) {
+    return services.map((item) => String(item || "").trim()).filter(Boolean).join(", ");
+  }
+
+  if (typeof services === "string" && services.trim()) {
+    return services.trim();
+  }
+
+  return String(procedure || "").trim();
+}
+
+function normalizeServiceList(services, procedure) {
+  if (Array.isArray(services) && services.length > 0) {
+    return services.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+
+  if (typeof services === "string" && services.trim()) {
+    return splitServiceNames(services);
+  }
+
+  return splitServiceNames(procedure);
+}
+
+async function resolveDurationMinutes({ services, procedure, durationHint }) {
+  const hintedMinutes = toPositiveInt(durationHint);
+  if (hintedMinutes) {
+    return hintedMinutes;
+  }
+
+  const normalizedServices = normalizeServiceList(services, procedure);
+  if (normalizedServices.length === 0) {
+    return DEFAULT_DURATION_MINUTES;
+  }
+
+  const placeholders = normalizedServices.map(() => "?").join(",");
+  const [rows] = await db.query(
+    `SELECT name, estimated_duration FROM clinic_services WHERE name IN (${placeholders})`,
+    normalizedServices
+  );
+
+  const durationMap = new Map(
+    rows.map((row) => [String(row.name || "").trim().toLowerCase(), toPositiveInt(row.estimated_duration) || DEFAULT_DURATION_MINUTES])
+  );
+
+  return normalizedServices.reduce((total, serviceName) => {
+    const key = String(serviceName || "").trim().toLowerCase();
+    return total + (durationMap.get(key) || DEFAULT_DURATION_MINUTES);
+  }, 0);
 }
 
 // --- CHECK DAILY LIMIT ---
@@ -495,35 +589,41 @@ router.get("/:id", async (req, res) => {
 
 // --- ADD APPOINTMENT ---
 router.post("/", async (req, res) => {
-  const { patient_id, dentist_id, timeStart, procedure, services, notes, status } = req.body;
+  const { patient_id, dentist_id, timeStart, procedure, services, notes, status, estimated_duration_minutes } = req.body;
   const appointment_datetime = parseTime(timeStart);
 
   if (!appointment_datetime) return res.status(400).json({ message: "Invalid time format" });
 
   try {
+    const finalReason = buildReasonText(services, procedure);
+    const durationMinutes = await resolveDurationMinutes({
+      services,
+      procedure: finalReason,
+      durationHint: estimated_duration_minutes,
+    });
+    const endDateTime = addMinutes(appointment_datetime, durationMinutes);
+
+    if (!endDateTime) {
+      return res.status(400).json({ message: "Invalid computed end time." });
+    }
+
     const [existingConflict] = await db.query(
       `SELECT id FROM appointments 
        WHERE dentist_id = ? 
-       AND appointment_datetime = ? 
-       AND status NOT IN ('Cancelled', 'Declined')`,
-      [dentist_id, appointment_datetime]
+       AND status NOT IN ('Cancelled', 'Declined')
+       AND appointment_datetime < ?
+       AND COALESCE(end_datetime, DATE_ADD(appointment_datetime, INTERVAL 30 MINUTE)) > ?`,
+      [dentist_id, endDateTime, appointment_datetime]
     );
 
     if (existingConflict.length > 0) {
       return res.status(409).json({ message: "This time slot is already booked for this dentist. Please select another time." });
     }
 
-    let finalReason = procedure || "";
-    if (services && Array.isArray(services)) {
-      finalReason = services.join(", ");
-    } else if (services) {
-      finalReason = services;
-    }
-
     const [result] = await db.query(
-      `INSERT INTO appointments (patient_id, dentist_id, appointment_datetime, reason, notes, status)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [patient_id, dentist_id, appointment_datetime, finalReason, notes || "", status || 'Scheduled']
+      `INSERT INTO appointments (patient_id, dentist_id, appointment_datetime, end_datetime, reason, notes, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [patient_id, dentist_id, appointment_datetime, endDateTime, finalReason, notes || "", status || 'Scheduled']
     );
     
     const [rows] = await db.query(
@@ -549,40 +649,78 @@ router.put("/:id", async (req, res) => {
   const values = [];
 
   try {
-    if (fields.timeStart || fields.dentist_id) {
-        const [currentAppt] = await db.query(`SELECT dentist_id, appointment_datetime FROM appointments WHERE id = ?`, [id]);
-        
-        if (currentAppt.length > 0) {
-            const checkTime = fields.timeStart ? parseTime(fields.timeStart) : currentAppt[0].appointment_datetime;
-            const checkDentistId = fields.dentist_id ? fields.dentist_id : currentAppt[0].dentist_id;
+    const [currentRows] = await db.query(
+      `SELECT id, dentist_id, appointment_datetime, reason, end_datetime FROM appointments WHERE id = ? LIMIT 1`,
+      [id]
+    );
 
-            const [existingConflict] = await db.query(
-              `SELECT id FROM appointments 
-               WHERE dentist_id = ? 
-               AND appointment_datetime = ? 
-               AND status NOT IN ('Cancelled', 'Declined') 
-               AND id != ?`,
-              [checkDentistId, checkTime, id]
-            );
+    if (!currentRows.length) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
 
-            if (existingConflict.length > 0) {
-              return res.status(409).json({ message: "This time slot is already booked for this dentist. Please select another time." });
-            }
-        }
+    const currentAppt = currentRows[0];
+    const nextDentistId = fields.dentist_id || currentAppt.dentist_id;
+
+    const parsedStart = fields.timeStart ? parseTime(fields.timeStart) : null;
+    if (fields.timeStart && !parsedStart) {
+      return res.status(400).json({ message: "Invalid time format" });
+    }
+
+    const nextStart = parsedStart || formatSqlDateTime(currentAppt.appointment_datetime);
+
+    const reasonSeed = Object.prototype.hasOwnProperty.call(fields, "procedure")
+      ? fields.procedure
+      : currentAppt.reason;
+    const nextReason = buildReasonText(fields.services, reasonSeed);
+
+    const durationMinutes = await resolveDurationMinutes({
+      services: fields.services,
+      procedure: nextReason,
+      durationHint: fields.estimated_duration_minutes,
+    });
+
+    const nextEnd = addMinutes(nextStart, durationMinutes);
+    if (!nextEnd) {
+      return res.status(400).json({ message: "Invalid computed end time." });
+    }
+
+    if (fields.timeStart || fields.dentist_id || fields.procedure || fields.services) {
+      const [existingConflict] = await db.query(
+        `SELECT id FROM appointments 
+         WHERE dentist_id = ? 
+         AND status NOT IN ('Cancelled', 'Declined')
+         AND appointment_datetime < ?
+         AND COALESCE(end_datetime, DATE_ADD(appointment_datetime, INTERVAL 30 MINUTE)) > ?
+         AND id != ?`,
+        [nextDentistId, nextEnd, nextStart, id]
+      );
+
+      if (existingConflict.length > 0) {
+        return res.status(409).json({ message: "This time slot is already booked for this dentist. Please select another time." });
+      }
     }
 
     if (fields.timeStart) {
-      const parsed = parseTime(fields.timeStart);
-      if (parsed) { setClauses.push("appointment_datetime = ?"); values.push(parsed); }
+      setClauses.push("appointment_datetime = ?");
+      values.push(nextStart);
     }
     if (fields.dentist_id) { setClauses.push("dentist_id = ?"); values.push(fields.dentist_id); }
     if (fields.procedure || fields.services) {
-      const updatedProc = fields.services ? (Array.isArray(fields.services) ? fields.services.join(", ") : fields.services) : fields.procedure;
       setClauses.push("reason = ?"); 
-      values.push(updatedProc);
+      values.push(nextReason);
     }
-    if (fields.notes) { setClauses.push("notes = ?"); values.push(fields.notes); }
-    if (fields.status) { setClauses.push("status = ?"); values.push(fields.status); }
+    if (fields.timeStart || fields.procedure || fields.services) {
+      setClauses.push("end_datetime = ?");
+      values.push(nextEnd);
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "notes")) {
+      setClauses.push("notes = ?");
+      values.push(fields.notes || "");
+    }
+    if (Object.prototype.hasOwnProperty.call(fields, "status")) {
+      setClauses.push("status = ?");
+      values.push(fields.status);
+    }
 
     if (setClauses.length === 0) return res.status(400).json({ message: "No valid updates provided." });
 

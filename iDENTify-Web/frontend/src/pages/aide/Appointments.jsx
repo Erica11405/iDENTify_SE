@@ -501,7 +501,7 @@ function Appointments() {
       toast.success("Added to Queue.");
       api.loadAppointments();
       api.loadQueue();
-    } catch (err) { toast.error("Failed to add to queue."); }
+    } catch { toast.error("Failed to add to queue."); }
   };
 
   const handleFilterChange = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));

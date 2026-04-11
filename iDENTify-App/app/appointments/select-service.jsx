@@ -168,11 +168,15 @@ export default function SelectServiceScreen() {
   }, []);
 
   const handleSelectService = (service) => {
-    // Pass the selected service name and price back to your booking flow
+    const durationMinutes = Number.parseInt(String(service?.estimated_duration || ""), 10);
+
+    // Pass service context so the next steps can do duration-aware slot checks.
     router.push({
       pathname: "/appointments/select-doctor",
       params: { 
           serviceName: service.name,
+          serviceId: String(service.id),
+          serviceDuration: Number.isFinite(durationMinutes) && durationMinutes > 0 ? String(durationMinutes) : "30",
           servicePrice: `₱${service.min_price} - ₱${service.max_price}` 
       }
     });

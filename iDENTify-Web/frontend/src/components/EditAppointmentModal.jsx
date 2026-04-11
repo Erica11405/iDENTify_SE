@@ -22,6 +22,12 @@ function toMinutes24(timeString) {
   return hours * 60 + minutes;
 }
 
+function parseDurationMinutes(value) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 30;
+  return parsed;
+}
+
 function getLocalToday() {
   const d = new Date();
   const year = d.getFullYear();
@@ -88,6 +94,7 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
   const [selectedServices, setSelectedServices] = useState([]);
   const [currentService, setCurrentService] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [availableServices, setAvailableServices] = useState([]);
 
   // Availability State
   const [availability, setAvailability] = useState({ count: 0, limit: 5, isFull: false, checked: false });
@@ -104,9 +111,38 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
     }
   }, [appointment]);
 
+  useEffect(() => {
+    const loadServices = async () => {
+      try {
+        const rows = await api.getServices();
+        setAvailableServices(Array.isArray(rows) ? rows : []);
+      } catch (err) {
+        console.error("Failed to load services for edit modal", err);
+      }
+    };
+
+    loadServices();
+  }, []);
+
   const selectedDentist = useMemo(() => {
     return dentists.find(d => String(d.id) === String(formData.dentist_id));
   }, [dentists, formData.dentist_id]);
+
+  const selectedDurationMinutes = useMemo(() => {
+    if (!selectedServices.length) return 30;
+
+    const durationByService = new Map(
+      availableServices.map((service) => [
+        String(service?.name || "").trim().toLowerCase(),
+        parseDurationMinutes(service?.estimated_duration),
+      ])
+    );
+
+    return selectedServices.reduce((total, serviceName) => {
+      const key = String(serviceName || "").trim().toLowerCase();
+      return total + (durationByService.get(key) || 30);
+    }, 0);
+  }, [selectedServices, availableServices]);
 
   // --- DYNAMIC AGE ---
   useEffect(() => {
@@ -184,17 +220,30 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
         : a.appointment_datetime.split(" ")[0];
       return aDate === formData.appointmentDate;
     }).map(a => {
-      let timePart = a.appointment_datetime.includes("T") ? a.appointment_datetime.split("T")[1] : a.appointment_datetime.split(" ")[1];
-      if (!timePart) return { start: -1, end: -1 };
-      const [h, m] = timePart.split(':').map(Number);
-      const startMins = h * 60 + m;
-      return { start: startMins, end: startMins + 30 };
+      const startDate = new Date(String(a.appointment_datetime).replace(" ", "T"));
+      if (Number.isNaN(startDate.getTime())) return { start: -1, end: -1 };
+
+      const startMins = startDate.getHours() * 60 + startDate.getMinutes();
+
+      let endMins = startMins + 30;
+      if (a.end_datetime) {
+        const endDate = new Date(String(a.end_datetime).replace(" ", "T"));
+        if (!Number.isNaN(endDate.getTime())) {
+          endMins = endDate.getHours() * 60 + endDate.getMinutes();
+        }
+      }
+
+      if (endMins <= startMins) {
+        endMins = startMins + 30;
+      }
+
+      return { start: startMins, end: endMins };
     });
 
     for (let time = startMin; time < endMin; time += 30) {
       const h = Math.floor(time / 60);
       const m = time % 60;
-      const slotEnd = time + 30;
+      const slotEnd = time + selectedDurationMinutes;
 
       let type = 'open';
       const timeStr24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -216,6 +265,8 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
 
       if (type === 'open' && isToday && time <= currentMinutes) type = 'past';
 
+      if (type === 'open' && slotEnd > endMin) type = 'booked';
+
       if (type === 'open') {
         for (let appt of dayAppts) {
           if (time < appt.end && slotEnd > appt.start) { type = 'booked'; break; }
@@ -225,7 +276,7 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
       slots.push({ value: timeStr24, label, type });
     }
     setGeneratedSlots(slots);
-  }, [selectedDentist, formData.appointmentDate, dentistAppts, appointment.id]);
+  }, [selectedDentist, formData.appointmentDate, dentistAppts, appointment.id, selectedDurationMinutes]);
 
   // --- HANDLERS ---
   const handleChange = (e) => {
@@ -271,6 +322,8 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
       dentist_id: Number(formData.dentist_id),
       dentist: dentistNameFromId || formData.dentist,
       procedure: procedureString,
+      services: selectedServices,
+      estimated_duration_minutes: selectedDurationMinutes,
       timeStart: fullTimeStart,
     };
 
@@ -459,9 +512,11 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
                 onChange={(e) => setCurrentService(e.target.value)}
               >
                 <option value="">Select a service to add...</option>
-                {dentalServices.map((service, index) => (
-                  <option key={index} value={service.name}>
-                    {service.name} ({service.price})
+                {(availableServices.length > 0 ? availableServices : dentalServices).map((service, index) => (
+                  <option key={service.id || index} value={service.name}>
+                    {availableServices.length > 0
+                      ? `${service.name} (P${service.min_price} - P${service.max_price})`
+                      : `${service.name} (${service.price})`}
                   </option>
                 ))}
               </select>

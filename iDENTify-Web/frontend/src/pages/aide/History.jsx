@@ -362,7 +362,7 @@ function History() {
             }
         };
         loadData();
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const baseHistoryList = useMemo(
         () =>

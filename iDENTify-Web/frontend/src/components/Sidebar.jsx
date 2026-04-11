@@ -13,6 +13,10 @@
 
 // function Sidebar({ role }) {
 //     const navigate = useNavigate();
+                            <NavLink to="/reports" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={ReportIcon} alt="Reports" />
+                                <span>Reports</span>
+                            </NavLink>
 //     const { resetStore, user } = useAppStore();
 //     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     
@@ -149,6 +153,12 @@ import ReportIcon from "../assets/report.svg";
 import DentistIcon from "../assets/dentist.svg";
 import LogoutIcon from "../assets/logout.svg";
 
+function roleLabel(role) {
+    if (role === 'superadmin') return 'Super Admin';
+    if (role === 'dentist') return 'Dentist';
+    return 'Dental Aide';
+}
+
 function Sidebar({ role }) {
     const navigate = useNavigate();
     const { resetStore, user } = useAppStore();
@@ -201,13 +211,35 @@ function Sidebar({ role }) {
                         >
                             {user?.name || 'User'}
                         </p>
-                        <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.8 }}>{role === 'dentist' ? 'Dentist' : 'Dental Aide'}</p>
+                        <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.8 }}>{roleLabel(role)}</p>
                     </div>
                 )}
 
                 <nav>
-                    {/* DENTIST LINKS */}
-                    {role === 'dentist' ? (
+                    {role === 'superadmin' ? (
+                        <>
+                            <NavLink to="/admin/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={DashboardIcon} alt="Dashboard" />
+                                <span>Dashboard</span>
+                            </NavLink>
+                            <NavLink to="/admin/users" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={DentistIcon} alt="Users" />
+                                <span>User Management</span>
+                            </NavLink>
+                            <NavLink to="/admin/reports" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={ReportIcon} alt="Reports" />
+                                <span>Reports</span>
+                            </NavLink>
+                            <NavLink to="/admin/settings" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={AppointmentIcon} alt="Clinic Settings" />
+                                <span>Clinic Settings</span>
+                            </NavLink>
+                            <NavLink to="/admin/archive" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={QueueIcon} alt="Archive" />
+                                <span>Archive</span>
+                            </NavLink>
+                        </>
+                    ) : role === 'dentist' ? (
                         <>
                             <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
                                 <img src={DashboardIcon} alt="Dashboard" />
@@ -216,6 +248,10 @@ function Sidebar({ role }) {
                             <NavLink to="/appointments" className={({ isActive }) => isActive ? 'active' : ''}>
                                 <img src={AppointmentIcon} alt="Appointments" />
                                 <span>Appointments</span>
+                            </NavLink>
+                            <NavLink to="/reports" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={ReportIcon} alt="Reports" />
+                                <span>Reports</span>
                             </NavLink>
                             <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''}>
                                 <img src={DentistIcon} alt="Settings" />
@@ -241,9 +277,9 @@ function Sidebar({ role }) {
                                 <img src={ReportIcon} alt="History" />
                                 <span>History</span>
                             </NavLink>
-                            <NavLink to="/dentists" className={({ isActive }) => isActive ? 'active' : ''}>
-                                <img src={DentistIcon} alt="Dentists" />
-                                <span>Dentists</span>
+                            <NavLink to="/payments" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={AppointmentIcon} alt="Payments" />
+                                <span>Payments</span>
                             </NavLink>
                             <NavLink to="/reports" className={({ isActive }) => isActive ? 'active' : ''}>
                                 <img src={ReportIcon} alt="Reports" />

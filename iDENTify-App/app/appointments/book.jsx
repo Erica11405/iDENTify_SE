@@ -738,7 +738,7 @@ export default function BookAppointment() {
           </TouchableOpacity>
 
           <Text style={styles.title}>Book Appointment</Text>
-          <Text style={styles.subtitle}>Let's get you set up.</Text>
+          <Text style={styles.subtitle}>{"Let's get you set up."}</Text>
         </View>
 
         {/* SERVICES GRID */}

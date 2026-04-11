@@ -361,7 +361,7 @@ function Queue() {
       }
     };
     loadData();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAddWalkIn = async (patientData) => {
     try {

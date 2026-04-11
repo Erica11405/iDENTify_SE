@@ -577,6 +577,12 @@ function toMinutes24(timeString) {
   return hours * 60 + minutes;
 }
 
+function parseDurationMinutes(value) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 30;
+  return parsed;
+}
+
 function getLocalToday() {
   const d = new Date();
   const year = d.getFullYear();
@@ -643,6 +649,22 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
   const selectedDentist = useMemo(() => {
     return dentists.find(d => String(d.id) === String(form.dentist_id));
   }, [dentists, form.dentist_id]);
+
+  const selectedDurationMinutes = useMemo(() => {
+    if (!selectedServices.length) return 30;
+
+    const durationByService = new Map(
+      availableServices.map((service) => [
+        String(service?.name || "").trim().toLowerCase(),
+        parseDurationMinutes(service?.estimated_duration),
+      ])
+    );
+
+    return selectedServices.reduce((total, serviceName) => {
+      const key = String(serviceName || "").trim().toLowerCase();
+      return total + (durationByService.get(key) || 30);
+    }, 0);
+  }, [selectedServices, availableServices]);
 
   // Dynamic Age Calculation
   useEffect(() => {
@@ -727,25 +749,30 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
       return aDate === form.appointmentDate;
 
     }).map(a => {
-      let h, m;
-      if (a.appointment_datetime.includes("T")) {
-        const d = new Date(a.appointment_datetime);
-        h = d.getHours();
-        m = d.getMinutes();
-      } else {
-        const timePart = a.appointment_datetime.split(" ")[1];
-        if (!timePart) return { start: -1, end: -1 };
-        [h, m] = timePart.split(':').map(Number);
+      const startDate = new Date(String(a.appointment_datetime).replace(" ", "T"));
+      if (Number.isNaN(startDate.getTime())) return { start: -1, end: -1 };
+
+      const startMins = startDate.getHours() * 60 + startDate.getMinutes();
+
+      let endMins = startMins + 30;
+      if (a.end_datetime) {
+        const endDate = new Date(String(a.end_datetime).replace(" ", "T"));
+        if (!Number.isNaN(endDate.getTime())) {
+          endMins = endDate.getHours() * 60 + endDate.getMinutes();
+        }
       }
 
-      const startMins = h * 60 + m;
-      return { start: startMins, end: startMins + 30 };
+      if (endMins <= startMins) {
+        endMins = startMins + 30;
+      }
+
+      return { start: startMins, end: endMins };
     });
 
     for (let time = startMin; time < endMin; time += 30) {
       const h = Math.floor(time / 60);
       const m = time % 60;
-      const slotEnd = time + 30;
+      const slotEnd = time + selectedDurationMinutes;
 
       let type = 'open';
       const timeStr24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -767,6 +794,8 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
 
       if (type === 'open' && isToday && time <= currentMinutes) type = 'past';
 
+      if (type === 'open' && slotEnd > endMin) type = 'booked';
+
       if (type === 'open') {
         for (let appt of dayAppts) {
           if (time < appt.end && slotEnd > appt.start) { type = 'booked'; break; }
@@ -775,7 +804,7 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
       slots.push({ value: timeStr24, label, type });
     }
     setGeneratedSlots(slots);
-  }, [selectedDentist, form.appointmentDate, appointments]);
+  }, [selectedDentist, form.appointmentDate, appointments, selectedDurationMinutes]);
 
   // HANDLERS
   if (!isOpen) return null;
@@ -860,6 +889,8 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
         ...form,
         patient_name: finalName,
         procedure: procedureString,
+        services: selectedServices,
+        estimated_duration_minutes: selectedDurationMinutes,
         dentist_id: Number(form.dentist_id),
         timeStart: fullTimeStart,
         isNewPatient: patientType === "new"

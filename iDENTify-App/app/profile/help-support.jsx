@@ -78,7 +78,7 @@ export default function HelpSupport() {
         <View style={styles.iconContainer}>
           <Ionicons name="help-circle" size={48} color="#D97706" />
         </View>
-        <Text style={styles.introTitle}>We're Here to Help!</Text>
+        <Text style={styles.introTitle}>{"We're Here to Help!"}</Text>
         <Text style={styles.introText}>
           Find answers to common questions or contact our support team for
           assistance.

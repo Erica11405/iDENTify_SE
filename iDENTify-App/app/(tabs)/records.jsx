@@ -169,7 +169,7 @@
 // });
 
 
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useState, useCallback } from "react";
@@ -179,16 +179,15 @@ import { useUser } from "@clerk/clerk-expo";
 export default function RecordsScreen() {
   const router = useRouter();
   const { user } = useUser();
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
   const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchRecords = async () => {
-    if (!user?.primaryEmailAddress?.emailAddress) return;
-    if (!refreshing) setLoading(true);
+  const fetchRecords = useCallback(async () => {
+    if (!userEmail) return;
 
     try {
-      const mainPatient = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
+      const mainPatient = await fetchPatientByEmail(userEmail);
       if (!mainPatient) return;
 
       const patientsMap = { [mainPatient.id]: "Myself" };
@@ -204,7 +203,7 @@ export default function RecordsScreen() {
             allPatientIds.push(m.id);
           });
         }
-      } catch (e) { console.log("No family found"); }
+      } catch (_e) { console.log("No family found"); }
 
       const promises = allPatientIds.map(id =>
         fetch(`${API.records}/${id}`).then(r => r.json())
@@ -223,12 +222,16 @@ export default function RecordsScreen() {
     } catch (error) {
       console.error("Error fetching records:", error);
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [userEmail]);
 
-  useFocusEffect(useCallback(() => { fetchRecords(); }, [user]));
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchRecords();
+  }, [fetchRecords]);
+
+  useFocusEffect(useCallback(() => { fetchRecords(); }, [fetchRecords]));
 
   return (
     <View style={styles.container}>
@@ -241,7 +244,7 @@ export default function RecordsScreen() {
         data={records}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchRecords} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item }) => (
           <TouchableOpacity 
             style={styles.card} 

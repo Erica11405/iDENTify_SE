@@ -1,5 +1,11 @@
 import React from 'react';
 
+function roleLabel(role) {
+    if (role === 'superadmin') return 'Super Admin';
+    if (role === 'dentist') return 'Dentist';
+    return 'Dental Aide';
+}
+
 function ProfileModal({ isOpen, onClose, user, role }) {
     if (!isOpen) return null;
 
@@ -38,7 +44,7 @@ function ProfileModal({ isOpen, onClose, user, role }) {
                 <div style={{ textAlign: 'left', marginBottom: '15px' }}>
                     <p style={{ margin: '0 0 5px 0', fontSize: '0.85rem', color: '#666' }}>Role</p>
                     <p style={{ margin: 0, fontWeight: '500', fontSize: '1rem' }}>
-                        {role === 'dentist' ? 'Dentist' : 'Dental Aide'}
+                        {roleLabel(role)}
                     </p>
                 </div>
                 

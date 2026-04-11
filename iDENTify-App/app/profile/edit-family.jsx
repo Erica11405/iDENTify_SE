@@ -24,7 +24,6 @@ export default function EditFamilyMember() {
   
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [parentId, setParentId] = useState(null); 
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,7 +44,6 @@ export default function EditFamilyMember() {
         setSex(data.gender || "");
         setPhone(data.contact_number || "");
         setAddress(data.address || "");
-        setParentId(data.parent_id);
 
         if (data.birthdate) {
             const parsedDate = new Date(data.birthdate);
@@ -69,7 +67,7 @@ export default function EditFamilyMember() {
     };
 
     if (id) fetchMemberData();
-  }, [id]);
+  }, [id, router]);
 
   const calculateAge = (birthDate) => {
     const today = new Date();

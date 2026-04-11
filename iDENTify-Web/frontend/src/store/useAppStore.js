@@ -97,7 +97,7 @@ import { persist } from 'zustand/middleware';
 
 const useAppStore = create(
   persist(
-    (set, get) => ({
+    (set) => ({
       // Authentication State
       user: null, // Stores the logged-in user object
       

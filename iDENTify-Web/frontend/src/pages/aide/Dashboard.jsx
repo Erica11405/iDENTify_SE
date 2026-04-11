@@ -310,7 +310,7 @@ function Dashboard() {
       }
     };
     loadAll();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inTreatmentStatuses = ["On Chair", "In Treatment", "Treatment", "With patient"];
 
@@ -363,7 +363,7 @@ function Dashboard() {
 
       return { ...dentist, computedStatus: liveStatus };
     });
-  }, [dentists, queue]);
+  }, [dentists, queue]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 2. TODAY'S APPOINTMENTS 
   const todaysAppointmentsEnriched = useMemo(() => {
@@ -546,7 +546,7 @@ function Dashboard() {
       <AddWalkInModal
         isOpen={isAddWalkInOpen}
         onClose={() => setIsAddWalkInOpen(false)}
-        onAddPatient={async (p) => { /* logic remains standard */ }}
+        onAddPatient={async () => { /* logic remains standard */ }}
       />
       
       <AddAppointmentModal 

@@ -1,12 +1,13 @@
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { API, fetchPatientByEmail } from "../../constants/Api";
 import { useUser } from "@clerk/clerk-expo";
 import { useFocusEffect } from "expo-router";
 
 export default function QueueScreen() {
   const { user } = useUser();
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [queueData, setQueueData] = useState({
@@ -16,14 +17,14 @@ export default function QueueScreen() {
     estimate: "—",
   });
 
-  const fetchQueue = async () => {
-    if (!user?.primaryEmailAddress?.emailAddress) return;
+  const fetchQueue = useCallback(async () => {
+    if (!userEmail) return;
 
     // Only show full loading spinner on initial load or manual refresh, not auto-focus
     if (!refreshing && queueData.status === "Not In Queue") setLoading(true);
 
     try {
-      const me = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
+      const me = await fetchPatientByEmail(userEmail);
 
       if (!me) {
         setQueueData({
@@ -55,17 +56,17 @@ export default function QueueScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [userEmail, refreshing, queueData.status]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchQueue();
-  }, [user]);
+  }, [fetchQueue]);
 
   useFocusEffect(
     useCallback(() => {
       fetchQueue();
-    }, [user])
+    }, [fetchQueue])
   );
 
   const getStatusColor = (status) => {

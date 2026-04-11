@@ -316,6 +316,14 @@
 
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 
+function assertSuperadminEndpointAvailable(res) {
+    if (res.status !== 404) return;
+
+    const error = new Error("Super admin signup is not available on this API yet. Deploy the latest backend, then try again.");
+    error.status = 404;
+    throw error;
+}
+
 async function handleResponse(res) {
     if (!res.ok) {
         let body = null;
@@ -323,10 +331,10 @@ async function handleResponse(res) {
             const text = await res.text();
             try {
                 body = JSON.parse(text);
-            } catch (e) {
+            } catch {
                 body = { message: res.statusText || `Server Error (${res.status})` };
             }
-        } catch (e) {
+        } catch {
             body = null;
         }
         const message = body?.message || res.statusText || 'API Error';
@@ -358,6 +366,28 @@ export const verifyOtp = async (payload) => {
     return handleResponse(res);
 };
 
+export const sendSuperadminSignupOtp = async (payload) => {
+    const res = await fetch(`${API_BASE}/auth/signup/superadmin/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    assertSuperadminEndpointAvailable(res);
+    return handleResponse(res);
+};
+
+export const signupSuperadmin = async (payload) => {
+    const res = await fetch(`${API_BASE}/auth/signup/superadmin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    assertSuperadminEndpointAvailable(res);
+    return handleResponse(res);
+};
+
 export const sendSignupOtp = async (payload) => {
     const res = await fetch(`${API_BASE}/auth/signup/dentist/send-otp`, {
         method: 'POST',
@@ -372,6 +402,31 @@ export const signupDentist = async (payload) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const getAdminUsers = async ({ role = 'all', archived = 'false' } = {}) => {
+    const params = new URLSearchParams();
+    if (role) params.set('role', role);
+    if (archived) params.set('archived', archived);
+
+    const res = await fetch(`${API_BASE}/admin/users?${params.toString()}`);
+    return handleResponse(res);
+};
+
+export const archiveAdminUser = async (id) => {
+    const res = await fetch(`${API_BASE}/admin/users/${id}/archive`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+    });
+    return handleResponse(res);
+};
+
+export const restoreAdminUser = async (id) => {
+    const res = await fetch(`${API_BASE}/admin/users/${id}/restore`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
     });
     return handleResponse(res);
 };
@@ -474,6 +529,25 @@ export const getAppointments = async () => {
     return handleResponse(res);
 };
 
+export const createAppointment = async (payload) => {
+    const res = await fetch(`${API_BASE}/appointments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const checkAppointmentLimit = async (dentistId, date) => {
+    const params = new URLSearchParams({
+        dentist_id: String(dentistId || ''),
+        date: String(date || ''),
+    });
+
+    const res = await fetch(`${API_BASE}/appointments/check-limit?${params.toString()}`);
+    return handleResponse(res);
+};
+
 export const updateAppointment = async (id, payload) => {
     const res = await fetch(`${API_BASE}/appointments/${id}`, {
         method: 'PUT',
@@ -490,8 +564,24 @@ export const getReports = async (date) => {
     return handleResponse(res);
 };
 
-export const getDentistPatientsForReport = async (dentistId, date) => {
-    const res = await fetch(`${API_BASE}/reports/dentist/${dentistId}/patients?date=${date}`);
+export const getDentistPatientsForReport = async (dentistId, { startDate, endDate, date } = {}) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    if (date) params.set('date', date);
+    const query = params.toString();
+
+    const res = await fetch(`${API_BASE}/reports/dentist/${dentistId}/patients${query ? `?${query}` : ''}`);
+    return handleResponse(res);
+};
+
+export const getDentistReportSummary = async (dentistId, { startDate, endDate } = {}) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    const query = params.toString();
+
+    const res = await fetch(`${API_BASE}/reports/dentist/${dentistId}/summary${query ? `?${query}` : ''}`);
     return handleResponse(res);
 };
 
@@ -621,11 +711,13 @@ export const get = async (url) => {
 };
 
 const api = {
-    login, verifyOtp, sendSignupOtp, signupDentist, getDentists, createDentist, updateDentist, deleteDentist,
+    login, verifyOtp, sendSuperadminSignupOtp, signupSuperadmin, sendSignupOtp, signupDentist,
+    getAdminUsers, archiveAdminUser, restoreAdminUser,
+    getDentists, createDentist, updateDentist, deleteDentist,
     getPatients, getPatientById, createPatient, updatePatient, searchPatients,
     getQueue, addQueueItem, updateQueueItem, deleteQueueItem,
-    getAppointments, updateAppointment,
-    getReports, getDentistPatientsForReport, get,
+    getAppointments, createAppointment, checkAppointmentLimit, updateAppointment,
+    getReports, getDentistPatientsForReport, getDentistReportSummary, get,
     getServices, createService, updateService, deleteService,
     getClinicMedications, createClinicMedication, updateClinicMedication, deleteClinicMedication,
     getAnnualRecord, saveAnnualRecord, getToothConditions, upsertToothCondition,

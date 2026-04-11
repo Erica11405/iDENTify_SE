@@ -515,7 +515,7 @@
 
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView, Modal, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { API, fetchPatientByEmail } from "../../constants/Api";
 import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
@@ -525,7 +525,10 @@ const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export default function ConfirmAppointment() {
   const router = useRouter();
   const { user } = useUser();
-  const { doctor, docId, service } = useLocalSearchParams();
+  const { doctor, docId, service, serviceName, serviceId, serviceDuration, servicePrice } = useLocalSearchParams();
+  const selectedServiceName = String(serviceName || service || "").trim();
+  const parsedDuration = Number.parseInt(String(serviceDuration || ""), 10);
+  const selectedDurationMinutes = Number.isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : 30;
 
   const [loading, setLoading] = useState(false);
   const [dentist, setDentist] = useState(null);
@@ -587,7 +590,7 @@ export default function ConfirmAppointment() {
                 const familyData = await familyRes.json();
                 setFamilyMembers(Array.isArray(familyData) ? familyData : []);
               }
-            } catch (err) {
+            } catch (_err) {
               console.log("No family data found");
             }
           }
@@ -628,13 +631,13 @@ export default function ConfirmAppointment() {
     setCurrentDate(newDate);
   };
 
-  const getDayStatus = (dateStr, dayIndex) => {
+  const getDayStatus = useCallback((dateStr, dayIndex) => {
     if (!dentist) return "Closed";
     if (dentist.status === 'Off') return "Off";
     if (dentist.leaveDays?.includes(dateStr)) return "Leave";
     const works = dentist.days?.some(day => Number(day) === dayIndex);
     return works ? "Open" : "Closed";
-  };
+  }, [dentist]);
 
   const renderCalendar = () => {
     const year = currentDate.getFullYear();
@@ -728,13 +731,28 @@ export default function ConfirmAppointment() {
       }
 
       const startMins = h * 60 + m;
-      return { start: startMins, end: startMins + 30 };
+      let endMins = startMins + 30;
+
+      if (a.end_datetime) {
+        if (a.end_datetime.includes("T")) {
+          const endDate = new Date(a.end_datetime);
+          endMins = endDate.getHours() * 60 + endDate.getMinutes();
+        } else {
+          const endTimePart = a.end_datetime.split(" ")[1];
+          if (endTimePart) {
+            const [endH, endM] = endTimePart.split(':').map(Number);
+            endMins = endH * 60 + endM;
+          }
+        }
+      }
+
+      return { start: startMins, end: endMins };
     });
 
     for (let time = startMin; time < endMin; time += 30) {
       const h = Math.floor(time / 60);
       const m = time % 60;
-      const slotEnd = time + 30;
+      const slotEnd = time + selectedDurationMinutes;
       let type = 'open';
       const timeStr24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       const h12 = h % 12 || 12;
@@ -754,6 +772,7 @@ export default function ConfirmAppointment() {
         }
       }
       if (type === 'open' && isToday && time <= currentMinutes) type = 'past';
+      if (type === 'open' && slotEnd > endMin) type = 'booked';
       if (type === 'open') {
         for (let appt of todayAppts) {
           if (time < appt.end && slotEnd > appt.start) { type = 'booked'; break; }
@@ -762,7 +781,7 @@ export default function ConfirmAppointment() {
       slots.push({ value: timeStr24, label: label, type: type });
     }
     return slots;
-  }, [dentist, selectedDate, appointments]);
+  }, [dentist, selectedDate, appointments, selectedDurationMinutes, getDayStatus]);
 
   const bookAppointment = async (timeSlot) => {
     if (!selectedPatient || !selectedPatient.id) {
@@ -778,7 +797,10 @@ export default function ConfirmAppointment() {
         patient_id: selectedPatient.id,
         dentist_id: docId,
         timeStart: fullDateTimeStart,
-        procedure: service,
+        procedure: selectedServiceName || "Checkup",
+        services: [selectedServiceName || "Checkup"],
+        service_id: serviceId ? Number(serviceId) : undefined,
+        estimated_duration_minutes: selectedDurationMinutes,
         status: "Scheduled",
         notes: "Booked via App"
       };
@@ -789,14 +811,27 @@ export default function ConfirmAppointment() {
         body: JSON.stringify(payload)
       });
 
+      let data = null;
+      try {
+        data = await res.json();
+      } catch (_parseErr) {
+        data = null;
+      }
+
       if (res.ok) {
         const patientName = selectedPatient.full_name || `${selectedPatient.first_name || ''} ${selectedPatient.last_name || ''}`.trim() || "Patient";
         Alert.alert("Success", `Appointment booked for ${patientName}!`, [
           { text: "OK", onPress: () => router.replace("/(tabs)/appointments") }
         ]);
       } else {
-        const data = await res.json();
-        Alert.alert("Failed", data.message || "Could not book appointment.");
+        if (res.status === 409) {
+          Alert.alert(
+            "Time Conflict",
+            data?.message || "This schedule overlaps with another appointment. Please choose another time slot."
+          );
+        } else {
+          Alert.alert("Failed", data?.message || "Could not book appointment.");
+        }
       }
     } catch (error) {
       console.error(error);
@@ -855,7 +890,10 @@ export default function ConfirmAppointment() {
           </View>
           <View>
             <Text style={styles.summaryLabel}>Service</Text>
-            <Text style={styles.summaryValue}>{service || "Checkup"}</Text>
+            <Text style={styles.summaryValue}>{selectedServiceName || "Checkup"}</Text>
+            <Text style={styles.summaryLabel}>Duration</Text>
+            <Text style={styles.summaryValue}>{selectedDurationMinutes} mins</Text>
+            {servicePrice ? <Text style={styles.summaryValue}>{String(servicePrice)}</Text> : null}
           </View>
         </View>
       </View>

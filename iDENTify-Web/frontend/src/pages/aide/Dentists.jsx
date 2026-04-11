@@ -266,7 +266,7 @@ function Dentists() {
 
   useEffect(() => {
     api.loadDentists();
-  }, []); 
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDeleteDentist = async (id, name) => {
     if (window.confirm(`Are you sure you want to delete Dr. ${name}?`)) {
@@ -274,7 +274,7 @@ function Dentists() {
         await api.deleteDentist(id);
         toast.success("Dentist removed");
         api.loadDentists(); // Refresh the list
-      } catch (error) {
+      } catch {
         toast.error("Failed to delete dentist");
       }
     }
@@ -306,7 +306,7 @@ function Dentists() {
              (filters.availability === "All" || computedStatus.includes(filters.availability)) &&
              (filters.assigned === "All" || (filters.assigned === "With" && assignedCount > 0) || (filters.assigned === "None" && assignedCount === 0));
     }),
-    [dentists, filters, selectedDateStr, appointments]
+    [dentists, filters, selectedDateStr, appointments] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   return (

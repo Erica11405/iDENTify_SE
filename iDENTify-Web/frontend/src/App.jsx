@@ -90,11 +90,20 @@ import Queue from './pages/aide/Queue';
 import History from './pages/aide/History';
 import Dentists from './pages/aide/Dentists';
 import Reports from './pages/aide/Reports';
+import Payments from './pages/aide/Payments';
 
 // --- Dentist Pages ---
 import DentistDashboard from './pages/dentist/DentistDashboard';
 import DentistAppointments from './pages/dentist/DentistAppointments';
 import DentistSettings from './pages/dentist/DentistSettings';
+import DentistReports from './pages/dentist/DentistReports';
+
+// --- Super Admin Pages ---
+import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
+import SuperAdminUsers from './pages/superadmin/SuperAdminUsers';
+import SuperAdminReports from './pages/superadmin/SuperAdminReports';
+import SuperAdminSettings from './pages/superadmin/SuperAdminSettings';
+import SuperAdminArchive from './pages/superadmin/SuperAdminArchive';
 
 function App() {
     const { user } = useAppStore();
@@ -114,18 +123,31 @@ function App() {
     return (
         <Routes>
             <Route element={<AppLayout userRole={user.role} />}>
-                {user.role === 'dentist' ? (
-                    // DENTIST ROUTES
+                {user.role === 'dentist' && (
                     <>
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/dashboard" element={<DentistDashboard />} />
                         <Route path="/appointments" element={<DentistAppointments />} />
+                        <Route path="/reports" element={<DentistReports />} />
                         <Route path="/settings" element={<DentistSettings />} />
                         <Route path="/patients/:id" element={<PatientForm />} />
                         <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </>
-                ) : (
-                    // AIDE ROUTES
+                )}
+
+                {user.role === 'superadmin' && (
+                    <>
+                        <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+                        <Route path="/admin/dashboard" element={<SuperAdminDashboard />} />
+                        <Route path="/admin/users" element={<SuperAdminUsers />} />
+                        <Route path="/admin/reports" element={<SuperAdminReports />} />
+                        <Route path="/admin/settings" element={<SuperAdminSettings />} />
+                        <Route path="/admin/archive" element={<SuperAdminArchive />} />
+                        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+                    </>
+                )}
+
+                {user.role !== 'dentist' && user.role !== 'superadmin' && (
                     <>
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/dashboard" element={<Dashboard />} />
@@ -136,6 +158,7 @@ function App() {
                         <Route path="/queue" element={<Queue />} />
                         <Route path="/history" element={<History />} />
                         <Route path="/dentists" element={<Dentists />} />
+                        <Route path="/payments" element={<Payments />} />
                         <Route path="/reports" element={<Reports />} />
                         <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </>

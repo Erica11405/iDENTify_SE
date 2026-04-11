@@ -238,6 +238,76 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Dentist-only analytics summary for a date range
+router.get("/dentist/:id/summary", async (req, res) => {
+  const dentistId = Number(req.params.id);
+  if (!Number.isFinite(dentistId) || dentistId <= 0) {
+    return res.status(400).json({ error: "Invalid dentist id." });
+  }
+
+  const { startDate, endDate, date } = req.query;
+  const start = startDate || date || new Date().toISOString().split('T')[0];
+  const end = endDate || start;
+
+  try {
+    const [dentistRows] = await db.query(
+      `SELECT id, name FROM dentists WHERE id = ? LIMIT 1`,
+      [dentistId]
+    );
+
+    if (!dentistRows.length) {
+      return res.status(404).json({ error: "Dentist not found." });
+    }
+
+    const [summaryRows] = await db.query(
+      `SELECT
+         COUNT(DISTINCT patient_id) AS patientsHandled,
+         COUNT(*) AS proceduresDone,
+         AVG(TIMESTAMPDIFF(MINUTE, appointment_datetime, end_datetime)) AS avgTreatmentMinutes
+       FROM appointments
+       WHERE dentist_id = ?
+         AND DATE(appointment_datetime) BETWEEN ? AND ?
+         AND status IN ('Done', 'Completed')`,
+      [dentistId, start, end]
+    );
+
+    const [distributionRows] = await db.query(
+      `SELECT
+         COALESCE(NULLIF(TRIM(reason), ''), 'Unspecified') AS service,
+         COUNT(*) AS count
+       FROM appointments
+       WHERE dentist_id = ?
+         AND DATE(appointment_datetime) BETWEEN ? AND ?
+         AND status IN ('Done', 'Completed')
+       GROUP BY COALESCE(NULLIF(TRIM(reason), ''), 'Unspecified')
+       ORDER BY count DESC, service ASC`,
+      [dentistId, start, end]
+    );
+
+    const summary = summaryRows[0] || {};
+    const avgMinutes = Number(summary.avgTreatmentMinutes || 0);
+
+    res.json({
+      dentist: dentistRows[0],
+      startDate: start,
+      endDate: end,
+      summary: {
+        patientsHandled: Number(summary.patientsHandled || 0),
+        proceduresDone: Number(summary.proceduresDone || 0),
+        avgTreatmentMinutes: avgMinutes,
+        avgTreatmentDuration: avgMinutes > 0 ? `${Math.round(avgMinutes)} min` : "0 min",
+      },
+      serviceDistribution: distributionRows.map((row) => ({
+        service: row.service,
+        count: Number(row.count || 0),
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching dentist summary report:", error);
+    res.status(500).json({ error: "Failed to load dentist summary report." });
+  }
+});
+
 // Get detailed list of patients for a specific dentist on a specific date range
 router.get("/dentist/:id/patients", async (req, res) => {
   const { id } = req.params;
@@ -248,14 +318,18 @@ router.get("/dentist/:id/patients", async (req, res) => {
   try {
     const query = `
       SELECT 
-        p.full_name, 
+        a.id AS appointment_id,
+        p.id AS patient_id,
+        p.full_name,
         a.appointment_datetime,
-        a.reason
+        a.end_datetime,
+        a.reason,
+        a.status
       FROM patients p
       JOIN appointments a ON p.id = a.patient_id
       WHERE a.dentist_id = ? 
       AND DATE(a.appointment_datetime) BETWEEN ? AND ?
-      AND a.status = 'Done'
+      AND a.status IN ('Done', 'Completed')
       ORDER BY a.appointment_datetime ASC
     `;
     const [rows] = await db.query(query, [id, start, end]);

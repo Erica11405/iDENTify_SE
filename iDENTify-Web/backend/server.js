@@ -153,17 +153,26 @@ const dentistsRoutes = require("./routes/dentists");
 const treatmentsRoutes = require("./routes/treatments");
 const reportsRoutes = require("./routes/reports");
 const authRoutes = require("./routes/auth"); 
+const adminUsersRoutes = require("./routes/admin_users");
 const servicesRoutes = require("./routes/services"); 
 const clinicMedicationsRoutes = require("./routes/clinic_medications"); 
 
 const app = express();
 
+const DEFAULT_PROD_ORIGIN = "https://identify-app-hth8t.ondigitalocean.app";
+const configuredOrigins = String(process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const allowedOrigins = configuredOrigins.length > 0 ? configuredOrigins : [DEFAULT_PROD_ORIGIN];
+if (process.env.NODE_ENV !== "production") {
+    allowedOrigins.push("http://localhost:5173");
+}
+
 // 2. CORS - Allow Production and Local Vite URLs
 app.use(cors({
-    origin: [
-        "https://identify-app-hth8t.ondigitalocean.app", // Production URL
-        "http://localhost:5173" // Local Vite URL for testing
-    ],
+    origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"]
 }));
@@ -191,6 +200,7 @@ apiRouter.use("/medications", medicationsRoutes);
 apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
+apiRouter.use("/admin/users", adminUsersRoutes);
 
 // Apply the unified router to the app
 app.use("/api", apiRouter); 

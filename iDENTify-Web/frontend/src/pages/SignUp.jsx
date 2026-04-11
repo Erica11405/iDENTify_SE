@@ -236,8 +236,7 @@ function SignUp() {
 		}
 
 		try {
-            // Ask backend to send an email verification code
-			await api.sendSignupOtp({ email });
+            await api.sendSuperadminSignupOtp({ email });
 			toast.success("Verification code sent to your email!");
             setIsOtpStep(true);
 		} catch (error) {
@@ -255,9 +254,8 @@ function SignUp() {
         }
 
         try {
-            // Pass middleName in the API payload
-			await api.signupDentist({ firstName, middleName, surname, email, password, otp: otpCode });
-			toast.success("Account verified and created! You can now log in.");
+			await api.signupSuperadmin({ firstName, middleName, surname, email, password, confirmPassword, otp: otpCode });
+			toast.success("Super admin account verified and created! You can now log in.");
 			navigate("/");
 		} catch (error) {
 			toast.error(error.message || "Signup failed.");
@@ -281,8 +279,8 @@ function SignUp() {
                             <div className="logo-circle-large">
                                 <img src={toothLogo} alt="iDENTify Logo" className="signup-logo-large" />
                             </div>
-                            <h2 className="signup-form__title">Dentist Registration</h2>
-                            <p className="signup-form__subtitle">Create your administrative account</p>
+                            <h2 className="signup-form__title">Super Admin Registration</h2>
+                            <p className="signup-form__subtitle">Create your clinic owner account</p>
                         </div>
 
                         {errors.form && <div className="error-banner" style={{color: 'red', textAlign: 'center', marginBottom: '10px'}}>{errors.form}</div>}

@@ -220,7 +220,7 @@ function DentistDashboard() {
   const api = useApi();
   
   // ADDED 'dentists' to the store pull so we can find your true ID
-  const { user, appointments, queue, dentists } = useAppStore();
+  const { user, appointments, dentists } = useAppStore();
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -276,7 +276,7 @@ function DentistDashboard() {
       let apptDate = "";
       try {
           apptDate = new Date(a.appointment_datetime).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
-      } catch (e) {
+        } catch {
           apptDate = a.appointment_datetime.split('T')[0].split(' ')[0];
       }
 

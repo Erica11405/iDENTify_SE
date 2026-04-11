@@ -188,7 +188,6 @@ import React, { useMemo, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
-import toast from "react-hot-toast";
 import "../../styles/pages/aide/Patients.css";
 
 function Patients() {

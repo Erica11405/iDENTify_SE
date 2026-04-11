@@ -428,7 +428,7 @@ import useApi from "../../hooks/useApi";
 import useAppStore from "../../store/useAppStore";
 import "../../styles/pages/aide/Reports.css";
 
-function Reports() {
+function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics and exports." }) {
   const api = useApi();
   const reports = useAppStore((state) => state.reports);
   const dentists = useAppStore((state) => state.dentists || []); 
@@ -446,6 +446,12 @@ function Reports() {
   const [patientsError, setPatientsError] = useState(null);
 
   const hasData = !!(dailySummary && dentistPerformance);
+  const summary = {
+    patientsSeen: dailySummary?.patientsSeen || 0,
+    proceduresDone: dailySummary?.proceduresDone || 0,
+    newPatients: dailySummary?.newPatients || 0,
+    avgTreatmentDuration: dailySummary?.avgTreatmentDuration || "0 min",
+  };
 
   const handleRangeChange = (type) => {
     setRangeType(type);
@@ -481,7 +487,7 @@ function Reports() {
     
     fetchReports();
     api.loadDentists().catch(err => console.error("Load dentists failed", err));
-  }, [startDate, endDate]); // removed api to prevent double-firing if api object changes
+  }, [startDate, endDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatApptTime = (value) => {
     if (!value) return "-";
@@ -533,7 +539,7 @@ function Reports() {
       const response = await apiClient.get(`/reports/dentist/${targetId}/patients?startDate=${startStr}&endDate=${endStr}`);
       // Accessing response.data.patients handles Axios responses properly
       setDentistPatients(response?.data?.patients || response?.patients || []);
-    } catch (err) {
+    } catch {
       setPatientsError("Failed to load records.");
     } finally {
       setPatientsLoading(false);
@@ -611,9 +617,10 @@ function Reports() {
       startY: 30,
       head: [['Metric', 'Value']],
       body: [
-        ['Patients Seen', dailySummary.patientsSeen],
-        ['Procedures Done', dailySummary.proceduresDone],
-        ['New Patients', dailySummary.newPatients],
+        ['Patients Seen', summary.patientsSeen],
+        ['Procedures Done', summary.proceduresDone],
+        ['New Patients', summary.newPatients],
+        ['Avg Treatment Duration', summary.avgTreatmentDuration],
       ],
     });
 
@@ -647,9 +654,10 @@ function Reports() {
 
     const summaryData = [
       { Metric: "Date Range", Value: getTitleDateRangeStr() },
-      { Metric: "Patients Seen", Value: dailySummary.patientsSeen },
-      { Metric: "Procedures Done", Value: dailySummary.proceduresDone },
-      { Metric: "New Patients", Value: dailySummary.newPatients },
+      { Metric: "Patients Seen", Value: summary.patientsSeen },
+      { Metric: "Procedures Done", Value: summary.proceduresDone },
+      { Metric: "New Patients", Value: summary.newPatients },
+      { Metric: "Avg Treatment Duration", Value: summary.avgTreatmentDuration },
     ];
     const dailySummaryWs = XLSX.utils.json_to_sheet(summaryData);
 
@@ -673,7 +681,8 @@ function Reports() {
     <div className="reports-page">
       <div className="reports-header">
         <div style={{display: 'flex', flexDirection: 'column'}}>
-            <h2 className="reports-title">Reports</h2>
+            <h2 className="reports-title">{pageTitle}</h2>
+            <p style={{ margin: '2px 0 0 0', color: '#64748b', fontSize: '0.9rem' }}>{pageSubtitle}</p>
             <div className="range-selector" style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
                 <button onClick={() => handleRangeChange('daily')} className={`export-btn ${rangeType === 'daily' ? 'pdf' : ''}`} style={{padding: '5px 10px', fontSize: '0.85rem'}}>Today</button>
                 <button onClick={() => handleRangeChange('weekly')} className={`export-btn ${rangeType === 'weekly' ? 'pdf' : ''}`} style={{padding: '5px 10px', fontSize: '0.85rem'}}>Past Week</button>
@@ -730,6 +739,25 @@ function Reports() {
 
       {!api.loading && hasData && (
         <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Patients Seen</p>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.patientsSeen}</p>
+            </div>
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Procedures Done</p>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.proceduresDone}</p>
+            </div>
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>New Patients</p>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.newPatients}</p>
+            </div>
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Avg Treatment Time</p>
+              <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.avgTreatmentDuration}</p>
+            </div>
+          </div>
+
           <div className="report-section">
             <h3 className="report-subtitle">Summary ({getTitleDateRangeStr()})</h3>
             <table className="report-table">
@@ -737,9 +765,10 @@ function Reports() {
                 <tr><th>Metric</th><th>Value</th></tr>
               </thead>
               <tbody>
-                <tr><td>Patients Seen (Done)</td><td>{dailySummary.patientsSeen}</td></tr>
-                <tr><td>Procedures Completed</td><td>{dailySummary.proceduresDone}</td></tr>
-                <tr><td>New Patients Registered</td><td>{dailySummary.newPatients}</td></tr>
+                <tr><td>Patients Seen (Done)</td><td>{summary.patientsSeen}</td></tr>
+                <tr><td>Procedures Completed</td><td>{summary.proceduresDone}</td></tr>
+                <tr><td>New Patients Registered</td><td>{summary.newPatients}</td></tr>
+                <tr><td>Average Treatment Duration</td><td>{summary.avgTreatmentDuration}</td></tr>
               </tbody>
             </table>
           </div>
@@ -778,6 +807,14 @@ function Reports() {
             </table>
           </div>
         </>
+      )}
+
+      {!api.loading && !api.error && !hasData && (
+        <div className="report-section" style={{ marginTop: '1rem' }}>
+          <p style={{ margin: 0, color: '#64748b' }}>
+            No report data available for the selected date range.
+          </p>
+        </div>
       )}
 
       {/* Patient List Modal */}

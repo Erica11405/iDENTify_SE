@@ -12,7 +12,6 @@
 
 import { Redirect, Stack } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
-import Tabslayout from "../(tabs)/_layout";
 
 export default function AuthRoutesLayout() {
   const { isSignedIn } = useAuth();

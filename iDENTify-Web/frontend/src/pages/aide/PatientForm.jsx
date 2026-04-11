@@ -926,6 +926,17 @@ import apiClient from "../../api/apiClient";
 import useAppStore from "../../store/useAppStore";
 import { dentalServices } from "../../data/services";
 
+const DEFAULT_MEDICATION_FREQUENCIES = [
+	"Daily",
+	"Twice a day",
+	"Three times a day",
+	"Every 4 hours",
+	"Every 6 hours",
+	"Every 8 hours",
+	"Every 12 hours",
+	"As needed",
+];
+
 const SearchableInput = ({ options, value, onChange, placeholder, disabled, renderOption }) => {
 	const [isOpen, setIsOpen] = useState(false);
 	const [search, setSearch] = useState(value || "");
@@ -1028,7 +1039,6 @@ function PatientForm({ userRole }) {
 	const allAppointments = useAppStore((state) => state.appointments || []);
 
 	const [patient, setPatient] = useState(null);
-	const [dentists, setDentists] = useState([]);
 	const [selectedDentistId, setSelectedDentistId] = useState("");
 
 	const [yearsList, setYearsList] = useState([1]);
@@ -1043,7 +1053,7 @@ function PatientForm({ userRole }) {
 		localStorage.setItem(`selectedYear_${id}`, year);
 	};
 
-	const [isYearDone, setIsYearDone] = useState(false); 
+	const [, setIsYearDone] = useState(false); 
 
 	const [boxMarks, setBoxMarks] = useState(Array(64).fill(""));
 	const [toothSegments, setToothSegments] = useState({});
@@ -1072,6 +1082,11 @@ function PatientForm({ userRole }) {
 	const [selectedTimelineServices, setSelectedTimelineServices] = useState([]);
 	const [currentTimelineService, setCurrentTimelineService] = useState("");
 	const [medicationForm, setMedicationForm] = useState({ medicine: "", dosage: "", frequency: "", notes: "" });
+	const medicationFrequencyOptions = Array.from(new Set([
+		...DEFAULT_MEDICATION_FREQUENCIES,
+		...(clinicMedicationsList || []).map((m) => m.default_frequency).filter(Boolean),
+		medicationForm.frequency,
+	].filter(Boolean)));
 
 	const getDisplayAge = (p) => {
 		if (!p) return "N/A";
@@ -1100,8 +1115,7 @@ function PatientForm({ userRole }) {
 		const loadGlobalData = async () => {
 			if (!id) return;
 			try {
-				const dentistsData = await api.loadDentists();
-				setDentists(dentistsData || []);
+				await api.loadDentists();
 
                 // Fetch dynamic medications list
                 try {
@@ -1156,7 +1170,7 @@ function PatientForm({ userRole }) {
 			} catch (err) { console.error("Failed to load global data", err); }
 		};
 		loadGlobalData();
-	}, [id, allAppointments]);
+	}, [id, allAppointments]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	useEffect(() => {
 		const loadAnnualData = async () => {
@@ -1256,7 +1270,7 @@ function PatientForm({ userRole }) {
 							} else {
 								setSelectedTimelineServices(procData.split(',').map(s => s.trim()).filter(Boolean));
 							}
-						} catch (e) {
+						} catch {
 							const procedures = procData.split(',').map(s => s.trim()).filter(Boolean);
 							setSelectedTimelineServices(procedures);
 						}
@@ -1310,7 +1324,7 @@ function PatientForm({ userRole }) {
 
 			if (treatments.length > 0) { issues.push({ tooth: `Tooth Area ${idx + 1}`, condition: conditionName, treatments: treatments }); }
 		});
-		Object.entries(toothSegments).forEach(([key, segs]) => {
+		Object.entries(toothSegments).forEach(([, segs]) => {
 			const hasIssue = Object.values(segs).some(status => status === 'issue');
 			if (hasIssue) { issues.push({ tooth: `Tooth (Marked on Chart)`, condition: "Visual Issue", treatments: ["General Consultation", "X-ray / Radiograph", "Dental Filling (Composite)"] }); }
 		});
@@ -1328,7 +1342,7 @@ function PatientForm({ userRole }) {
 		} else { toast.error("Service already in plan"); }
 	};
 
-	const handleSaveAll = async (e) => {
+	const handleSaveAll = async () => {
 		if (!patient) return;
 		setIsSaving(true);
 		try {
@@ -1461,8 +1475,13 @@ function PatientForm({ userRole }) {
             
             if (field === "medicine") {
                 const selectedMed = clinicMedicationsList.find(m => m.name === value);
-                if (selectedMed && selectedMed.default_dosage) {
-                    updated.dosage = selectedMed.default_dosage;
+				if (selectedMed) {
+					if (selectedMed.default_dosage) {
+						updated.dosage = selectedMed.default_dosage;
+					}
+					if (selectedMed.default_frequency) {
+						updated.frequency = selectedMed.default_frequency;
+					}
                 }
             }
             return updated;
@@ -1775,13 +1794,9 @@ function PatientForm({ userRole }) {
 							<input className="pill-input-input" placeholder="Dosage (e.g., 500mg)" value={medicationForm.dosage} onChange={(e) => updateMedicationForm("dosage", e.target.value)} />
 							<select className="pill-input-input" value={medicationForm.frequency} onChange={(e) => updateMedicationForm("frequency", e.target.value)}>
 								<option value="" disabled>Select Frequency</option>
-								<option value="Daily">Daily</option>
-								<option value="Twice a day">Twice a day</option>
-								<option value="Three times a day">Three times a day</option>
-								<option value="Every 4 hours">Every 4 hours</option>
-								<option value="Every 6 hours">Every 6 hours</option>
-								<option value="Every 8 hours">Every 8 hours</option>
-								<option value="As needed">As needed</option>
+								{medicationFrequencyOptions.map((option) => (
+									<option key={option} value={option}>{option}</option>
+								))}
 							</select>
 							<input className="pill-input-input" placeholder="Notes" value={medicationForm.notes} onChange={(e) => updateMedicationForm("notes", e.target.value)} />
 							<div className="medication-actions"><button className="small-btn" onClick={addMedication}>Add</button></div>

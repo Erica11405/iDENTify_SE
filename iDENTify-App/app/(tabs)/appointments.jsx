@@ -357,16 +357,17 @@ import { useUser } from "@clerk/clerk-expo";
 export default function AppointmentsScreen() {
   const router = useRouter();
   const { user } = useUser();
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
   const [appointments, setAppointments] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fetchAppointments = async () => {
-    if (!user?.primaryEmailAddress?.emailAddress) return;
+  const fetchAppointments = useCallback(async () => {
+    if (!userEmail) return;
     if (!refreshing) setLoading(true);
     try {
       // 1. Get Main Patient
-      let mainPatient = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
+      let mainPatient = await fetchPatientByEmail(userEmail);
       // SAFEGUARD: If backend returns an array, grab the first item
       if (Array.isArray(mainPatient)) mainPatient = mainPatient[0];
       
@@ -388,7 +389,7 @@ export default function AppointmentsScreen() {
             allPatientIds = [...allPatientIds, ...familyIds];
           }
         }
-      } catch (e) {
+      } catch (_e) {
         console.log("No family members found or error fetching");
       }
 
@@ -419,17 +420,17 @@ export default function AppointmentsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [userEmail, refreshing]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchAppointments();
-  }, [user]);
+  }, [fetchAppointments]);
 
   useFocusEffect(
     useCallback(() => {
       fetchAppointments();
-    }, [user])
+    }, [fetchAppointments])
   );
 
   const getStatusColor = (status) => {

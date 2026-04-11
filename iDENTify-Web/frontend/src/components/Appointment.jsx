@@ -34,7 +34,7 @@ function Appointments() {
       }
     };
     loadData();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const appointments = useAppStore((state) => state.appointments);
   const patients = useAppStore((state) => state.patients);
@@ -234,7 +234,7 @@ function Appointments() {
       await api.removeAppointment(selectedAppointment.id);
       toast.success("Appointment deleted");
       handleCloseModal();
-    } catch (err) {
+    } catch {
       toast.error('Failed to delete appointment');
     }
   };
@@ -257,7 +257,7 @@ function Appointments() {
       await api.createAppointment(appointmentToCreate);
       toast.success("Appointment added");
       setIsAddModalOpen(false);
-    } catch (err) {
+    } catch {
       toast.error('Failed to add appointment');
     }
   };

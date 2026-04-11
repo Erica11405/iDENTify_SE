@@ -10,10 +10,9 @@ import {
 	Pressable
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
-import { useEffect, useState, useCallback } from "react";
-import { useFocusEffect } from "expo-router";
+import { useState, useCallback } from "react";
 import { API, fetchPatientByEmail } from "../../constants/Api";
 import { dentalServices } from "../../constants/services";
 
@@ -28,6 +27,7 @@ const parseDate = (dateString) => {
 export default function HomeScreen() {
 	const router = useRouter();
 	const { user } = useUser();
+	const userEmail = user?.primaryEmailAddress?.emailAddress;
 	const [patient, setPatient] = useState(null);
 	const [upcomingAppt, setUpcomingAppt] = useState(null);
 	const [loading, setLoading] = useState(true);
@@ -37,12 +37,12 @@ export default function HomeScreen() {
 	const [selectedService, setSelectedService] = useState(null);
 	const [modalVisible, setModalVisible] = useState(false);
 
-	const loadData = async () => {
-		if (!user?.primaryEmailAddress?.emailAddress) return;
+	const loadData = useCallback(async () => {
+		if (!userEmail) return;
 		if (!refreshing) setLoading(true);
 
 		try {
-			const patientData = await fetchPatientByEmail(user.primaryEmailAddress.emailAddress);
+			const patientData = await fetchPatientByEmail(userEmail);
 			setPatient(patientData);
 
 			if (patientData) {
@@ -55,7 +55,7 @@ export default function HomeScreen() {
 						const fIds = familyMembers.map(m => m.id);
 						allIds = [...allIds, ...fIds];
 					}
-				} catch (e) {
+				} catch (_e) {
 					console.log('No family members found or error fetching');
 				}
 
@@ -90,17 +90,17 @@ export default function HomeScreen() {
 			setLoading(false);
 			setRefreshing(false);
 		}
-	};
+	}, [userEmail, refreshing]);
 
 	const onRefresh = useCallback(() => {
 		setRefreshing(true);
 		loadData();
-	}, [user]);
+	}, [loadData]);
 
 	useFocusEffect(
 		useCallback(() => {
 			loadData();
-		}, [user])
+		}, [loadData])
 	);
 
 	const handleServicePress = (service) => {

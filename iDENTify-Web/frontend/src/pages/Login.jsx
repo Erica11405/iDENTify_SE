@@ -145,8 +145,12 @@ import useAppStore from "../store/useAppStore";
 import toothLogo from "../assets/toothlogo.svg";
 import "../styles/pages/LoginPage.css";
 
+function getHomeRoute(role) {
+    if (role === "superadmin") return "/admin/dashboard";
+    return "/dashboard";
+}
+
 function Login() {
-    const [role, setRole] = useState("aide"); 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -181,17 +185,15 @@ function Login() {
         }
 
         try {
-            const response = await api.login({ email, password, role });
+            const response = await api.login({ email, password });
             
             if (response.requireOtp) {
-                // Aide flow: Require OTP
                 toast.success(response.message || "OTP sent to your email!");
                 setIsOtpStep(true); 
             } else {
-                // Dentist flow: Instant Login
                 setUser(response.user); 
                 toast.success(response.message || "Welcome back!");
-                navigate("/dashboard");
+                navigate(getHomeRoute(response.user?.role));
             }
         } catch (error) {
             setErrors({ form: error.message || "Invalid credentials." });
@@ -208,10 +210,10 @@ function Login() {
         }
 
         try {
-            const response = await api.verifyOtp({ email, otp: otpCode, role });
+            const response = await api.verifyOtp({ email, otp: otpCode });
             setUser(response.user); 
             toast.success(response.message || "Welcome back!");
-            navigate("/dashboard");
+            navigate(getHomeRoute(response.user?.role));
         } catch (error) {
             setErrors({ form: error.message || "Invalid verification code." });
             toast.error(error.message || "Invalid verification code.");
@@ -236,25 +238,6 @@ function Login() {
                             </div>
                             <h2 className="login-form__title">Welcome Back</h2>
                             <p className="login-form__subtitle">Log in to your account</p>
-                        </div>
-
-                        <div className="role-selector" style={{ display: 'flex', gap: '15px', marginBottom: '20px', justifyContent: 'center' }}>
-                            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                <input 
-                                    type="radio" 
-                                    value="aide" 
-                                    checked={role === "aide"} 
-                                    onChange={(e) => setRole(e.target.value)} 
-                                /> Dental Aide
-                            </label>
-                            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                <input 
-                                    type="radio" 
-                                    value="dentist" 
-                                    checked={role === "dentist"} 
-                                    onChange={(e) => setRole(e.target.value)} 
-                                /> Dentist
-                            </label>
                         </div>
 
                         {errors.form && <div className="error-banner" style={{color: 'red', textAlign: 'center', marginBottom: '10px'}}>{errors.form}</div>}
@@ -296,11 +279,9 @@ function Login() {
 
                         <button type="submit" className="login-form__button">Continue</button>
 
-                        {role === "dentist" && (
-                            <p style={{ textAlign: "center", marginTop: "15px" }}>
-                                Don't have an account? <Link to="/signup" style={{ color: "var(--primary-color)", fontWeight: "bold" }}>Sign up here</Link>
-                            </p>
-                        )}
+                        <p style={{ textAlign: "center", marginTop: "15px" }}>
+                            Need a super admin account? <Link to="/signup" style={{ color: "var(--primary-color)", fontWeight: "bold" }}>Sign up here</Link>
+                        </p>
                     </form>
                 ) : (
                     <form className="login-form" onSubmit={handleOtpSubmit}>
