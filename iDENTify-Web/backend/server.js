@@ -157,6 +157,7 @@ const adminUsersRoutes = require("./routes/admin_users");
 const servicesRoutes = require("./routes/services"); 
 const clinicMedicationsRoutes = require("./routes/clinic_medications"); 
 const dentistTypesRoutes = require("./routes/dentist_types");
+const paymentsRoutes = require("./routes/payments");
 
 const app = express();
 
@@ -203,6 +204,7 @@ apiRouter.use("/dentists", dentistsRoutes);
 apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
 apiRouter.use("/admin/users", adminUsersRoutes);
+apiRouter.use("/payments", paymentsRoutes);
 
 // Apply the unified router to the app
 app.use("/api", apiRouter); 

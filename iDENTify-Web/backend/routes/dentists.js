@@ -150,6 +150,7 @@ const bcrypt = require('bcrypt');
 const safeVal = (val) => val === undefined ? null : val;
 
 let hasMiddleNameColumnCache = null;
+let hasIsArchivedColumnCache = null;
 
 async function hasMiddleNameColumn() {
   if (hasMiddleNameColumnCache !== null) {
@@ -166,6 +167,21 @@ async function hasMiddleNameColumn() {
   return hasMiddleNameColumnCache;
 }
 
+async function hasIsArchivedColumn() {
+  if (hasIsArchivedColumnCache !== null) {
+    return hasIsArchivedColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM dentists LIKE 'is_archived'");
+    hasIsArchivedColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasIsArchivedColumnCache = false;
+  }
+
+  return hasIsArchivedColumnCache;
+}
+
 function composeStaffName(firstName, middleName, lastName) {
   return [firstName, middleName, lastName]
     .map((part) => String(part || '').trim())
@@ -177,13 +193,22 @@ function composeStaffName(firstName, middleName, lastName) {
 router.get('/', async (req, res) => {
   try {
     const { type } = req.query;
-    let query = 'SELECT * FROM dentists';
+    const whereClauses = [];
+
+    if (await hasIsArchivedColumn()) {
+      whereClauses.push('COALESCE(is_archived, 0) = 0');
+    }
     
     // Server-side filtering logic
     if (type === 'dentist') {
-      query += " WHERE specialization != 'Dental Aide'";
+      whereClauses.push("specialization != 'Dental Aide'");
     } else if (type === 'aide') {
-      query += " WHERE specialization = 'Dental Aide'";
+      whereClauses.push("specialization = 'Dental Aide'");
+    }
+
+    let query = 'SELECT * FROM dentists';
+    if (whereClauses.length > 0) {
+      query += ` WHERE ${whereClauses.join(' AND ')}`;
     }
 
     const [rows] = await db.query(query);

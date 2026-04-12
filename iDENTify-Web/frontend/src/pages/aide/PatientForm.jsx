@@ -921,6 +921,7 @@ import toast from "react-hot-toast";
 import "../../styles/pages/aide/PatientForm.css";
 import XrayViewer from "../../components/XrayViewer";
 import MedicalAlertBanner from "../../components/MedicalAlertBanner";
+import PaymentModal from "../../components/PaymentModal";
 import useApi from "../../hooks/useApi";
 import apiClient from "../../api/apiClient"; 
 import useAppStore from "../../store/useAppStore";
@@ -1037,6 +1038,7 @@ function PatientForm({ userRole }) {
     const user = useAppStore((state) => state.user);
 	const queue = useAppStore((state) => state.queue || []);
 	const allAppointments = useAppStore((state) => state.appointments || []);
+	const dentists = useAppStore((state) => state.dentists || []);
 
 	const [patient, setPatient] = useState(null);
 	const [selectedDentistId, setSelectedDentistId] = useState("");
@@ -1072,6 +1074,9 @@ function PatientForm({ userRole }) {
 	const [selectedXray, setSelectedXray] = useState(null);
     const [isXrayViewerOpen, setIsXrayViewerOpen] = useState(false);
 	const [isSaving, setIsSaving] = useState(false);
+	const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+	const [paymentContext, setPaymentContext] = useState(null);
+	const [unpaidServiceMatches, setUnpaidServiceMatches] = useState([]);
 
 	const [alertInput, setAlertInput] = useState("");
 	const [tempUnit, setTempUnit] = useState("C");
@@ -1144,7 +1149,9 @@ function PatientForm({ userRole }) {
 				if (linkedAppt?.dentist_id) setSelectedDentistId(linkedAppt.dentist_id);
 				else if (patientData.vitals?.dentist_id) setSelectedDentistId(patientData.vitals.dentist_id);
 
-                const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+				const API_BASE = import.meta.env.DEV
+					? "/api"
+					: (import.meta.env.VITE_API_BASE || "/api");
                 const yearsRes = await fetch(`${API_BASE}/annual-records/years/${id}`);
                 if (yearsRes.ok) {
                     const yearsData = await yearsRes.json();
@@ -1226,7 +1233,9 @@ function PatientForm({ userRole }) {
 				let dbAppointments = allAppointments;
 				if (!dbAppointments || dbAppointments.length === 0) {
 					try {
-						const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+						const API_BASE = import.meta.env.DEV
+							? "/api"
+							: (import.meta.env.VITE_API_BASE || "/api");
 						const res = await fetch(`${API_BASE}/appointments`);
 						if (res.ok) dbAppointments = await res.json();
 					} catch (e) { console.error("Failed to fetch appointments", e); }
@@ -1342,36 +1351,299 @@ function PatientForm({ userRole }) {
 		} else { toast.error("Service already in plan"); }
 	};
 
+	const toPositiveInt = (value) => {
+		const parsed = Number.parseInt(String(value || ""), 10);
+		if (!Number.isFinite(parsed) || parsed <= 0) return null;
+		return parsed;
+	};
+
+	const parseServiceListFromText = (value) => {
+		if (Array.isArray(value)) {
+			return value.map((item) => String(item || "").trim()).filter(Boolean);
+		}
+
+		const text = String(value || "").trim();
+		if (!text) return [];
+
+		try {
+			const parsed = JSON.parse(text);
+			if (Array.isArray(parsed)) {
+				return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+			}
+		} catch {
+			// Ignore parse errors and fall back to comma split.
+		}
+
+		return text.split(",").map((item) => item.trim()).filter(Boolean);
+	};
+
+	const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
+
+	const resolveQueueItemForPayment = () => {
+		const stateAppointment = location.state?.appointment;
+		const queueIdFromState = toPositiveInt(location.state?.queueId);
+		const queueIdFromAppointmentPayload = hasOwn(stateAppointment, "appointment_id")
+			? toPositiveInt(stateAppointment?.id)
+			: null;
+		const preferredQueueId = queueIdFromState || queueIdFromAppointmentPayload;
+
+		if (preferredQueueId) {
+			const locationQueueItem = (queue || []).find((item) => toPositiveInt(item.id) === preferredQueueId);
+			if (locationQueueItem) return locationQueueItem;
+		}
+
+		return (queue || []).find((item) => (
+			String(item.patient_id) === String(id)
+			&& item.status !== "Done"
+			&& item.status !== "Cancelled"
+		));
+	};
+
+	const resolveAppointmentForPayment = (queueItem) => {
+		const stateAppointment = location.state?.appointment;
+		const locationApptId = hasOwn(stateAppointment, "appointment_id")
+			? toPositiveInt(stateAppointment?.appointment_id)
+			: toPositiveInt(stateAppointment?.id);
+
+		if (locationApptId) {
+			const locationAppt = (allAppointments || []).find((item) => toPositiveInt(item.id) === locationApptId);
+			if (locationAppt) return locationAppt;
+		}
+
+		if (stateAppointment) {
+			return stateAppointment;
+		}
+
+		const queueAppointmentId = toPositiveInt(queueItem?.appointment_id);
+		if (queueAppointmentId) {
+			const byQueue = (allAppointments || []).find((item) => toPositiveInt(item.id) === queueAppointmentId);
+			if (byQueue) return byQueue;
+		}
+
+		return (allAppointments || []).find((item) => (
+			String(item.patient_id) === String(id)
+			&& item.status !== "Done"
+			&& item.status !== "Cancelled"
+		));
+	};
+
+	const resolveServicesForPayment = (appointment, queueItem) => {
+		const appointmentServices = parseServiceListFromText(
+			appointment?.reason
+			|| appointment?.procedure
+			|| appointment?.service
+			|| appointment?.services
+			|| appointment?.dental_service
+			|| location.state?.appointment?.reason
+			|| location.state?.appointment?.procedure
+			|| location.state?.appointment?.service
+			|| location.state?.appointment?.services
+			|| location.state?.appointment?.dental_service
+			|| ""
+		);
+		if (appointmentServices.length > 0) return appointmentServices;
+
+		const queueServices = parseServiceListFromText(
+			queueItem?.notes
+			|| queueItem?.reason
+			|| queueItem?.procedure
+			|| queueItem?.service
+			|| queueItem?.services
+			|| queueItem?.dental_service
+			|| ""
+		);
+		if (queueServices.length > 0) return queueServices;
+
+		if ((selectedTimelineServices || []).length > 0) {
+			return selectedTimelineServices.map((item) => String(item || "").trim()).filter(Boolean);
+		}
+
+		const latestTimelineEntry = (timelineEntries || []).slice().reverse().find((entry) => entry?.procedure_text);
+		return parseServiceListFromText(latestTimelineEntry?.procedure_text || "");
+	};
+
+	const resolveDentistInfoForPayment = (appointment, queueItem) => {
+		const resolvedDentistId = toPositiveInt(
+			selectedDentistId
+			|| appointment?.dentist_id
+			|| queueItem?.dentist_id
+			|| location.state?.dentistId
+		);
+
+		const dentistMatch = (dentists || []).find((item) => toPositiveInt(item.id) === resolvedDentistId);
+
+		const dentistName = dentistMatch?.name
+			|| appointment?.dentist_name
+			|| queueItem?.dentist_name
+			|| location.state?.assignedDentistName
+			|| "Unassigned";
+
+		return { dentistId: resolvedDentistId, dentistName };
+	};
+
+	const resolveVisitDateTimeForPayment = (appointment) => {
+		return appointment?.appointment_datetime
+			|| timelineForm.start_time
+			|| new Date().toLocaleString();
+	};
+
+	const buildPaymentContext = () => {
+		const queueItem = resolveQueueItemForPayment();
+		const appointment = resolveAppointmentForPayment(queueItem);
+		const services = resolveServicesForPayment(appointment, queueItem);
+		const { dentistId, dentistName } = resolveDentistInfoForPayment(appointment, queueItem);
+		const appointmentId = hasOwn(appointment, "appointment_id")
+			? toPositiveInt(appointment?.appointment_id)
+			: toPositiveInt(appointment?.id);
+
+		return {
+			patient_id: toPositiveInt(patient?.id) || toPositiveInt(id),
+			patient_name: patient?.full_name || "Unknown",
+			dentist_id: dentistId,
+			dentist_name: dentistName,
+			appointment_id: appointmentId,
+			queue_id: toPositiveInt(queueItem?.id),
+			visit_datetime: resolveVisitDateTimeForPayment(appointment),
+			services,
+		};
+	};
+
+	const saveClinicalProgress = async () => {
+		let finalAlerts = [...(patient.medicalAlerts || [])];
+		if (patient.relationship) { finalAlerts.push(`Relation:${patient.relationship}`); }
+
+		const patientPayload = {
+			...patient,
+			medicalAlerts: finalAlerts,
+			contact_number: patient.contact_number,
+			contact: patient.contact_number,
+		};
+		await apiClient.updatePatient(patient.id, patientPayload);
+
+		const annualPayload = {
+			patient_id: id,
+			record_year: selectedYear,
+			vitals: { ...vitals, dentist_id: selectedDentistId },
+			xrays: uploadedFiles,
+			status: "Active",
+		};
+		await apiClient.saveAnnualRecord(annualPayload);
+	};
+
 	const handleSaveAll = async () => {
 		if (!patient) return;
+		const context = buildPaymentContext();
+		setPaymentContext(context);
+
+		try {
+			const patientId = toPositiveInt(context?.patient_id);
+			const services = Array.isArray(context?.services)
+				? context.services.map((item) => String(item || "").trim()).filter(Boolean)
+				: [];
+
+			if (patientId && services.length > 0) {
+				const result = await apiClient.getUnpaidPaymentMatches({
+					patient_id: patientId,
+					services,
+				});
+
+				const matches = Array.isArray(result?.matches) ? result.matches : [];
+				setUnpaidServiceMatches(matches);
+			} else {
+				setUnpaidServiceMatches([]);
+			}
+		} catch (error) {
+			if (error?.status === 404) {
+				console.warn("Skipping unpaid balance detection because /api/payments/unpaid-matches is unavailable on the current backend process.");
+			} else {
+				console.error("Failed to detect existing unpaid balances", error);
+			}
+			setUnpaidServiceMatches([]);
+		}
+
+		setIsPaymentModalOpen(true);
+	};
+
+	const handleClosePaymentModal = () => {
+		if (isSaving) return;
+		setIsPaymentModalOpen(false);
+		setPaymentContext(null);
+		setUnpaidServiceMatches([]);
+	};
+
+	const handleContinueExistingPayment = async (selectedMatch) => {
+		if (!patient || !paymentContext || !selectedMatch?.id) return;
+
 		setIsSaving(true);
 		try {
-			let finalAlerts = [...(patient.medicalAlerts || [])];
-			if (patient.relationship) { finalAlerts.push(`Relation:${patient.relationship}`); }
-			
-            const patientPayload = { ...patient, medicalAlerts: finalAlerts, contact_number: patient.contact_number, contact: patient.contact_number };
-			await apiClient.updatePatient(patient.id, patientPayload);
-			
-            const annualPayload = { patient_id: id, record_year: selectedYear, vitals: { ...vitals, dentist_id: selectedDentistId }, xrays: uploadedFiles, status: "Active" };
-			await apiClient.saveAnnualRecord(annualPayload);
-			
-            const queueItem = (queue || []).find(q => String(q.patient_id) === String(id) && q.status !== "Done" && q.status !== "Cancelled");
-			if (queueItem) { await apiClient.updateQueueItem(queueItem.id, { status: "Done" }); }
-			
-            const appointment = (allAppointments || []).find(a => String(a.patient_id) === String(id) && a.status !== "Done" && a.status !== "Cancelled");
-			if (appointment) { await apiClient.updateAppointment(appointment.id, { status: "Done" }); }
-			
-            if (api.loadQueue) await api.loadQueue();
+			await saveClinicalProgress();
+
+			if (api.loadQueue) await api.loadQueue();
 			if (api.loadAppointments) await api.loadAppointments();
-			
-            toast.success(`Appointment Progress Saved. Session moved to History.`);
+
+			setIsPaymentModalOpen(false);
+			setPaymentContext(null);
+			setUnpaidServiceMatches([]);
+
+			toast.success("Progress saved. Continue payment from the existing balance record.");
+			navigate("/payments", { state: { focusPaymentId: Number(selectedMatch.id) } });
+		} catch (error) {
+			console.error(error);
+			toast.error(error?.message || "Failed to continue existing payment record.");
+		} finally {
+			setIsSaving(false);
+		}
+	};
+
+	const handleConfirmPayment = async (paymentPayload) => {
+		if (!patient || !paymentContext) return;
+
+		setIsSaving(true);
+		try {
+			await saveClinicalProgress();
+
+			const savedPayment = await apiClient.createPaymentRecord({
+				...paymentContext,
+				...paymentPayload,
+			});
+
+			if (api.loadQueue) await api.loadQueue();
+			if (api.loadAppointments) await api.loadAppointments();
+
+			setIsPaymentModalOpen(false);
+			setPaymentContext(null);
+			setUnpaidServiceMatches([]);
+
+			const balanceDue = Number(savedPayment?.balance_due || 0);
+			if (balanceDue > 0) {
+				toast.success("Progress saved. Payment record added to billing.");
+				navigate("/payments");
+				return;
+			}
+
+			toast.success("Appointment progress and payment saved.");
 			navigate("/history");
-		} catch (error) { 
-            console.error(error); 
-            toast.error("Failed to save. Please check connection."); 
-        } finally { 
-            setIsSaving(false); 
-        }
+		} catch (error) {
+			console.error(error);
+
+			if (error?.status === 404) {
+				toast.error("Payments API is unavailable on the running backend. Restart/update backend server, then try again.");
+				return;
+			}
+
+			if (error?.status === 409) {
+				toast.success("A payment record already exists. Opening billing page.");
+				setIsPaymentModalOpen(false);
+				setPaymentContext(null);
+				setUnpaidServiceMatches([]);
+				navigate("/payments");
+				return;
+			}
+
+			toast.error(error?.message || "Failed to save payment progress.");
+		} finally {
+			setIsSaving(false);
+		}
 	};
 
 	const handleSegmentClick = async (cellKey, part) => {
@@ -1847,6 +2119,23 @@ function PatientForm({ userRole }) {
 				</div>
 			)}
 			{isXrayViewerOpen && <XrayViewer file={selectedXray} onClose={closeXrayViewer} />}
+			<PaymentModal
+				isOpen={isPaymentModalOpen}
+				onClose={handleClosePaymentModal}
+				onSubmit={handleConfirmPayment}
+				onContinueExisting={handleContinueExistingPayment}
+				isSubmitting={isSaving}
+				summary={paymentContext || {}}
+				unpaidMatches={unpaidServiceMatches}
+				initialValues={{
+					total_due: "",
+					is_deposit: false,
+					payment_method: "cash",
+					amount_paid_now: "",
+					already_paid: 0,
+				}}
+				mode="create"
+			/>
 		</div>
 	);
 }

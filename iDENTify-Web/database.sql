@@ -89,6 +89,54 @@ CREATE TABLE IF NOT EXISTS `walk_in_queue` (
   FOREIGN KEY (`dentist_id`) REFERENCES `dentists`(`id`) ON DELETE SET NULL
 );
 
+-- PAYMENT RECORDS TABLE
+-- Stores one billing record per appointment/queue context.
+CREATE TABLE IF NOT EXISTS `payment_records` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `patient_id` INT NOT NULL,
+  `dentist_id` INT NULL,
+  `appointment_id` INT NULL,
+  `queue_id` INT NULL,
+  `patient_name` VARCHAR(255),
+  `dentist_name` VARCHAR(255),
+  `visit_datetime` VARCHAR(255),
+  `services_text` TEXT,
+  `total_due` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `amount_paid` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `balance_due` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `is_deposit` TINYINT(1) NOT NULL DEFAULT 0,
+  `payment_status` VARCHAR(50) NOT NULL DEFAULT 'Unpaid',
+  `notes` TEXT,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uniq_payment_queue` (`queue_id`),
+  UNIQUE KEY `uniq_payment_appointment` (`appointment_id`),
+  INDEX `idx_payment_patient` (`patient_id`),
+  INDEX `idx_payment_status` (`payment_status`),
+  INDEX `idx_payment_created` (`created_at`),
+  FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`dentist_id`) REFERENCES `dentists`(`id`) ON DELETE SET NULL,
+  FOREIGN KEY (`appointment_id`) REFERENCES `appointments`(`id`) ON DELETE SET NULL,
+  FOREIGN KEY (`queue_id`) REFERENCES `walk_in_queue`(`id`) ON DELETE SET NULL
+);
+
+-- PAYMENT TRANSACTIONS TABLE
+-- Stores installment/payment history entries for each payment record.
+CREATE TABLE IF NOT EXISTS `payment_transactions` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `payment_record_id` INT NOT NULL,
+  `payment_method` VARCHAR(50) NOT NULL,
+  `amount_paid` DECIMAL(10,2) NOT NULL,
+  `cash_received` DECIMAL(10,2) NULL,
+  `change_amount` DECIMAL(10,2) NULL,
+  `proof_name` VARCHAR(255) NULL,
+  `proof_data` LONGTEXT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_payment_tx_record` (`payment_record_id`),
+  INDEX `idx_payment_tx_created` (`created_at`),
+  FOREIGN KEY (`payment_record_id`) REFERENCES `payment_records`(`id`) ON DELETE CASCADE
+);
+
 -- TOOTH CONDITIONS TABLE
 -- Added record_year
 CREATE TABLE IF NOT EXISTS `tooth_conditions` (

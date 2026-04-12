@@ -134,8 +134,15 @@ function SuperAdminUsers() {
                 api.getDentistTypes().catch(() => []),
             ]);
 
-            const dentistsOnly = (staffList || []).filter((staff) => !isAide(staff));
-            const aidesOnly = (staffList || []).filter((staff) => isAide(staff));
+            const activeDentistIds = new Set(
+                (usersList || [])
+                    .filter((user) => !isArchived(user) && user?.dentist_id)
+                    .map((user) => String(user.dentist_id))
+            );
+
+            const visibleStaff = (staffList || []).filter((staff) => activeDentistIds.has(String(staff.id)));
+            const dentistsOnly = visibleStaff.filter((staff) => !isAide(staff));
+            const aidesOnly = visibleStaff.filter((staff) => isAide(staff));
             const loadedTypes = (typeList || [])
                 .map((entry) => normalizeText(entry?.name))
                 .filter(Boolean);

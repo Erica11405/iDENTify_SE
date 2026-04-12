@@ -559,6 +559,64 @@ export const updateAppointment = async (id, payload) => {
     return handleResponse(res);
 };
 
+/* --- Payments Functions --- */
+export const getPayments = async ({ startDate, endDate, search } = {}) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    if (search) params.set('search', search);
+
+    const query = params.toString();
+    const res = await fetch(`${API_BASE}/payments${query ? `?${query}` : ''}`);
+    return handleResponse(res);
+};
+
+export const getPaymentById = async (id) => {
+    const res = await fetch(`${API_BASE}/payments/${id}`);
+    return handleResponse(res);
+};
+
+export const getPaymentByQueueId = async (queueId) => {
+    const res = await fetch(`${API_BASE}/payments/by-queue/${queueId}`);
+    return handleResponse(res);
+};
+
+export const getUnpaidPaymentMatches = async ({ patient_id, services }) => {
+    const res = await fetch(`${API_BASE}/payments/unpaid-matches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patient_id, services }),
+    });
+    return handleResponse(res);
+};
+
+export const createPaymentRecord = async (payload) => {
+    const res = await fetch(`${API_BASE}/payments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const updatePaymentRecord = async (id, payload) => {
+    const res = await fetch(`${API_BASE}/payments/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const addPaymentInstallment = async (id, payload) => {
+    const res = await fetch(`${API_BASE}/payments/${id}/installments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
 /* --- Reports Functions --- */
 export const getReports = async (date) => {
     const url = date ? `${API_BASE}/reports?date=${date}` : `${API_BASE}/reports`;
@@ -748,6 +806,7 @@ const api = {
     getPatients, getPatientById, createPatient, updatePatient, searchPatients,
     getQueue, addQueueItem, updateQueueItem, deleteQueueItem,
     getAppointments, createAppointment, checkAppointmentLimit, updateAppointment,
+    getPayments, getPaymentById, getPaymentByQueueId, getUnpaidPaymentMatches, createPaymentRecord, updatePaymentRecord, addPaymentInstallment,
     getReports, getDentistPatientsForReport, getDentistReportSummary, get,
     getServices, createService, updateService, deleteService,
     getClinicMedications, createClinicMedication, updateClinicMedication, deleteClinicMedication,

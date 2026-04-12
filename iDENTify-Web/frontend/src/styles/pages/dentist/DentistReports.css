@@ -1,0 +1,81 @@
+.dentist-reports-page {
+  padding: 1.5rem;
+}
+
+.dentist-reports-subtitle {
+  margin-top: 0.25rem;
+  color: #64748b;
+}
+
+.dentist-reports-identity {
+  margin-top: 0.3rem;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.dentist-reports-range-label {
+  margin-top: 0.8rem;
+  margin-bottom: 1rem;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.dentist-report-section {
+  margin-top: 1rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.dentist-report-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+}
+
+.dentist-report-subtitle {
+  margin: 0;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.dentist-report-table-wrap {
+  overflow-x: auto;
+}
+
+.dentist-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.dentist-report-table th,
+.dentist-report-table td {
+  text-align: left;
+  padding: 0.65rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.dentist-report-table th {
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 700;
+}
+
+.dentist-report-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.dentist-report-empty-cell {
+  color: #64748b;
+}
+
+@media (max-width: 640px) {
+  .dentist-reports-page {
+    padding: 1rem;
+  }
+}
