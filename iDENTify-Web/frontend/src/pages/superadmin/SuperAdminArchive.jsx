@@ -1,7 +1,7 @@
-import React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../api/apiClient';
+import '../../styles/pages/dentist/DentistSettings.css';
 
 const ROLE_OPTIONS = [
     { value: 'all', label: 'All Roles' },
@@ -77,47 +77,57 @@ function SuperAdminArchive() {
     };
 
     return (
-        <section style={{ padding: '1.5rem' }}>
-            <h1>Archived Accounts</h1>
-            <p>Restore archived dentist and aide accounts when needed.</p>
+        <section className="settings-dashboard-container">
+            <div className="settings-header-section">
+                <h2>Archived Accounts</h2>
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
-                <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Total Archived</p>
-                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.total}</p>
+            <div className="superadmin-stats-grid" style={{ marginBottom: '1rem' }}>
+                <div className="superadmin-stat-card compact">
+                    <p>Total Archived</p>
+                    <h4>{summary.total}</h4>
                 </div>
-                <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Dentists</p>
-                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.dentists}</p>
+                <div className="superadmin-stat-card compact">
+                    <p>Dentists</p>
+                    <h4>{summary.dentists}</h4>
                 </div>
-                <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Dental Aides</p>
-                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.aides}</p>
+                <div className="superadmin-stat-card compact">
+                    <p>Dental Aides</p>
+                    <h4>{summary.aides}</h4>
                 </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem', marginBottom: '1rem' }}>
-                <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
-                    {ROLE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                </select>
+            <div className="settings-form-card" style={{ marginBottom: '1rem' }}>
+                <div className="form-row form-row-bottom">
+                    <div className="form-group" style={{ maxWidth: '220px' }}>
+                        <label>Role</label>
+                        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+                            {ROLE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
+                    </div>
 
-                <input
-                    type="search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search by name or email"
-                    style={{ minWidth: '260px' }}
-                />
+                    <div className="form-group flex-2">
+                        <label>Search</label>
+                        <input
+                            type="search"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search by name or email"
+                        />
+                    </div>
+                </div>
 
-                <button type="button" onClick={loadArchivedUsers} disabled={loading}>
-                    {loading ? 'Refreshing...' : 'Refresh'}
-                </button>
+                <div className="settings-inline-actions" style={{ justifyContent: 'flex-start' }}>
+                    <button type="button" className="btn-secondary-action" onClick={loadArchivedUsers} disabled={loading}>
+                        {loading ? 'Refreshing...' : 'Refresh'}
+                    </button>
+                </div>
             </div>
 
             {lastRestored ? (
-                <p style={{ marginTop: '-0.25rem', marginBottom: '1rem', color: '#065f46', fontSize: '0.9rem' }}>
+                <p className="archive-last-restored">
                     Last restored: {lastRestored}
                 </p>
             ) : null}
@@ -125,26 +135,26 @@ function SuperAdminArchive() {
             {loading ? (
                 <p>Loading archived users...</p>
             ) : filteredUsers.length === 0 ? (
-                <p>No archived users found.</p>
+                <p className="empty-state archive-empty-state">No archived users found.</p>
             ) : (
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div className="table-container">
+                    <table className="settings-table">
                         <thead>
                             <tr>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #ddd' }}>Name</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #ddd' }}>Email</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #ddd' }}>Role</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #ddd' }}>Action</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredUsers.map((user) => (
                                 <tr key={user.id}>
-                                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f0f0f0' }}>{user.full_name || '-'}</td>
-                                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f0f0f0' }}>{user.email}</td>
-                                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f0f0f0', textTransform: 'capitalize' }}>{user.role}</td>
-                                    <td style={{ padding: '0.5rem', borderBottom: '1px solid #f0f0f0' }}>
-                                        <button type="button" disabled={busyId === user.id} onClick={() => handleRestore(user)}>
+                                    <td className="font-semibold">{user.full_name || '-'}</td>
+                                    <td>{user.email}</td>
+                                    <td className="archive-role-cell">{user.role}</td>
+                                    <td>
+                                        <button type="button" className="btn-edit" disabled={busyId === user.id} onClick={() => handleRestore(user)}>
                                             {busyId === user.id ? 'Restoring...' : 'Restore'}
                                         </button>
                                     </td>

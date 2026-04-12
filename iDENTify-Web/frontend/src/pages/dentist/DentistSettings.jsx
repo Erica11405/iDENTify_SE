@@ -921,6 +921,32 @@ const COMMON_FREQUENCY_OPTIONS = [
     "As needed",
 ];
 
+const DURATION_OPTIONS = Array.from({ length: 12 }, (_unused, index) => (index + 1) * 30);
+
+function formatDurationLabel(minutes) {
+    const numericMinutes = Number(minutes);
+    if (!Number.isFinite(numericMinutes) || numericMinutes <= 0) {
+        return "";
+    }
+
+    const hours = Math.floor(numericMinutes / 60);
+    const remainingMinutes = numericMinutes % 60;
+
+    if (hours > 0 && remainingMinutes === 0) {
+        return `${hours} hour${hours > 1 ? "s" : ""}`;
+    }
+
+    if (hours > 0 && remainingMinutes > 0) {
+        return `${hours} hour${hours > 1 ? "s" : ""} ${remainingMinutes} mins`;
+    }
+
+    return `${numericMinutes} mins`;
+}
+
+function sortDentistTypesByName(typeList) {
+    return [...(typeList || [])].sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
+}
+
 function DentistSettings({ showAideManagement = true }) {
     const [activeTab, setActiveTab] = useState(showAideManagement ? "aides" : "services");
 
@@ -939,30 +965,48 @@ function DentistSettings({ showAideManagement = true }) {
     const [newMedication, setNewMedication] = useState({ name: "", defaultDosage: "", defaultFrequency: "" });
   const [editingMedicationId, setEditingMedicationId] = useState(null);
 
+    // --- DENTIST TYPES STATE (Super Admin) ---
+    const [dentistTypes, setDentistTypes] = useState([]);
+    const [newDentistType, setNewDentistType] = useState({ name: "" });
+    const [editingDentistTypeId, setEditingDentistTypeId] = useState(null);
+
   // Fetch data when the page loads
   useEffect(() => {
     const loadData = async () => {
       try {
-        const staffList = await api.getDentists();
+                const dentistTypePromise = showAideManagement
+                        ? Promise.resolve([])
+                        : api.getDentistTypes().catch(() => []);
+
+                const [staffList, servicesList, medsList, dentistTypeList] = await Promise.all([
+                        api.getDentists(),
+                        api.getServices(),
+                        api.getClinicMedications(),
+                        dentistTypePromise,
+                ]);
+
         const aidesOnly = staffList.filter(staff => staff.specialization === 'Dental Aide');
         setAides(aidesOnly);
-
-        const servicesList = await api.getServices();
         setServices(servicesList);
-
-        const medsList = await api.getClinicMedications();
         setClinicMedications(medsList);
+
+                if (!showAideManagement) {
+                    setDentistTypes(sortDentistTypesByName(dentistTypeList));
+                }
 
       } catch (error) {
         console.error("Failed to load settings data:", error);
       }
     };
     loadData();
-  }, []);
+  }, [showAideManagement]);
 
     useEffect(() => {
         if (!showAideManagement && activeTab === "aides") {
             setActiveTab("services");
+        }
+        if (showAideManagement && activeTab === "dentist-types") {
+            setActiveTab("aides");
         }
     }, [showAideManagement, activeTab]);
 
@@ -1155,6 +1199,54 @@ function DentistSettings({ showAideManagement = true }) {
     }
   };
 
+    // --- DENTIST TYPE HANDLERS (Super Admin) ---
+    const handleSaveDentistType = async (e) => {
+        e.preventDefault();
+        const typeName = String(newDentistType.name || "").trim();
+
+        if (!typeName) {
+                return toast.error("Dentist type name is required.");
+        }
+
+        try {
+                if (editingDentistTypeId) {
+                        await api.updateDentistType(editingDentistTypeId, { name: typeName });
+                    setDentistTypes(sortDentistTypesByName(dentistTypes.map((item) => (
+                                item.id === editingDentistTypeId ? { ...item, name: typeName } : item
+                    ))));
+                        toast.success("Dentist type updated successfully!");
+                } else {
+                        const createdType = await api.createDentistType({ name: typeName });
+                    setDentistTypes(sortDentistTypesByName([...dentistTypes, { id: createdType.id, name: createdType.name }]));
+                        toast.success("Dentist type added successfully!");
+                }
+
+                cancelDentistTypeEdit();
+        } catch (error) {
+                toast.error(error.message || "Failed to save dentist type.");
+        }
+    };
+
+    const handleEditDentistTypeClick = (typeEntry) => {
+        setEditingDentistTypeId(typeEntry.id);
+        setNewDentistType({ name: typeEntry.name || "" });
+    };
+
+    const cancelDentistTypeEdit = () => {
+        setEditingDentistTypeId(null);
+        setNewDentistType({ name: "" });
+    };
+
+    const handleDeleteDentistType = async (id) => {
+        try {
+                await api.deleteDentistType(id);
+                setDentistTypes(dentistTypes.filter((item) => item.id !== id));
+                toast.success("Dentist type removed.");
+        } catch (error) {
+                toast.error(error.message || "Failed to delete dentist type.");
+        }
+    };
+
   // REUSABLE STYLES FOR THE VISIBLE SAVE BUTTONS
   const saveBtnStyle = { padding: '10px 20px', background: '#0ea5e9', color: 'white', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold' };
   const cancelBtnStyle = { padding: '10px 20px', background: '#94a3b8', color: 'white', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold' };
@@ -1163,7 +1255,7 @@ function DentistSettings({ showAideManagement = true }) {
     <div className="settings-dashboard-container">
       <div className="settings-header-section">
         <h2>Clinic Settings</h2>
-                <p>{showAideManagement ? "Manage your dental staff, services, and medications." : "Manage clinic services and medications."}</p>
+                                {showAideManagement ? <p>Manage your dental staff, services, and medications.</p> : null}
       </div>
 
       <div className="settings-tabs">
@@ -1172,6 +1264,9 @@ function DentistSettings({ showAideManagement = true }) {
                 ) : null}
         <button className={activeTab === "services" ? "active" : ""} onClick={() => setActiveTab("services")}>Clinic Services</button>
         <button className={activeTab === "medications" ? "active" : ""} onClick={() => setActiveTab("medications")}>Medications</button>
+                {!showAideManagement ? (
+                    <button className={activeTab === "dentist-types" ? "active" : ""} onClick={() => setActiveTab("dentist-types")}>Dentist Types</button>
+                ) : null}
       </div>
 
       <div className="settings-tab-content">
@@ -1275,12 +1370,11 @@ function DentistSettings({ showAideManagement = true }) {
                                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveService(e); } }}
                             >
                                 <option value="" disabled>Select time</option>
-                                <option value="15">15 mins</option>
-                                <option value="30">30 mins</option>
-                                <option value="45">45 mins</option>
-                                <option value="60">1 hour</option>
-                                <option value="90">1.5 hours</option>
-                                <option value="120">2 hours</option>
+                                {DURATION_OPTIONS.map((minutes) => (
+                                    <option key={minutes} value={String(minutes)}>
+                                        {formatDurationLabel(minutes)}
+                                    </option>
+                                ))}
                             </select>
                         </div>
                         <div className="form-group">
@@ -1309,7 +1403,7 @@ function DentistSettings({ showAideManagement = true }) {
                         services.map((service) => (
                             <tr key={service.id} className={editingServiceId === service.id ? "row-highlight" : ""}>
                                 <td className="font-semibold">{service.name}</td>
-                                <td>{service.estimated_duration ? `${service.estimated_duration} mins` : "N/A"}</td>
+                                <td>{service.estimated_duration ? formatDurationLabel(service.estimated_duration) : "N/A"}</td>
                                 <td>
                                     <span className="price-badge">₱{service.min_price}</span>
                                     <span className="price-separator">to</span>
@@ -1407,6 +1501,61 @@ function DentistSettings({ showAideManagement = true }) {
                                     <div className="action-buttons">
                                         <button onClick={() => handleEditMedicationClick(med)} className="btn-edit">Edit</button>
                                         <button onClick={() => handleDeleteMedication(med.id)} className="btn-delete">Remove</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+                </table>
+            </div>
+          </div>
+        )}
+
+        {!showAideManagement && activeTab === "dentist-types" && (
+          <div className="animation-fade-in">
+            <div className={`settings-form-card ${editingDentistTypeId ? 'editing' : ''}`}>
+                <h3>
+                    {editingDentistTypeId ? "Edit Dentist Type" : "Add New Dentist Type"}
+                </h3>
+                <form
+                    onSubmit={handleSaveDentistType}
+                    onKeyDown={(e) => e.key === 'Escape' && cancelDentistTypeEdit()}
+                >
+                    <div className="form-row form-row-bottom">
+                        <div className="form-group flex-2">
+                            <label>Dentist Type Name *</label>
+                            <input
+                                type="text"
+                                placeholder="e.g., General Dentist"
+                                value={newDentistType.name}
+                                onChange={(e) => setNewDentistType({ name: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '15px' }}>
+                        {editingDentistTypeId && <button type="button" style={cancelBtnStyle} onClick={cancelDentistTypeEdit}>Cancel</button>}
+                        <button type="submit" style={saveBtnStyle}>{editingDentistTypeId ? 'Save Changes' : 'Add Dentist Type'}</button>
+                    </div>
+                </form>
+            </div>
+
+            <h3 className="table-title">Available Dentist Types</h3>
+            <div className="table-container">
+                <table className="settings-table">
+                <thead><tr><th>Dentist Type</th><th>Actions</th></tr></thead>
+                <tbody>
+                    {dentistTypes.length === 0 ? (
+                        <tr><td colSpan="2" className="empty-state">No dentist types added yet.</td></tr>
+                    ) : (
+                        dentistTypes.map((typeEntry) => (
+                            <tr key={typeEntry.id} className={editingDentistTypeId === typeEntry.id ? "row-highlight" : ""}>
+                                <td className="font-semibold">{typeEntry.name}</td>
+                                <td>
+                                    <div className="action-buttons">
+                                        <button onClick={() => handleEditDentistTypeClick(typeEntry)} className="btn-edit">Edit</button>
+                                        <button onClick={() => handleDeleteDentistType(typeEntry.id)} className="btn-delete">Remove</button>
                                     </div>
                                 </td>
                             </tr>

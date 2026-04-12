@@ -418,3 +418,20 @@
     cursor: pointer;
     font-weight: 600;
 }
+
+.archive-last-restored {
+    margin-top: -0.25rem;
+    margin-bottom: 1rem;
+    color: #065f46;
+    font-size: 0.9rem;
+}
+
+.archive-empty-state {
+    background-color: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.archive-role-cell {
+    text-transform: capitalize;
+}

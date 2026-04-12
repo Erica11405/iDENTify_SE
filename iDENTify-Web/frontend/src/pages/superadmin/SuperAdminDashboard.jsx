@@ -133,7 +133,7 @@ function SuperAdminDashboard() {
         <section className="settings-dashboard-container">
             <div className="settings-header-section">
                 <h2>Super Admin Dashboard</h2>
-                <p>Quick overview of users and weekly dentist appointment load.</p>
+                
             </div>
 
             {loading ? <p>Loading dashboard...</p> : null}

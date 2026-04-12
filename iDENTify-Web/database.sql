@@ -11,6 +11,20 @@ CREATE TABLE IF NOT EXISTS `dentists` (
   `schedule` JSON
 );
 
+CREATE TABLE IF NOT EXISTS `dentist_types` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL UNIQUE,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT IGNORE INTO `dentist_types` (`name`) VALUES
+('General Dentist'),
+('Orthodontist'),
+('Periodontist'),
+('Oral Surgeon'),
+('Pediatric Dentist'),
+('Endodontist');
+
 -- PATIENTS TABLE
 -- Stores global immutable data (Demographics, Medical Alerts)
 CREATE TABLE IF NOT EXISTS `patients` (

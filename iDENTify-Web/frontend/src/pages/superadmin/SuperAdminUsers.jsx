@@ -16,15 +16,6 @@ const DAYS = [
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const DENTIST_TYPE_OPTIONS = [
-    'General Dentist',
-    'Orthodontist',
-    'Periodontist',
-    'Oral Surgeon',
-    'Pediatric Dentist',
-    'Endodontist',
-];
-
 function normalizeText(value) {
     return String(value || '').trim();
 }
@@ -44,19 +35,18 @@ function fullName(firstName, middleName, lastName) {
         .join(' ');
 }
 
-function initialDentistForm() {
+function initialDentistForm(defaultSpecialization = 'General Dentist') {
     return {
         firstName: '',
         middleName: '',
         lastName: '',
         email: '',
         password: '',
-        specialization: 'General Dentist',
+        specialization: defaultSpecialization,
         phone: '',
         days: [1, 2, 3, 4, 5],
         operatingHours: { start: '09:00', end: '17:00' },
         lunch: { start: '12:00', end: '13:00' },
-        breaks: [],
         leaveDays: [],
     };
 }
@@ -129,26 +119,32 @@ function SuperAdminUsers() {
     const [savingAide, setSavingAide] = useState(false);
     const [editingDentist, setEditingDentist] = useState(null);
     const [editingAideId, setEditingAideId] = useState(null);
+    const [dentistTypeOptions, setDentistTypeOptions] = useState(['General Dentist']);
 
     const [dentistForm, setDentistForm] = useState(initialDentistForm);
     const [aideForm, setAideForm] = useState(initialAideForm);
-    const [breakDraft, setBreakDraft] = useState({ start: '', end: '' });
     const [leaveDraft, setLeaveDraft] = useState('');
 
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [staffList, usersList] = await Promise.all([
+            const [staffList, usersList, typeList] = await Promise.all([
                 api.getDentists(),
                 api.getAdminUsers({ role: 'all', archived: 'all' }),
+                api.getDentistTypes().catch(() => []),
             ]);
 
             const dentistsOnly = (staffList || []).filter((staff) => !isAide(staff));
             const aidesOnly = (staffList || []).filter((staff) => isAide(staff));
+            const loadedTypes = (typeList || [])
+                .map((entry) => normalizeText(entry?.name))
+                .filter(Boolean);
+            const nextTypeOptions = loadedTypes.length > 0 ? loadedTypes : ['General Dentist'];
 
             setDentists(dentistsOnly);
             setAides(aidesOnly);
             setUsers(usersList || []);
+            setDentistTypeOptions(nextTypeOptions);
         } catch (error) {
             toast.error(error.message || 'Failed to load users.');
         } finally {
@@ -184,6 +180,23 @@ function SuperAdminUsers() {
         };
     }, [users]);
 
+    useEffect(() => {
+        if (!dentistTypeOptions.length) {
+            return;
+        }
+
+        setDentistForm((prev) => {
+            if (dentistTypeOptions.includes(prev.specialization)) {
+                return prev;
+            }
+
+            return {
+                ...prev,
+                specialization: dentistTypeOptions[0],
+            };
+        });
+    }, [dentistTypeOptions]);
+
     const toggleWorkingDay = (dayValue) => {
         setDentistForm((prev) => {
             const currentDays = Array.isArray(prev.days) ? prev.days : [];
@@ -202,23 +215,6 @@ function SuperAdminUsers() {
                 ...prev[section],
                 [field]: value,
             },
-        }));
-    };
-
-    const addBreak = () => {
-        if (!breakDraft.start || !breakDraft.end) return;
-
-        setDentistForm((prev) => ({
-            ...prev,
-            breaks: [...(prev.breaks || []), { label: 'Break', start: breakDraft.start, end: breakDraft.end }],
-        }));
-        setBreakDraft({ start: '', end: '' });
-    };
-
-    const removeBreak = (index) => {
-        setDentistForm((prev) => ({
-            ...prev,
-            breaks: (prev.breaks || []).filter((_, i) => i !== index),
         }));
     };
 
@@ -272,13 +268,11 @@ function SuperAdminUsers() {
                 days: dentistForm.days,
                 operatingHours: dentistForm.operatingHours,
                 lunch: dentistForm.lunch,
-                breaks: dentistForm.breaks,
                 leaveDays: dentistForm.leaveDays,
             });
 
             toast.success('Dentist added successfully.');
-            setDentistForm(initialDentistForm());
-            setBreakDraft({ start: '', end: '' });
+            setDentistForm(initialDentistForm(dentistTypeOptions[0] || 'General Dentist'));
             setLeaveDraft('');
             await loadData();
         } catch (error) {
@@ -395,7 +389,6 @@ function SuperAdminUsers() {
         <section className="settings-dashboard-container">
             <div className="settings-header-section">
                 <h2>User Management</h2>
-                <p>Manage dentist and dental aide accounts in one place.</p>
             </div>
 
             <div className="superadmin-stats-grid" style={{ marginBottom: '1.25rem' }}>
@@ -460,7 +453,7 @@ function SuperAdminUsers() {
                                     <div className="form-group">
                                         <label>Type of Dentist *</label>
                                         <select value={dentistForm.specialization} onChange={(e) => setDentistForm((prev) => ({ ...prev, specialization: e.target.value }))}>
-                                            {DENTIST_TYPE_OPTIONS.map((option) => (
+                                            {dentistTypeOptions.map((option) => (
                                                 <option key={option} value={option}>{option}</option>
                                             ))}
                                         </select>
@@ -509,27 +502,7 @@ function SuperAdminUsers() {
                                 </div>
 
                                 <div className="form-row">
-                                    <div className="form-group" style={{ flex: 1 }}>
-                                        <label>Additional Breaks</label>
-                                        <div className="chips-container">
-                                            {(dentistForm.breaks || []).map((entry, index) => (
-                                                <div className="chip" key={`${entry.start}-${entry.end}-${index}`}>
-                                                    {entry.start} - {entry.end}
-                                                    <button type="button" onClick={() => removeBreak(index)}>&times;</button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="add-row">
-                                            <input type="time" value={breakDraft.start} onChange={(e) => setBreakDraft((prev) => ({ ...prev, start: e.target.value }))} />
-                                            <span>-</span>
-                                            <input type="time" value={breakDraft.end} onChange={(e) => setBreakDraft((prev) => ({ ...prev, end: e.target.value }))} />
-                                            <button type="button" className="btn-small-add" onClick={addBreak}>Add</button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="form-row">
-                                    <div className="form-group" style={{ flex: 1 }}>
+                                    <div className="form-group">
                                         <label>Leave Days</label>
                                         <div className="chips-container">
                                             {(dentistForm.leaveDays || []).map((dateValue) => (
@@ -720,6 +693,7 @@ function SuperAdminUsers() {
             {editingDentist ? (
                 <EditDentistModal
                     dentist={editingDentist}
+                    dentistTypeOptions={dentistTypeOptions}
                     onClose={() => setEditingDentist(null)}
                     onSuccess={async () => {
                         setEditingDentist(null);

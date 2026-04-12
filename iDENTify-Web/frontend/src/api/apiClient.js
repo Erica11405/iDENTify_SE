@@ -645,6 +645,35 @@ export const deleteClinicMedication = async (id) => {
     return handleResponse(res);
 };
 
+/* --- Dentist Types Master List --- */
+export const getDentistTypes = async () => {
+    const res = await fetch(`${API_BASE}/dentist-types`);
+    return handleResponse(res);
+};
+
+export const createDentistType = async (payload) => {
+    const res = await fetch(`${API_BASE}/dentist-types`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const updateDentistType = async (id, payload) => {
+    const res = await fetch(`${API_BASE}/dentist-types/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const deleteDentistType = async (id) => {
+    const res = await fetch(`${API_BASE}/dentist-types/${id}`, { method: 'DELETE' });
+    return handleResponse(res);
+};
+
 /* --- Clinical Records (Charting) --- */
 export const getAnnualRecord = async (patientId, year) => {
     const res = await fetch(`${API_BASE}/annual-records/${patientId}/${year}`);
@@ -722,6 +751,7 @@ const api = {
     getReports, getDentistPatientsForReport, getDentistReportSummary, get,
     getServices, createService, updateService, deleteService,
     getClinicMedications, createClinicMedication, updateClinicMedication, deleteClinicMedication,
+    getDentistTypes, createDentistType, updateDentistType, deleteDentistType,
     getAnnualRecord, saveAnnualRecord, getToothConditions, upsertToothCondition,
     getTreatmentTimeline, addTreatmentTimelineEntry, getMedications, addMedication, deleteMedication
 };

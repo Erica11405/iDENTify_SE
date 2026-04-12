@@ -156,6 +156,7 @@ const authRoutes = require("./routes/auth");
 const adminUsersRoutes = require("./routes/admin_users");
 const servicesRoutes = require("./routes/services"); 
 const clinicMedicationsRoutes = require("./routes/clinic_medications"); 
+const dentistTypesRoutes = require("./routes/dentist_types");
 
 const app = express();
 
@@ -191,6 +192,7 @@ apiRouter.use("/auth", authRoutes);
 apiRouter.use("/patients", patientsRoutes);
 apiRouter.use("/services", servicesRoutes);
 apiRouter.use("/clinic-medications", clinicMedicationsRoutes);
+apiRouter.use("/dentist-types", dentistTypesRoutes);
 apiRouter.use("/annual-records", annualRecordsRoutes);
 apiRouter.use("/appointments", appointmentsRoutes);
 apiRouter.use("/queue", queueRoutes);

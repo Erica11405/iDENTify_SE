@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import '../styles/components/EditDentistModal.css'; 
 import api from '../api/apiClient';
 import toast from 'react-hot-toast';
@@ -8,8 +8,18 @@ const DAYS = [
   { label: "W", value: 3 }, { label: "TH", value: 4 }, { label: "F", value: 5 }, { label: "S", value: 6 },
 ];
 
-const EditDentistModal = ({ dentist, onClose, onSuccess }) => {
+const FALLBACK_DENTIST_TYPES = [
+  'General Dentist',
+  'Orthodontist',
+  'Periodontist',
+  'Oral Surgeon',
+  'Pediatric Dentist',
+  'Endodontist',
+];
+
+const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
+  const [leaveDraft, setLeaveDraft] = useState('');
   
   // Pre-fill the form with the dentist's existing data
   const [formData, setFormData] = useState({
@@ -27,6 +37,18 @@ const EditDentistModal = ({ dentist, onClose, onSuccess }) => {
     status: dentist?.status || "Available"
   });
 
+  const specializationOptions = useMemo(() => {
+    const base = (Array.isArray(dentistTypeOptions) && dentistTypeOptions.length > 0)
+      ? dentistTypeOptions
+      : FALLBACK_DENTIST_TYPES;
+
+    if (formData.specialization && !base.includes(formData.specialization)) {
+      return [formData.specialization, ...base];
+    }
+
+    return base;
+  }, [dentistTypeOptions, formData.specialization]);
+
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const toggleWorkingDay = (dayValue) => {
@@ -39,6 +61,28 @@ const EditDentistModal = ({ dentist, onClose, onSuccess }) => {
 
   const handleTimeChange = (section, field, value) => {
     setFormData(prev => ({ ...prev, [section]: { ...prev[section], [field]: value } }));
+  };
+
+  const addLeaveDay = () => {
+    if (!leaveDraft) return;
+
+    setFormData((prev) => {
+      const nextLeaveDays = prev.leaveDays || [];
+      if (nextLeaveDays.includes(leaveDraft)) return prev;
+      return {
+        ...prev,
+        leaveDays: [...nextLeaveDays, leaveDraft],
+      };
+    });
+
+    setLeaveDraft('');
+  };
+
+  const removeLeaveDay = (dateValue) => {
+    setFormData((prev) => ({
+      ...prev,
+      leaveDays: (prev.leaveDays || []).filter((value) => value !== dateValue),
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -91,12 +135,9 @@ const EditDentistModal = ({ dentist, onClose, onSuccess }) => {
                 <label>Specialization</label>
                 <select name="specialization" value={formData.specialization} onChange={handleChange} required>
                   <option value="">Select Specialization</option>
-                  <option value="General Dentist">General Dentist</option>
-                  <option value="Orthodontist">Orthodontist</option>
-                  <option value="Periodontist">Periodontist</option>
-                  <option value="Oral Surgeon">Oral Surgeon</option>
-                  <option value="Pediatric Dentist">Pediatric Dentist</option>
-                  <option value="Endodontist">Endodontist</option>
+                  {specializationOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
                 </select>
               </div>
               <div className="form-group">
@@ -147,6 +188,24 @@ const EditDentistModal = ({ dentist, onClose, onSuccess }) => {
                   <input type="time" value={formData.lunch.start} onChange={(e) => handleTimeChange('lunch', 'start', e.target.value)} />
                   <span>to</span>
                   <input type="time" value={formData.lunch.end} onChange={(e) => handleTimeChange('lunch', 'end', e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Leave Days</label>
+                <div className="chips-container">
+                  {(formData.leaveDays || []).map((dateValue) => (
+                    <div className="chip red-chip" key={dateValue}>
+                      {dateValue}
+                      <button type="button" onClick={() => removeLeaveDay(dateValue)}>&times;</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="add-row">
+                  <input type="date" value={leaveDraft} onChange={(e) => setLeaveDraft(e.target.value)} />
+                  <button type="button" className="btn-small-add" onClick={addLeaveDay}>Add</button>
                 </div>
               </div>
             </div>
