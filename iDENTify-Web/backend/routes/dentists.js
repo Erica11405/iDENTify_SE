@@ -149,6 +149,30 @@ const bcrypt = require('bcrypt');
 // Helper to convert undefined to null to prevent MySQL crashes
 const safeVal = (val) => val === undefined ? null : val;
 
+let hasMiddleNameColumnCache = null;
+
+async function hasMiddleNameColumn() {
+  if (hasMiddleNameColumnCache !== null) {
+    return hasMiddleNameColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM dentists LIKE 'middle_name'");
+    hasMiddleNameColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasMiddleNameColumnCache = false;
+  }
+
+  return hasMiddleNameColumnCache;
+}
+
+function composeStaffName(firstName, middleName, lastName) {
+  return [firstName, middleName, lastName]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(' ') || 'Unnamed Staff';
+}
+
 // GET ALL DENTISTS / STAFF (Updated with filtering)
 router.get('/', async (req, res) => {
   try {
@@ -170,7 +194,7 @@ router.get('/', async (req, res) => {
       lunch: typeof d.lunch === 'string' ? JSON.parse(d.lunch) : (d.lunch || { start: '', end: '' }),
       breaks: typeof d.breaks === 'string' ? JSON.parse(d.breaks) : (d.breaks || []),
       leaveDays: typeof d.leave_days === 'string' ? JSON.parse(d.leave_days) : (d.leave_days || []),
-      name: d.name || `${d.first_name || ''} ${d.last_name || ''}`.trim()
+      name: d.name || composeStaffName(d.first_name, d.middle_name, d.last_name)
     }));
     res.json(formattedDentists);
   } catch (err) {
@@ -181,10 +205,11 @@ router.get('/', async (req, res) => {
 
 // ADD NEW DENTIST OR AIDE (AND CREATE LOGIN ACCOUNT)
 router.post('/', async (req, res) => {
-  const { first_name, last_name, specialization, phone, email, days, operatingHours, lunch, breaks, leaveDays, status, password, role } = req.body;
+  const { first_name, middle_name, last_name, specialization, phone, email, days, operatingHours, lunch, breaks, leaveDays, status, password, role } = req.body;
   
   try {
-    const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'Unnamed Staff';
+    const fullName = composeStaffName(first_name, middle_name, last_name);
+    const supportsMiddleName = await hasMiddleNameColumn();
     
     if (email) {
        const [existingUser] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
@@ -193,21 +218,40 @@ router.post('/', async (req, res) => {
        }
     }
 
-    const sql = `INSERT INTO dentists (first_name, last_name, name, specialization, phone, email, schedule_days, operating_hours, lunch, breaks, leave_days, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    const values = [
-      safeVal(first_name), 
-      safeVal(last_name), 
-      fullName, 
-      safeVal(specialization), 
-      safeVal(phone), 
-      safeVal(email), 
-      JSON.stringify(days || []), 
-      JSON.stringify(operatingHours || {}), 
-      JSON.stringify(lunch || {}), 
-      JSON.stringify(breaks || []), 
-      JSON.stringify(leaveDays || []), 
-      status || 'Available'
-    ];
+    const sql = supportsMiddleName
+      ? `INSERT INTO dentists (first_name, middle_name, last_name, name, specialization, phone, email, schedule_days, operating_hours, lunch, breaks, leave_days, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      : `INSERT INTO dentists (first_name, last_name, name, specialization, phone, email, schedule_days, operating_hours, lunch, breaks, leave_days, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    const values = supportsMiddleName
+      ? [
+          safeVal(first_name),
+          safeVal(middle_name),
+          safeVal(last_name),
+          fullName,
+          safeVal(specialization),
+          safeVal(phone),
+          safeVal(email),
+          JSON.stringify(days || []),
+          JSON.stringify(operatingHours || {}),
+          JSON.stringify(lunch || {}),
+          JSON.stringify(breaks || []),
+          JSON.stringify(leaveDays || []),
+          status || 'Available',
+        ]
+      : [
+          safeVal(first_name),
+          safeVal(last_name),
+          fullName,
+          safeVal(specialization),
+          safeVal(phone),
+          safeVal(email),
+          JSON.stringify(days || []),
+          JSON.stringify(operatingHours || {}),
+          JSON.stringify(lunch || {}),
+          JSON.stringify(breaks || []),
+          JSON.stringify(leaveDays || []),
+          status || 'Available',
+        ];
     
     const [result] = await db.query(sql, values);
     const newStaffId = result.insertId;
@@ -238,12 +282,18 @@ router.post('/', async (req, res) => {
 // UPDATE DENTIST / STAFF
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { first_name, last_name, specialization, phone, email, days, operatingHours, lunch, breaks, leaveDays, status } = req.body;
+  const { first_name, middle_name, last_name, specialization, phone, email, days, operatingHours, lunch, breaks, leaveDays, status } = req.body;
   try {
-    const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'Unnamed Staff';
-    
-    const sql = `UPDATE dentists SET first_name = ?, last_name = ?, name = ?, specialization = ?, phone = ?, email = ?, schedule_days = ?, operating_hours = ?, lunch = ?, breaks = ?, leave_days = ?, status = ? WHERE id = ?`;
-    const values = [safeVal(first_name), safeVal(last_name), fullName, safeVal(specialization), safeVal(phone), safeVal(email), JSON.stringify(days || []), JSON.stringify(operatingHours || {}), JSON.stringify(lunch || {}), JSON.stringify(breaks || []), JSON.stringify(leaveDays || []), status || 'Available', id];
+    const fullName = composeStaffName(first_name, middle_name, last_name);
+    const supportsMiddleName = await hasMiddleNameColumn();
+
+    const sql = supportsMiddleName
+      ? `UPDATE dentists SET first_name = ?, middle_name = ?, last_name = ?, name = ?, specialization = ?, phone = ?, email = ?, schedule_days = ?, operating_hours = ?, lunch = ?, breaks = ?, leave_days = ?, status = ? WHERE id = ?`
+      : `UPDATE dentists SET first_name = ?, last_name = ?, name = ?, specialization = ?, phone = ?, email = ?, schedule_days = ?, operating_hours = ?, lunch = ?, breaks = ?, leave_days = ?, status = ? WHERE id = ?`;
+
+    const values = supportsMiddleName
+      ? [safeVal(first_name), safeVal(middle_name), safeVal(last_name), fullName, safeVal(specialization), safeVal(phone), safeVal(email), JSON.stringify(days || []), JSON.stringify(operatingHours || {}), JSON.stringify(lunch || {}), JSON.stringify(breaks || []), JSON.stringify(leaveDays || []), status || 'Available', id]
+      : [safeVal(first_name), safeVal(last_name), fullName, safeVal(specialization), safeVal(phone), safeVal(email), JSON.stringify(days || []), JSON.stringify(operatingHours || {}), JSON.stringify(lunch || {}), JSON.stringify(breaks || []), JSON.stringify(leaveDays || []), status || 'Available', id];
     
     const [result] = await db.query(sql, values);
     if (result.affectedRows === 0) return res.status(404).json({ message: 'Staff member not found' });

@@ -257,3 +257,164 @@
 .btn-delete:hover {
     background-color: #fee2e2;
 }
+
+.superadmin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+.superadmin-stat-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.superadmin-stat-card.compact {
+    padding: 0.65rem 0.8rem;
+}
+
+.superadmin-stat-card p {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.8rem;
+}
+
+.superadmin-stat-card h4 {
+    margin: 0.3rem 0 0 0;
+    font-size: 1.3rem;
+    color: #0f172a;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-pill.active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-pill.archived {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.settings-inline-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 0.85rem;
+}
+
+.btn-primary-action {
+    padding: 0.65rem 1rem;
+    background: var(--primary-color, #1B93D5);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-primary-action:disabled {
+    opacity: 0.75;
+    cursor: not-allowed;
+}
+
+.btn-secondary-action {
+    padding: 0.65rem 1rem;
+    background: #e2e8f0;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.days-selector {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.day-toggle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.day-toggle.active {
+    background: var(--primary-color, #1B93D5);
+    color: #fff;
+    border-color: var(--primary-color, #1B93D5);
+}
+
+.time-range,
+.add-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.time-range span,
+.add-row span {
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-height: 24px;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 0.8rem;
+}
+
+.chip.red-chip {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.chip button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-weight: 700;
+    padding: 0;
+    line-height: 1;
+}
+
+.btn-small-add {
+    padding: 0.4rem 0.75rem;
+    background: #0ea5e9;
+    border: none;
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}

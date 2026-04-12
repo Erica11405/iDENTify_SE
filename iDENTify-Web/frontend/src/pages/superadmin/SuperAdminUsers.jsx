@@ -1,76 +1,178 @@
-import React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../api/apiClient';
+import EditDentistModal from '../../components/EditDentistModal';
+import '../../styles/pages/dentist/DentistSettings.css';
 
-const ROLE_OPTIONS = [
-    { value: 'all', label: 'All Roles' },
-    { value: 'dentist', label: 'Dentists' },
-    { value: 'aide', label: 'Dental Aides' },
+const DAYS = [
+    { label: 'S', value: 0 },
+    { label: 'M', value: 1 },
+    { label: 'T', value: 2 },
+    { label: 'W', value: 3 },
+    { label: 'TH', value: 4 },
+    { label: 'F', value: 5 },
+    { label: 'S', value: 6 },
 ];
 
-const ARCHIVE_OPTIONS = [
-    { value: 'active', label: 'Active' },
-    { value: 'archived', label: 'Archived' },
-    { value: 'all', label: 'All' },
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const DENTIST_TYPE_OPTIONS = [
+    'General Dentist',
+    'Orthodontist',
+    'Periodontist',
+    'Oral Surgeon',
+    'Pediatric Dentist',
+    'Endodontist',
 ];
 
-function normalizeRole(role) {
-    return String(role || '').trim().toLowerCase();
+function normalizeText(value) {
+    return String(value || '').trim();
 }
 
 function isArchived(user) {
     return Number(user?.is_archived || 0) === 1;
 }
 
+function isAide(staff) {
+    return normalizeText(staff?.specialization).toLowerCase() === 'dental aide';
+}
+
+function fullName(firstName, middleName, lastName) {
+    return [firstName, middleName, lastName]
+        .map((part) => normalizeText(part))
+        .filter(Boolean)
+        .join(' ');
+}
+
+function initialDentistForm() {
+    return {
+        firstName: '',
+        middleName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        specialization: 'General Dentist',
+        phone: '',
+        days: [1, 2, 3, 4, 5],
+        operatingHours: { start: '09:00', end: '17:00' },
+        lunch: { start: '12:00', end: '13:00' },
+        breaks: [],
+        leaveDays: [],
+    };
+}
+
+function initialAideForm() {
+    return {
+        firstName: '',
+        middleName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        contactNumber: '',
+    };
+}
+
+function parseStaffName(staff) {
+    const sourceName = normalizeText(staff?.name);
+    const sourceFirst = normalizeText(staff?.first_name);
+    const sourceLast = normalizeText(staff?.last_name);
+    const sourceMiddle = normalizeText(staff?.middle_name);
+
+    if (sourceFirst || sourceLast || sourceMiddle) {
+        return {
+            firstName: sourceFirst,
+            middleName: sourceMiddle,
+            lastName: sourceLast,
+        };
+    }
+
+    const parts = sourceName ? sourceName.split(/\s+/) : [];
+    if (parts.length === 0) {
+        return { firstName: '', middleName: '', lastName: '' };
+    }
+
+    if (parts.length === 1) {
+        return { firstName: parts[0], middleName: '', lastName: '' };
+    }
+
+    return {
+        firstName: parts[0],
+        middleName: parts.length > 2 ? parts.slice(1, -1).join(' ') : '',
+        lastName: parts[parts.length - 1],
+    };
+}
+
+function formatScheduleSummary(staff) {
+    const days = Array.isArray(staff?.days)
+        ? staff.days
+              .filter((value) => Number.isFinite(Number(value)))
+              .map((value) => DAY_LABELS[Number(value)] || '')
+              .filter(Boolean)
+        : [];
+    const dayText = days.length ? days.join(', ') : 'No days set';
+
+    const start = normalizeText(staff?.operatingHours?.start);
+    const end = normalizeText(staff?.operatingHours?.end);
+    const hoursText = start && end ? `${start} - ${end}` : 'Hours not set';
+
+    return `${dayText} | ${hoursText}`;
+}
+
 function SuperAdminUsers() {
+    const [activeTab, setActiveTab] = useState('dentists');
+    const [dentists, setDentists] = useState([]);
+    const [aides, setAides] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [busyId, setBusyId] = useState(null);
-    const [roleFilter, setRoleFilter] = useState('all');
-    const [archiveFilter, setArchiveFilter] = useState('active');
-    const [search, setSearch] = useState('');
-    const [lastAction, setLastAction] = useState('');
+    const [savingDentist, setSavingDentist] = useState(false);
+    const [savingAide, setSavingAide] = useState(false);
+    const [editingDentist, setEditingDentist] = useState(null);
+    const [editingAideId, setEditingAideId] = useState(null);
 
-    const archivedApiFilter = archiveFilter === 'all' ? 'all' : archiveFilter === 'archived' ? 'true' : 'false';
+    const [dentistForm, setDentistForm] = useState(initialDentistForm);
+    const [aideForm, setAideForm] = useState(initialAideForm);
+    const [breakDraft, setBreakDraft] = useState({ start: '', end: '' });
+    const [leaveDraft, setLeaveDraft] = useState('');
 
-    const loadUsers = useCallback(async () => {
+    const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await api.getAdminUsers({ role: roleFilter, archived: archivedApiFilter });
-            setUsers(data || []);
+            const [staffList, usersList] = await Promise.all([
+                api.getDentists(),
+                api.getAdminUsers({ role: 'all', archived: 'all' }),
+            ]);
+
+            const dentistsOnly = (staffList || []).filter((staff) => !isAide(staff));
+            const aidesOnly = (staffList || []).filter((staff) => isAide(staff));
+
+            setDentists(dentistsOnly);
+            setAides(aidesOnly);
+            setUsers(usersList || []);
         } catch (error) {
             toast.error(error.message || 'Failed to load users.');
         } finally {
             setLoading(false);
         }
-    }, [roleFilter, archivedApiFilter]);
+    }, []);
 
     useEffect(() => {
-        loadUsers();
-    }, [loadUsers]);
+        loadData();
+    }, [loadData]);
 
-    const filteredUsers = useMemo(() => {
-        const needle = search.trim().toLowerCase();
-        const searched = !needle
-            ? users
-            : users.filter((user) => {
-                return (
-                    String(user.full_name || '').toLowerCase().includes(needle) ||
-                    String(user.email || '').toLowerCase().includes(needle)
-                );
-            });
-
-        return [...searched].sort((a, b) => {
-            const aName = String(a.full_name || a.email || '').toLowerCase();
-            const bName = String(b.full_name || b.email || '').toLowerCase();
-            return aName.localeCompare(bName);
+    const userByDentistId = useMemo(() => {
+        const lookup = new Map();
+        users.forEach((user) => {
+            if (user?.dentist_id) {
+                lookup.set(String(user.dentist_id), user);
+            }
         });
-    }, [users, search]);
+        return lookup;
+    }, [users]);
 
     const summary = useMemo(() => {
-        const dentistCount = users.filter((u) => normalizeRole(u.role) === 'dentist').length;
-        const aideCount = users.filter((u) => normalizeRole(u.role) === 'aide').length;
+        const dentistCount = users.filter((u) => normalizeText(u.role).toLowerCase() === 'dentist').length;
+        const aideCount = users.filter((u) => normalizeText(u.role).toLowerCase() === 'aide').length;
         const activeCount = users.filter((u) => !isArchived(u)).length;
         const archivedCount = users.filter((u) => isArchived(u)).length;
         return {
@@ -82,15 +184,187 @@ function SuperAdminUsers() {
         };
     }, [users]);
 
-    const handleResetFilters = () => {
-        setRoleFilter('all');
-        setArchiveFilter('active');
-        setSearch('');
+    const toggleWorkingDay = (dayValue) => {
+        setDentistForm((prev) => {
+            const currentDays = Array.isArray(prev.days) ? prev.days : [];
+            const nextDays = currentDays.includes(dayValue)
+                ? currentDays.filter((item) => item !== dayValue)
+                : [...currentDays, dayValue].sort((a, b) => a - b);
+
+            return { ...prev, days: nextDays };
+        });
     };
 
-    const handleArchiveToggle = async (user) => {
-        const willRestore = isArchived(user);
-        const targetName = user.full_name || user.email || 'this user';
+    const updateDentistTime = (section, field, value) => {
+        setDentistForm((prev) => ({
+            ...prev,
+            [section]: {
+                ...prev[section],
+                [field]: value,
+            },
+        }));
+    };
+
+    const addBreak = () => {
+        if (!breakDraft.start || !breakDraft.end) return;
+
+        setDentistForm((prev) => ({
+            ...prev,
+            breaks: [...(prev.breaks || []), { label: 'Break', start: breakDraft.start, end: breakDraft.end }],
+        }));
+        setBreakDraft({ start: '', end: '' });
+    };
+
+    const removeBreak = (index) => {
+        setDentistForm((prev) => ({
+            ...prev,
+            breaks: (prev.breaks || []).filter((_, i) => i !== index),
+        }));
+    };
+
+    const addLeaveDay = () => {
+        if (!leaveDraft) return;
+
+        setDentistForm((prev) => {
+            const nextLeaveDays = prev.leaveDays || [];
+            if (nextLeaveDays.includes(leaveDraft)) return prev;
+            return {
+                ...prev,
+                leaveDays: [...nextLeaveDays, leaveDraft],
+            };
+        });
+        setLeaveDraft('');
+    };
+
+    const removeLeaveDay = (dateValue) => {
+        setDentistForm((prev) => ({
+            ...prev,
+            leaveDays: (prev.leaveDays || []).filter((value) => value !== dateValue),
+        }));
+    };
+
+    const handleCreateDentist = async (event) => {
+        event.preventDefault();
+
+        if (!dentistForm.firstName || !dentistForm.lastName || !dentistForm.email || !dentistForm.password || !dentistForm.specialization) {
+            toast.error('First name, last name, email, password, and dentist type are required.');
+            return;
+        }
+
+        if (!Array.isArray(dentistForm.days) || dentistForm.days.length === 0) {
+            toast.error('Please select at least one working day.');
+            return;
+        }
+
+        setSavingDentist(true);
+        try {
+            await api.createDentist({
+                first_name: normalizeText(dentistForm.firstName),
+                middle_name: normalizeText(dentistForm.middleName),
+                last_name: normalizeText(dentistForm.lastName),
+                name: fullName(dentistForm.firstName, dentistForm.middleName, dentistForm.lastName),
+                specialization: dentistForm.specialization,
+                email: normalizeText(dentistForm.email),
+                password: dentistForm.password,
+                phone: normalizeText(dentistForm.phone),
+                role: 'dentist',
+                status: 'Available',
+                days: dentistForm.days,
+                operatingHours: dentistForm.operatingHours,
+                lunch: dentistForm.lunch,
+                breaks: dentistForm.breaks,
+                leaveDays: dentistForm.leaveDays,
+            });
+
+            toast.success('Dentist added successfully.');
+            setDentistForm(initialDentistForm());
+            setBreakDraft({ start: '', end: '' });
+            setLeaveDraft('');
+            await loadData();
+        } catch (error) {
+            toast.error(error.message || 'Failed to add dentist.');
+        } finally {
+            setSavingDentist(false);
+        }
+    };
+
+    const handleEditAide = (aide) => {
+        const nameParts = parseStaffName(aide);
+        setEditingAideId(aide.id);
+        setAideForm({
+            firstName: nameParts.firstName,
+            middleName: nameParts.middleName,
+            lastName: nameParts.lastName,
+            email: normalizeText(aide.email),
+            password: '',
+            contactNumber: normalizeText(aide.phone),
+        });
+    };
+
+    const resetAideForm = () => {
+        setEditingAideId(null);
+        setAideForm(initialAideForm());
+    };
+
+    const handleSaveAide = async (event) => {
+        event.preventDefault();
+
+        if (!aideForm.firstName || !aideForm.lastName || !aideForm.email || !aideForm.contactNumber) {
+            toast.error('First name, last name, email, and contact number are required.');
+            return;
+        }
+
+        if (!editingAideId && !aideForm.password) {
+            toast.error('Password is required for new dental aide accounts.');
+            return;
+        }
+
+        setSavingAide(true);
+        try {
+            const selectedAide = aides.find((item) => item.id === editingAideId);
+            const payload = {
+                first_name: normalizeText(aideForm.firstName),
+                middle_name: normalizeText(aideForm.middleName),
+                last_name: normalizeText(aideForm.lastName),
+                name: fullName(aideForm.firstName, aideForm.middleName, aideForm.lastName),
+                email: normalizeText(aideForm.email),
+                phone: normalizeText(aideForm.contactNumber),
+                specialization: 'Dental Aide',
+                role: 'aide',
+                status: selectedAide?.status || 'Available',
+                days: selectedAide?.days || [],
+                operatingHours: selectedAide?.operatingHours || { start: '09:00', end: '17:00' },
+                lunch: selectedAide?.lunch || { start: '12:00', end: '13:00' },
+                breaks: selectedAide?.breaks || [],
+                leaveDays: selectedAide?.leaveDays || [],
+            };
+
+            if (editingAideId) {
+                await api.updateDentist(editingAideId, payload);
+                toast.success('Dental aide updated successfully.');
+            } else {
+                await api.createDentist({ ...payload, password: aideForm.password });
+                toast.success('Dental aide added successfully.');
+            }
+
+            resetAideForm();
+            await loadData();
+        } catch (error) {
+            toast.error(error.message || 'Failed to save dental aide.');
+        } finally {
+            setSavingAide(false);
+        }
+    };
+
+    const handleArchiveToggle = async (staff) => {
+        const linkedUser = userByDentistId.get(String(staff.id));
+        if (!linkedUser) {
+            toast.error('No linked login account found for this staff member.');
+            return;
+        }
+
+        const willRestore = isArchived(linkedUser);
+        const targetName = staff.name || linkedUser.full_name || linkedUser.email || 'this user';
         const confirmText = willRestore
             ? `Restore ${targetName}?`
             : `Archive ${targetName}? This account will not be able to login until restored.`;
@@ -99,19 +373,17 @@ function SuperAdminUsers() {
             return;
         }
 
-        setBusyId(user.id);
+        setBusyId(staff.id);
         try {
             if (willRestore) {
-                await api.restoreAdminUser(user.id);
+                await api.restoreAdminUser(linkedUser.id);
                 toast.success('User restored successfully.');
-                setLastAction(`Restored ${targetName}`);
             } else {
-                await api.archiveAdminUser(user.id);
+                await api.archiveAdminUser(linkedUser.id);
                 toast.success('User archived successfully.');
-                setLastAction(`Archived ${targetName}`);
             }
 
-            await loadUsers();
+            await loadData();
         } catch (error) {
             toast.error(error.message || 'Failed to update user status.');
         } finally {
@@ -120,117 +392,341 @@ function SuperAdminUsers() {
     };
 
     return (
-        <section style={{ padding: '1.5rem' }}>
-            <h1>User Management</h1>
-            <p>Manage dentist and aide access, then archive or restore accounts as needed.</p>
+        <section className="settings-dashboard-container">
+            <div className="settings-header-section">
+                <h2>User Management</h2>
+                <p>Manage dentist and dental aide accounts in one place.</p>
+            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
-                <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Loaded Users</p>
-                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.total}</p>
+            <div className="superadmin-stats-grid" style={{ marginBottom: '1.25rem' }}>
+                <div className="superadmin-stat-card compact">
+                    <p>Loaded Users</p>
+                    <h4>{summary.total}</h4>
                 </div>
-                <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Active</p>
-                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.active}</p>
+                <div className="superadmin-stat-card compact">
+                    <p>Dentists</p>
+                    <h4>{summary.dentists}</h4>
                 </div>
-                <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Archived</p>
-                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.archived}</p>
+                <div className="superadmin-stat-card compact">
+                    <p>Dental Aides</p>
+                    <h4>{summary.aides}</h4>
                 </div>
-                <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Dentists / Aides</p>
-                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.1rem', fontWeight: 700 }}>{summary.dentists} / {summary.aides}</p>
+                <div className="superadmin-stat-card compact">
+                    <p>Active / Archived</p>
+                    <h4>{summary.active} / {summary.archived}</h4>
                 </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem', marginBottom: '1rem' }}>
-                <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
-                    {ROLE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                </select>
-
-                <select value={archiveFilter} onChange={(e) => setArchiveFilter(e.target.value)}>
-                    {ARCHIVE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                </select>
-
-                <input
-                    type="search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search by name or email"
-                    style={{ minWidth: '260px' }}
-                />
-
-                <button type="button" onClick={loadUsers} disabled={loading}>
-                    {loading ? 'Refreshing...' : 'Refresh'}
-                </button>
-
-                <button type="button" onClick={handleResetFilters} disabled={loading}>
-                    Reset
-                </button>
+            <div className="settings-tabs">
+                <button className={activeTab === 'dentists' ? 'active' : ''} onClick={() => setActiveTab('dentists')}>Dentists</button>
+                <button className={activeTab === 'aides' ? 'active' : ''} onClick={() => setActiveTab('aides')}>Dental Aides</button>
             </div>
 
-            <p style={{ marginTop: '-0.25rem', marginBottom: '1rem', color: '#475569', fontSize: '0.9rem' }}>
-                Showing {filteredUsers.length} result{filteredUsers.length === 1 ? '' : 's'}
-                {lastAction ? ` · Last action: ${lastAction}` : ''}
-            </p>
+            <div className="settings-tab-content">
+                {loading ? <p>Loading users...</p> : null}
 
-            {loading ? (
-                <p>Loading users...</p>
-            ) : filteredUsers.length === 0 ? (
-                <p>No users found for the selected filters.</p>
-            ) : (
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                            <tr>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #ddd' }}>Name</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #ddd' }}>Email</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #ddd' }}>Role</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #ddd' }}>Status</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem', borderBottom: '1px solid #ddd' }}>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredUsers.map((user) => {
-                                const archived = isArchived(user);
+                {!loading && activeTab === 'dentists' ? (
+                    <div className="animation-fade-in">
+                        <div className="settings-form-card">
+                            <h3>Add New Dentist</h3>
+                            <form onSubmit={handleCreateDentist}>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>First Name *</label>
+                                        <input type="text" value={dentistForm.firstName} onChange={(e) => setDentistForm((prev) => ({ ...prev, firstName: e.target.value }))} placeholder="Juan" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Middle Name (Optional)</label>
+                                        <input type="text" value={dentistForm.middleName} onChange={(e) => setDentistForm((prev) => ({ ...prev, middleName: e.target.value }))} placeholder="Dela" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Last Name *</label>
+                                        <input type="text" value={dentistForm.lastName} onChange={(e) => setDentistForm((prev) => ({ ...prev, lastName: e.target.value }))} placeholder="Cruz" />
+                                    </div>
+                                </div>
 
-                                return (
-                                    <tr key={user.id}>
-                                        <td style={{ padding: '0.5rem', borderBottom: '1px solid #f0f0f0' }}>{user.full_name || '-'}</td>
-                                        <td style={{ padding: '0.5rem', borderBottom: '1px solid #f0f0f0' }}>{user.email}</td>
-                                        <td style={{ padding: '0.5rem', borderBottom: '1px solid #f0f0f0', textTransform: 'capitalize' }}>{user.role}</td>
-                                        <td style={{ padding: '0.5rem', borderBottom: '1px solid #f0f0f0' }}>
-                                            <span style={{
-                                                display: 'inline-block',
-                                                padding: '0.2rem 0.5rem',
-                                                borderRadius: '999px',
-                                                fontSize: '0.8rem',
-                                                background: archived ? '#fee2e2' : '#dcfce7',
-                                                color: archived ? '#991b1b' : '#166534',
-                                            }}>
-                                                {archived ? 'Archived' : 'Active'}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '0.5rem', borderBottom: '1px solid #f0f0f0' }}>
-                                            <button
-                                                type="button"
-                                                disabled={busyId === user.id}
-                                                onClick={() => handleArchiveToggle(user)}
-                                            >
-                                                {busyId === user.id ? 'Saving...' : archived ? 'Restore' : 'Archive'}
-                                            </button>
-                                        </td>
+                                <div className="form-row">
+                                    <div className="form-group flex-2">
+                                        <label>Email Address *</label>
+                                        <input type="email" value={dentistForm.email} onChange={(e) => setDentistForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="dentist@clinic.com" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Password *</label>
+                                        <input type="password" value={dentistForm.password} onChange={(e) => setDentistForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="At least 8 characters" />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Type of Dentist *</label>
+                                        <select value={dentistForm.specialization} onChange={(e) => setDentistForm((prev) => ({ ...prev, specialization: e.target.value }))}>
+                                            {DENTIST_TYPE_OPTIONS.map((option) => (
+                                                <option key={option} value={option}>{option}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Contact Number</label>
+                                        <input type="text" value={dentistForm.phone} onChange={(e) => setDentistForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="09xxxxxxxxx" />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group" style={{ flex: 1 }}>
+                                        <label>Dentist Schedule *</label>
+                                        <div className="days-selector">
+                                            {DAYS.map((day) => (
+                                                <button
+                                                    key={day.value}
+                                                    type="button"
+                                                    className={`day-toggle ${dentistForm.days.includes(day.value) ? 'active' : ''}`}
+                                                    onClick={() => toggleWorkingDay(day.value)}
+                                                >
+                                                    {day.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Operating Hours</label>
+                                        <div className="time-range">
+                                            <input type="time" value={dentistForm.operatingHours.start} onChange={(e) => updateDentistTime('operatingHours', 'start', e.target.value)} />
+                                            <span>to</span>
+                                            <input type="time" value={dentistForm.operatingHours.end} onChange={(e) => updateDentistTime('operatingHours', 'end', e.target.value)} />
+                                        </div>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Lunch Break</label>
+                                        <div className="time-range">
+                                            <input type="time" value={dentistForm.lunch.start} onChange={(e) => updateDentistTime('lunch', 'start', e.target.value)} />
+                                            <span>to</span>
+                                            <input type="time" value={dentistForm.lunch.end} onChange={(e) => updateDentistTime('lunch', 'end', e.target.value)} />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group" style={{ flex: 1 }}>
+                                        <label>Additional Breaks</label>
+                                        <div className="chips-container">
+                                            {(dentistForm.breaks || []).map((entry, index) => (
+                                                <div className="chip" key={`${entry.start}-${entry.end}-${index}`}>
+                                                    {entry.start} - {entry.end}
+                                                    <button type="button" onClick={() => removeBreak(index)}>&times;</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="add-row">
+                                            <input type="time" value={breakDraft.start} onChange={(e) => setBreakDraft((prev) => ({ ...prev, start: e.target.value }))} />
+                                            <span>-</span>
+                                            <input type="time" value={breakDraft.end} onChange={(e) => setBreakDraft((prev) => ({ ...prev, end: e.target.value }))} />
+                                            <button type="button" className="btn-small-add" onClick={addBreak}>Add</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group" style={{ flex: 1 }}>
+                                        <label>Leave Days</label>
+                                        <div className="chips-container">
+                                            {(dentistForm.leaveDays || []).map((dateValue) => (
+                                                <div className="chip red-chip" key={dateValue}>
+                                                    {dateValue}
+                                                    <button type="button" onClick={() => removeLeaveDay(dateValue)}>&times;</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="add-row">
+                                            <input type="date" value={leaveDraft} onChange={(e) => setLeaveDraft(e.target.value)} />
+                                            <button type="button" className="btn-small-add" onClick={addLeaveDay}>Add</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="settings-inline-actions">
+                                    <button type="submit" className="btn-primary-action" disabled={savingDentist}>
+                                        {savingDentist ? 'Saving...' : 'Add Dentist'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <h3 className="table-title">Current Dentists</h3>
+                        <div className="table-container">
+                            <table className="settings-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Type</th>
+                                        <th>Email</th>
+                                        <th>Schedule</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
                                     </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+                                </thead>
+                                <tbody>
+                                    {dentists.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="6" className="empty-state">No dentist accounts found.</td>
+                                        </tr>
+                                    ) : (
+                                        dentists.map((dentist) => {
+                                            const linkedUser = userByDentistId.get(String(dentist.id));
+                                            const archived = isArchived(linkedUser);
+
+                                            return (
+                                                <tr key={dentist.id}>
+                                                    <td className="font-semibold">{dentist.name || fullName(dentist.first_name, dentist.middle_name, dentist.last_name)}</td>
+                                                    <td>{dentist.specialization || 'General Dentist'}</td>
+                                                    <td>{dentist.email || '-'}</td>
+                                                    <td>{formatScheduleSummary(dentist)}</td>
+                                                    <td>
+                                                        <span className={`status-pill ${archived ? 'archived' : 'active'}`}>{archived ? 'Archived' : 'Active'}</span>
+                                                    </td>
+                                                    <td>
+                                                        <div className="action-buttons">
+                                                            <button type="button" className="btn-edit" onClick={() => setEditingDentist(dentist)}>Edit Schedule</button>
+                                                            <button
+                                                                type="button"
+                                                                className={archived ? 'btn-edit' : 'btn-delete'}
+                                                                disabled={busyId === dentist.id}
+                                                                onClick={() => handleArchiveToggle(dentist)}
+                                                            >
+                                                                {busyId === dentist.id ? 'Saving...' : archived ? 'Restore' : 'Archive'}
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : null}
+
+                {!loading && activeTab === 'aides' ? (
+                    <div className="animation-fade-in">
+                        <div className={`settings-form-card ${editingAideId ? 'editing' : ''}`}>
+                            <h3>{editingAideId ? 'Edit Dental Aide' : 'Add New Dental Aide'}</h3>
+                            <form onSubmit={handleSaveAide}>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>First Name *</label>
+                                        <input type="text" value={aideForm.firstName} onChange={(e) => setAideForm((prev) => ({ ...prev, firstName: e.target.value }))} placeholder="Juan" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Middle Name (Optional)</label>
+                                        <input type="text" value={aideForm.middleName} onChange={(e) => setAideForm((prev) => ({ ...prev, middleName: e.target.value }))} placeholder="Dela" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Last Name *</label>
+                                        <input type="text" value={aideForm.lastName} onChange={(e) => setAideForm((prev) => ({ ...prev, lastName: e.target.value }))} placeholder="Cruz" />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Email Address *</label>
+                                        <input type="email" value={aideForm.email} onChange={(e) => setAideForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="aide@clinic.com" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Contact Number *</label>
+                                        <input type="text" value={aideForm.contactNumber} onChange={(e) => setAideForm((prev) => ({ ...prev, contactNumber: e.target.value }))} placeholder="09xxxxxxxxx" />
+                                    </div>
+                                    {!editingAideId ? (
+                                        <div className="form-group">
+                                            <label>Password *</label>
+                                            <input type="password" value={aideForm.password} onChange={(e) => setAideForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="At least 8 characters" />
+                                        </div>
+                                    ) : null}
+                                </div>
+
+                                <div className="settings-inline-actions">
+                                    {editingAideId ? (
+                                        <button type="button" className="btn-secondary-action" onClick={resetAideForm}>Cancel</button>
+                                    ) : null}
+                                    <button type="submit" className="btn-primary-action" disabled={savingAide}>
+                                        {savingAide ? 'Saving...' : editingAideId ? 'Save Changes' : 'Add Dental Aide'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <h3 className="table-title">Current Dental Aides</h3>
+                        <div className="table-container">
+                            <table className="settings-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Contact Number</th>
+                                        <th>Email</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {aides.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="empty-state">No dental aide accounts found.</td>
+                                        </tr>
+                                    ) : (
+                                        aides.map((aide) => {
+                                            const linkedUser = userByDentistId.get(String(aide.id));
+                                            const archived = isArchived(linkedUser);
+
+                                            return (
+                                                <tr key={aide.id} className={editingAideId === aide.id ? 'row-highlight' : ''}>
+                                                    <td className="font-semibold">{aide.name || fullName(aide.first_name, aide.middle_name, aide.last_name)}</td>
+                                                    <td>{aide.phone || '-'}</td>
+                                                    <td>{aide.email || '-'}</td>
+                                                    <td>
+                                                        <span className={`status-pill ${archived ? 'archived' : 'active'}`}>{archived ? 'Archived' : 'Active'}</span>
+                                                    </td>
+                                                    <td>
+                                                        <div className="action-buttons">
+                                                            <button type="button" className="btn-edit" onClick={() => handleEditAide(aide)}>Edit</button>
+                                                            <button
+                                                                type="button"
+                                                                className={archived ? 'btn-edit' : 'btn-delete'}
+                                                                disabled={busyId === aide.id}
+                                                                onClick={() => handleArchiveToggle(aide)}
+                                                            >
+                                                                {busyId === aide.id ? 'Saving...' : archived ? 'Restore' : 'Archive'}
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : null}
+
+                {!loading ? (
+                    <div className="settings-inline-actions" style={{ marginTop: '1rem' }}>
+                        <button type="button" className="btn-secondary-action" onClick={loadData}>Refresh Data</button>
+                    </div>
+                ) : null}
+            </div>
+
+            {editingDentist ? (
+                <EditDentistModal
+                    dentist={editingDentist}
+                    onClose={() => setEditingDentist(null)}
+                    onSuccess={async () => {
+                        setEditingDentist(null);
+                        await loadData();
+                    }}
+                />
+            ) : null}
         </section>
     );
 }

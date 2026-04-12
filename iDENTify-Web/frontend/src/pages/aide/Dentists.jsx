@@ -252,7 +252,6 @@ function Dentists() {
   const dentists = useAppStore((state) => state.dentists);
   const appointments = useAppStore((state) => state.appointments);
 
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingDentist, setEditingDentist] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [filters, setFilters] = useState({
@@ -426,17 +425,6 @@ function Dentists() {
           );
         })}
       </div>
-
-      {isAddModalOpen && (
-        <AddDentistModal
-          onClose={() => setIsAddModalOpen(false)}
-          onSuccess={() => {
-            setIsAddModalOpen(false);
-            api.loadDentists();
-            toast.success("Dentist added successfully");
-          }}
-        />
-      )}
 
       {editingDentist && (
         <EditDentistModal

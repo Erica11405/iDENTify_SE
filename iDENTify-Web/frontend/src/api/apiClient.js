@@ -314,7 +314,9 @@
 // export default api;
 
 
-const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const API_BASE = import.meta.env.DEV
+    ? "/api"
+    : (import.meta.env.VITE_API_BASE || "/api");
 
 function assertSuperadminEndpointAvailable(res) {
     if (res.status !== 404) return;

@@ -214,7 +214,7 @@ function SignUp() {
 		if (field === "email") setEmail(value);
 		if (field === "password") setPassword(value);
 		if (field === "confirmPassword") setConfirmPassword(value);
-        if (field === "otp") setOtpCode(value);
+        if (field === "otp") setOtpCode(String(value || "").replace(/\D/g, "").slice(0, 6));
 	};
 
     // Step 1: Validate form and request OTP
@@ -248,13 +248,14 @@ function SignUp() {
     // Step 2: Verify OTP and finalize account creation
     const handleVerifyAndSignup = async (e) => {
         e.preventDefault();
-        if (!otpCode.trim()) {
-            setErrors({ otp: "Verification code is required" });
+        const normalizedOtp = String(otpCode || "").replace(/\D/g, "");
+        if (normalizedOtp.length !== 6) {
+            setErrors({ otp: "Please enter the 6-digit verification code" });
             return;
         }
 
         try {
-			await api.signupSuperadmin({ firstName, middleName, surname, email, password, confirmPassword, otp: otpCode });
+			await api.signupSuperadmin({ firstName, middleName, surname, email, password, confirmPassword, otp: normalizedOtp });
 			toast.success("Super admin account verified and created! You can now log in.");
 			navigate("/");
 		} catch (error) {

@@ -428,7 +428,7 @@ import useApi from "../../hooks/useApi";
 import useAppStore from "../../store/useAppStore";
 import "../../styles/pages/aide/Reports.css";
 
-function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics and exports." }) {
+function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics and exports.", showSummaryCards = true }) {
   const api = useApi();
   const reports = useAppStore((state) => state.reports);
   const dentists = useAppStore((state) => state.dentists || []); 
@@ -739,24 +739,26 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
 
       {!api.loading && hasData && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Patients Seen</p>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.patientsSeen}</p>
+          {showSummaryCards ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Patients Seen</p>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.patientsSeen}</p>
+              </div>
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Procedures Done</p>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.proceduresDone}</p>
+              </div>
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>New Patients</p>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.newPatients}</p>
+              </div>
+              <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
+                <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Avg Treatment Time</p>
+                <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.avgTreatmentDuration}</p>
+              </div>
             </div>
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Procedures Done</p>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.proceduresDone}</p>
-            </div>
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>New Patients</p>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.newPatients}</p>
-            </div>
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-              <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Avg Treatment Time</p>
-              <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.avgTreatmentDuration}</p>
-            </div>
-          </div>
+          ) : null}
 
           <div className="report-section">
             <h3 className="report-subtitle">Summary ({getTitleDateRangeStr()})</h3>

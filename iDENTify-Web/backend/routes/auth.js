@@ -187,6 +187,8 @@ const transporter = nodemailer.createTransport({
 
 // Temporary in-memory store for Sign-Up OTPs
 const signupOtpStore = new Map();
+let signupOtpTableReady = false;
+let signupOtpTableUnavailable = false;
 
 function normalizeRole(role) {
     const normalized = String(role || '').trim().toLowerCase();
@@ -200,6 +202,10 @@ function toEmail(value) {
 
 function getSignupOtpKey(scope, email) {
     return `${scope}:${toEmail(email)}`;
+}
+
+function normalizeOtp(value) {
+    return String(value || '').replace(/\D/g, '');
 }
 
 function generateOtpCode() {
@@ -239,6 +245,93 @@ async function ensureEmailNotRegistered(email) {
     return existingUser.length === 0;
 }
 
+async function ensureSignupOtpTable() {
+    if (signupOtpTableReady) return true;
+    if (signupOtpTableUnavailable) return false;
+
+    try {
+        await db.query(
+            `CREATE TABLE IF NOT EXISTS signup_otp_codes (
+                scope VARCHAR(32) NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                otp_code VARCHAR(10) NOT NULL,
+                expires_at DATETIME NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (scope, email)
+            )`
+        );
+        signupOtpTableReady = true;
+        return true;
+    } catch (err) {
+        signupOtpTableUnavailable = true;
+        console.warn('Signup OTP table unavailable, using in-memory fallback only:', err.message);
+        return false;
+    }
+}
+
+async function saveSignupOtp(scope, email, otpCode, expiresAt) {
+    const scopedKey = getSignupOtpKey(scope, email);
+    const value = { otpCode, expiresAt };
+
+    signupOtpStore.set(scopedKey, value);
+    // Legacy fallback key for compatibility if older logic referenced plain email.
+    signupOtpStore.set(email, value);
+
+    const canPersist = await ensureSignupOtpTable();
+    if (!canPersist) return;
+
+    try {
+        await db.query(
+            `INSERT INTO signup_otp_codes (scope, email, otp_code, expires_at)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE otp_code = VALUES(otp_code), expires_at = VALUES(expires_at), created_at = CURRENT_TIMESTAMP`,
+            [scope, email, otpCode, new Date(expiresAt)]
+        );
+    } catch (err) {
+        console.error('Failed to persist signup OTP:', err);
+    }
+}
+
+async function getSignupOtpRecord(scope, email) {
+    const scopedKey = getSignupOtpKey(scope, email);
+    const memoryRecord = signupOtpStore.get(scopedKey) || signupOtpStore.get(email);
+    if (memoryRecord) return memoryRecord;
+
+    const canPersist = await ensureSignupOtpTable();
+    if (!canPersist) return null;
+
+    try {
+        const [rows] = await db.query(
+            `SELECT otp_code, expires_at FROM signup_otp_codes WHERE scope = ? AND email = ? LIMIT 1`,
+            [scope, email]
+        );
+        if (!rows.length) return null;
+
+        const row = rows[0];
+        return {
+            otpCode: String(row.otp_code || ''),
+            expiresAt: new Date(row.expires_at).getTime(),
+        };
+    } catch (err) {
+        console.error('Failed to read persisted signup OTP:', err);
+        return null;
+    }
+}
+
+async function clearSignupOtp(scope, email) {
+    signupOtpStore.delete(getSignupOtpKey(scope, email));
+    signupOtpStore.delete(email);
+
+    const canPersist = await ensureSignupOtpTable();
+    if (!canPersist) return;
+
+    try {
+        await db.query(`DELETE FROM signup_otp_codes WHERE scope = ? AND email = ?`, [scope, email]);
+    } catch (err) {
+        console.error('Failed to clear persisted signup OTP:', err);
+    }
+}
+
 // --- STEP 1: SEND OTP FOR SUPER ADMIN SIGN UP ---
 router.post('/signup/superadmin/send-otp', async (req, res) => {
     const email = toEmail(req.body?.email);
@@ -256,7 +349,7 @@ router.post('/signup/superadmin/send-otp', async (req, res) => {
         const otpCode = generateOtpCode();
         const expiresAt = Date.now() + OTP_EXPIRY_MS;
 
-        signupOtpStore.set(getSignupOtpKey('superadmin', email), { otpCode, expiresAt });
+        await saveSignupOtp('superadmin', email, otpCode, expiresAt);
 
         await sendOtpEmail({
             email,
@@ -281,10 +374,11 @@ router.post('/signup/superadmin', async (req, res) => {
         email: rawEmail,
         password,
         confirmPassword,
-        otp,
+        otp: rawOtp,
     } = req.body || {};
 
     const email = toEmail(rawEmail);
+    const otp = normalizeOtp(rawOtp);
 
     if (!firstName || !surname || !email || !password || !otp) {
         return res.status(400).json({ error: 'First name, surname, email, password, and OTP are required.' });
@@ -295,14 +389,13 @@ router.post('/signup/superadmin', async (req, res) => {
     }
 
     try {
-        const otpKey = getSignupOtpKey('superadmin', email);
-        const record = signupOtpStore.get(otpKey);
-        if (!record || record.otpCode !== otp) {
+        const record = await getSignupOtpRecord('superadmin', email);
+        if (!record || normalizeOtp(record.otpCode) !== otp) {
             return res.status(400).json({ error: 'Invalid verification code.' });
         }
 
         if (Date.now() > record.expiresAt) {
-            signupOtpStore.delete(otpKey);
+            await clearSignupOtp('superadmin', email);
             return res.status(400).json({ error: 'Verification code has expired. Please sign up again.' });
         }
 
@@ -315,7 +408,7 @@ router.post('/signup/superadmin', async (req, res) => {
             [email, hashedPassword, fullName, String(surname).trim()]
         );
 
-        signupOtpStore.delete(otpKey);
+        await clearSignupOtp('superadmin', email);
 
         res.status(201).json({ message: 'Super admin account created successfully.' });
     } catch (err) {
@@ -344,7 +437,7 @@ router.post('/signup/dentist/send-otp', async (req, res) => {
         const otpCode = generateOtpCode();
         const expiresAt = Date.now() + OTP_EXPIRY_MS;
         
-        signupOtpStore.set(getSignupOtpKey('dentist', email), { otpCode, expiresAt });
+        await saveSignupOtp('dentist', email, otpCode, expiresAt);
 
         await sendOtpEmail({
             email,
@@ -362,22 +455,22 @@ router.post('/signup/dentist/send-otp', async (req, res) => {
 
 // --- STEP 2: VERIFY OTP & CREATE DENTIST ACCOUNT ---
 router.post('/signup/dentist', async (req, res) => {
-    const { firstName, middleName, surname, email: rawEmail, password, otp } = req.body || {};
+    const { firstName, middleName, surname, email: rawEmail, password, otp: rawOtp } = req.body || {};
     const email = toEmail(rawEmail);
+    const otp = normalizeOtp(rawOtp);
 
     if (!firstName || !surname || !email || !password || !otp) {
         return res.status(400).json({ error: 'First name, surname, email, password, and OTP are required.' });
     }
 
     try {
-        const otpKey = getSignupOtpKey('dentist', email);
-        const record = signupOtpStore.get(otpKey);
-        if (!record || record.otpCode !== otp) {
+        const record = await getSignupOtpRecord('dentist', email);
+        if (!record || normalizeOtp(record.otpCode) !== otp) {
             return res.status(400).json({ error: "Invalid verification code." });
         }
 
         if (Date.now() > record.expiresAt) {
-            signupOtpStore.delete(otpKey);
+            await clearSignupOtp('dentist', email);
             return res.status(400).json({ error: "Verification code has expired. Please try signing up again." });
         }
 
@@ -391,7 +484,7 @@ router.post('/signup/dentist', async (req, res) => {
         const userSql = `INSERT INTO users (email, password_hash, full_name, last_name, role, dentist_id, is_verified, is_archived) VALUES (?, ?, ?, ?, 'dentist', ?, 1, 0)`;
         await db.query(userSql, [email, hashedPassword, fullName, String(surname).trim(), newDentistId]);
 
-        signupOtpStore.delete(otpKey);
+        await clearSignupOtp('dentist', email);
 
         res.status(201).json({ message: "Dentist account created successfully!" });
     } catch (err) {

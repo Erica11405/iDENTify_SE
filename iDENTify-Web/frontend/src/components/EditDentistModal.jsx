@@ -14,6 +14,7 @@ const EditDentistModal = ({ dentist, onClose, onSuccess }) => {
   // Pre-fill the form with the dentist's existing data
   const [formData, setFormData] = useState({
     first_name: dentist?.first_name || '',
+    middle_name: dentist?.middle_name || '',
     last_name: dentist?.last_name || '',
     specialization: dentist?.specialization || '',
     phone: dentist?.phone || '',
@@ -76,6 +77,10 @@ const EditDentistModal = ({ dentist, onClose, onSuccess }) => {
                 <input name="first_name" value={formData.first_name} onChange={handleChange} required />
               </div>
               <div className="form-group">
+                <label>Middle Name (Optional)</label>
+                <input name="middle_name" value={formData.middle_name} onChange={handleChange} />
+              </div>
+              <div className="form-group">
                 <label>Last Name</label>
                 <input name="last_name" value={formData.last_name} onChange={handleChange} required />
               </div>
@@ -90,6 +95,8 @@ const EditDentistModal = ({ dentist, onClose, onSuccess }) => {
                   <option value="Orthodontist">Orthodontist</option>
                   <option value="Periodontist">Periodontist</option>
                   <option value="Oral Surgeon">Oral Surgeon</option>
+                  <option value="Pediatric Dentist">Pediatric Dentist</option>
+                  <option value="Endodontist">Endodontist</option>
                 </select>
               </div>
               <div className="form-group">

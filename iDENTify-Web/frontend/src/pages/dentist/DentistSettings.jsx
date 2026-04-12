@@ -921,8 +921,8 @@ const COMMON_FREQUENCY_OPTIONS = [
     "As needed",
 ];
 
-function DentistSettings() {
-  const [activeTab, setActiveTab] = useState("aides");
+function DentistSettings({ showAideManagement = true }) {
+    const [activeTab, setActiveTab] = useState(showAideManagement ? "aides" : "services");
 
   // --- DENTAL AIDES STATE ---
   const [aides, setAides] = useState([]);
@@ -959,6 +959,12 @@ function DentistSettings() {
     };
     loadData();
   }, []);
+
+    useEffect(() => {
+        if (!showAideManagement && activeTab === "aides") {
+            setActiveTab("services");
+        }
+    }, [showAideManagement, activeTab]);
 
   // --- AIDE HANDLERS ---
   const handleSaveAide = async (e) => {
@@ -1157,11 +1163,13 @@ function DentistSettings() {
     <div className="settings-dashboard-container">
       <div className="settings-header-section">
         <h2>Clinic Settings</h2>
-        <p>Manage your dental staff, services, and medications.</p>
+                <p>{showAideManagement ? "Manage your dental staff, services, and medications." : "Manage clinic services and medications."}</p>
       </div>
 
       <div className="settings-tabs">
-        <button className={activeTab === "aides" ? "active" : ""} onClick={() => setActiveTab("aides")}>Dental Aides</button>
+                {showAideManagement ? (
+                    <button className={activeTab === "aides" ? "active" : ""} onClick={() => setActiveTab("aides")}>Dental Aides</button>
+                ) : null}
         <button className={activeTab === "services" ? "active" : ""} onClick={() => setActiveTab("services")}>Clinic Services</button>
         <button className={activeTab === "medications" ? "active" : ""} onClick={() => setActiveTab("medications")}>Medications</button>
       </div>
@@ -1169,7 +1177,7 @@ function DentistSettings() {
       <div className="settings-tab-content">
         
         {/* --- DENTAL AIDES TAB --- */}
-        {activeTab === "aides" && (
+                {showAideManagement && activeTab === "aides" && (
           <div className="animation-fade-in">
             <div className={`settings-form-card ${editingAideId ? 'editing' : ''}`}>
                 <h3>

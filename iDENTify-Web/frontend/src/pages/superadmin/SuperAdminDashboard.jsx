@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../api/apiClient';
-
-function getPhDateOnly() {
-    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
-}
+import WeeklyBarChart from '../../components/WeeklyBarChart';
+import '../../styles/pages/dentist/DentistSettings.css';
 
 function isArchived(user) {
     return Number(user?.is_archived || 0) === 1;
@@ -13,12 +11,39 @@ function normalizeStatus(value) {
     return String(value || '').trim().toLowerCase();
 }
 
+function parseDateTime(value) {
+    if (!value) return null;
+    const parsed = new Date(String(value).replace(' ', 'T'));
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+}
+
+function getCurrentWeekRange() {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const mondayOffset = (now.getDay() + 6) % 7;
+    const start = new Date(now);
+    start.setDate(now.getDate() - mondayOffset);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+
+    return { start, end };
+}
+
+function formatRangeLabel(start, end) {
+    return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+}
+
 function SuperAdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [users, setUsers] = useState([]);
+    const [dentists, setDentists] = useState([]);
     const [appointments, setAppointments] = useState([]);
-    const [queue, setQueue] = useState([]);
 
     useEffect(() => {
         const loadDashboardData = async () => {
@@ -26,15 +51,15 @@ function SuperAdminDashboard() {
             setError('');
 
             try {
-                const [usersData, appointmentsData, queueData] = await Promise.all([
+                const [usersData, dentistsData, appointmentsData] = await Promise.all([
                     api.getAdminUsers({ role: 'all', archived: 'all' }),
+                    api.getDentists(),
                     api.getAppointments(),
-                    api.getQueue(),
                 ]);
 
                 setUsers(usersData || []);
+                setDentists((dentistsData || []).filter((item) => String(item.specialization || '').trim().toLowerCase() !== 'dental aide'));
                 setAppointments(appointmentsData || []);
-                setQueue(queueData || []);
             } catch (err) {
                 setError(err?.message || 'Failed to load dashboard data.');
             } finally {
@@ -46,68 +71,91 @@ function SuperAdminDashboard() {
     }, []);
 
     const metrics = useMemo(() => {
-        const today = getPhDateOnly();
-
-        const activeDentists = users.filter((u) => u.role === 'dentist' && !isArchived(u)).length;
-        const activeAides = users.filter((u) => u.role === 'aide' && !isArchived(u)).length;
+        const totalDentists = users.filter((u) => normalizeStatus(u.role) === 'dentist').length;
+        const totalAides = users.filter((u) => normalizeStatus(u.role) === 'aide').length;
         const archivedAccounts = users.filter((u) => isArchived(u)).length;
 
-        const appointmentsToday = appointments.filter((appt) => {
-            if (!appt?.appointment_datetime) return false;
-            return new Date(appt.appointment_datetime).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) === today;
-        }).length;
+        return {
+            totalUsers: users.length,
+            totalDentists,
+            totalAides,
+            archivedAccounts,
+        };
+    }, [users]);
 
-        const completedAppointments = appointments.filter((appt) => normalizeStatus(appt?.status) === 'done').length;
-        const cancelledAppointments = appointments.filter((appt) => {
-            const status = normalizeStatus(appt?.status);
-            return status === 'cancelled' || status === 'no-show';
-        }).length;
+    const chartData = useMemo(() => {
+        const { start, end } = getCurrentWeekRange();
+        const ignoredStatuses = new Set(['cancelled', 'no-show', 'declined']);
 
-        const waitingQueue = queue.filter((item) => {
-            const status = normalizeStatus(item?.status);
-            return status === 'waiting' || status === 'checked-in';
-        }).length;
+        const labelMap = new Map();
+        dentists.forEach((dentist) => {
+            labelMap.set(String(dentist.id), dentist.name || `${dentist.first_name || ''} ${dentist.last_name || ''}`.trim() || `Dentist #${dentist.id}`);
+        });
 
-        const inTreatmentQueue = queue.filter((item) => {
-            const status = normalizeStatus(item?.status);
-            return status === 'on chair' || status === 'treatment' || status === 'in treatment' || status === 'with patient';
-        }).length;
+        const counter = new Map();
+        appointments.forEach((appointment) => {
+            const dentistId = appointment?.dentist_id;
+            if (!dentistId) return;
 
-        const billingQueue = queue.filter((item) => normalizeStatus(item?.status) === 'payment / billing').length;
+            const parsedDate = parseDateTime(appointment?.appointment_datetime);
+            if (!parsedDate) return;
+            if (parsedDate < start || parsedDate > end) return;
+
+            const status = normalizeStatus(appointment?.status);
+            if (ignoredStatuses.has(status)) return;
+
+            const key = String(dentistId);
+            counter.set(key, (counter.get(key) || 0) + 1);
+
+            if (!labelMap.has(key)) {
+                labelMap.set(key, appointment.dentist_name || `Dentist #${key}`);
+            }
+        });
+
+        const sortedEntries = [...labelMap.entries()]
+            .map(([id, name]) => ({
+                id,
+                name,
+                count: counter.get(id) || 0,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
 
         return {
-            activeDentists,
-            activeAides,
-            archivedAccounts,
-            appointmentsToday,
-            completedAppointments,
-            cancelledAppointments,
-            waitingQueue,
-            inTreatmentQueue,
-            billingQueue,
+            labels: sortedEntries.map((item) => item.name),
+            appointments: sortedEntries.map((item) => item.count),
+            appointmentsLabel: 'Appointments',
+            singleSeries: true,
+            rangeLabel: formatRangeLabel(start, end),
         };
-    }, [users, appointments, queue]);
+    }, [dentists, appointments]);
 
     return (
-        <section style={{ padding: '1.5rem' }}>
-            <h1>Super Admin Dashboard</h1>
-            <p style={{ marginBottom: '1rem' }}>Live clinic overview across users, appointments, and queue flow.</p>
+        <section className="settings-dashboard-container">
+            <div className="settings-header-section">
+                <h2>Super Admin Dashboard</h2>
+                <p>Quick overview of users and weekly dentist appointment load.</p>
+            </div>
 
             {loading ? <p>Loading dashboard...</p> : null}
             {!loading && error ? <p style={{ color: '#dc2626' }}>{error}</p> : null}
 
             {!loading && !error ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.75rem' }}>
-                    <StatCard label="Active Dentists" value={metrics.activeDentists} />
-                    <StatCard label="Active Dental Aides" value={metrics.activeAides} />
-                    <StatCard label="Archived Accounts" value={metrics.archivedAccounts} />
-                    <StatCard label="Appointments Today" value={metrics.appointmentsToday} />
-                    <StatCard label="Completed Appointments" value={metrics.completedAppointments} />
-                    <StatCard label="Cancelled/No-Show" value={metrics.cancelledAppointments} />
-                    <StatCard label="Queue Waiting" value={metrics.waitingQueue} />
-                    <StatCard label="In Treatment" value={metrics.inTreatmentQueue} />
-                    <StatCard label="Billing Queue" value={metrics.billingQueue} />
-                </div>
+                <>
+                    <div className="superadmin-stats-grid">
+                        <StatCard label="Total Users" value={metrics.totalUsers} />
+                        <StatCard label="Total Dentists" value={metrics.totalDentists} />
+                        <StatCard label="Total Aides" value={metrics.totalAides} />
+                        <StatCard label="Archived Accounts" value={metrics.archivedAccounts} />
+                    </div>
+
+                    <div className="settings-form-card" style={{ marginTop: '1rem' }}>
+                        <h3>Appointments Per Dentist</h3>
+                        <p style={{ margin: '0 0 0.75rem 0', color: '#64748b', fontSize: '0.9rem' }}>
+                            Current week: {chartData.rangeLabel}
+                        </p>
+                        <WeeklyBarChart chartData={chartData} />
+                    </div>
+                </>
             ) : null}
         </section>
     );
@@ -115,15 +163,7 @@ function SuperAdminDashboard() {
 
 function StatCard({ label, value }) {
     return (
-        <article
-            style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: '12px',
-                padding: '0.85rem 1rem',
-                background: '#fff',
-                boxShadow: '0 1px 2px rgba(15, 23, 42, 0.06)',
-            }}
-        >
+        <article className="superadmin-stat-card">
             <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>{label}</p>
             <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.6rem', fontWeight: 700 }}>{value}</p>
         </article>

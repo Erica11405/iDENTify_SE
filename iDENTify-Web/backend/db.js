@@ -3,6 +3,11 @@ require("dotenv").config();
 
 let poolConfig = {};
 
+const forceIndividualDbConfig =
+  process.env.DB_FORCE_INDIVIDUAL === "1" ||
+  process.env.DB_USE_LOCAL_DB === "1";
+const forceEmptyDbPassword = process.env.DB_FORCE_EMPTY_PASSWORD === "1";
+
 const hasDbEnvConfig = Boolean(
   process.env.DB_HOST ||
   process.env.DB_PORT ||
@@ -12,7 +17,7 @@ const hasDbEnvConfig = Boolean(
   process.env.DB_NAME
 );
 
-if (process.env.DATABASE_URL) {
+if (!forceIndividualDbConfig && process.env.DATABASE_URL) {
   console.log("-> Connecting using DATABASE_URL...");
   const dbUrl = new URL(process.env.DATABASE_URL);
   poolConfig = {
@@ -27,12 +32,19 @@ if (process.env.DATABASE_URL) {
     queueLimit: 0
   };
 } else if (hasDbEnvConfig) {
-  console.log("-> Using individual DB_ environment variables...");
+  if (forceIndividualDbConfig) {
+    console.log("-> DB_FORCE_INDIVIDUAL enabled, using DB_ environment variables...");
+  } else {
+    console.log("-> Using individual DB_ environment variables...");
+  }
   const host = process.env.DB_HOST || "localhost";
+  const dbPassword = forceEmptyDbPassword
+    ? ""
+    : (process.env.DB_PASSWORD || process.env.DB_PASS || "");
   poolConfig = {
     host,
     user: process.env.DB_USER || "root",
-    password: process.env.DB_PASSWORD || process.env.DB_PASS || "",
+    password: dbPassword,
     database: process.env.DB_NAME || "identify_app",
     port: Number(process.env.DB_PORT || (host !== "localhost" && host !== "127.0.0.1" ? 25060 : 3306)),
     waitForConnections: true,
