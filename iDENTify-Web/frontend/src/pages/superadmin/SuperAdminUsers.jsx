@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../api/apiClient';
 import EditDentistModal from '../../components/EditDentistModal';
+import ConfirmationModal from '../../components/ConfirmationModal';
 import '../../styles/pages/dentist/DentistSettings.css';
 
 const DAYS = [
@@ -109,6 +110,14 @@ function formatScheduleSummary(staff) {
 }
 
 function SuperAdminUsers() {
+    const initialArchiveDialog = {
+        isOpen: false,
+        staff: null,
+        linkedUser: null,
+        willRestore: false,
+        message: '',
+    };
+
     const [activeTab, setActiveTab] = useState('dentists');
     const [dentists, setDentists] = useState([]);
     const [aides, setAides] = useState([]);
@@ -120,6 +129,7 @@ function SuperAdminUsers() {
     const [editingDentist, setEditingDentist] = useState(null);
     const [editingAideId, setEditingAideId] = useState(null);
     const [dentistTypeOptions, setDentistTypeOptions] = useState(['General Dentist']);
+    const [archiveDialog, setArchiveDialog] = useState(initialArchiveDialog);
 
     const [dentistForm, setDentistForm] = useState(initialDentistForm);
     const [aideForm, setAideForm] = useState(initialAideForm);
@@ -370,17 +380,33 @@ function SuperAdminUsers() {
             ? `Restore ${targetName}?`
             : `Archive ${targetName}? This account will not be able to login until restored.`;
 
-        if (!window.confirm(confirmText)) {
+        setArchiveDialog({
+            isOpen: true,
+            staff,
+            linkedUser,
+            willRestore,
+            message: confirmText,
+        });
+    };
+
+    const handleCloseArchiveDialog = () => {
+        if (busyId) return;
+        setArchiveDialog(initialArchiveDialog);
+    };
+
+    const handleConfirmArchiveToggle = async () => {
+        if (!archiveDialog.staff || !archiveDialog.linkedUser) {
+            setArchiveDialog(initialArchiveDialog);
             return;
         }
 
-        setBusyId(staff.id);
+        setBusyId(archiveDialog.staff.id);
         try {
-            if (willRestore) {
-                await api.restoreAdminUser(linkedUser.id);
+            if (archiveDialog.willRestore) {
+                await api.restoreAdminUser(archiveDialog.linkedUser.id);
                 toast.success('User restored successfully.');
             } else {
-                await api.archiveAdminUser(linkedUser.id);
+                await api.archiveAdminUser(archiveDialog.linkedUser.id);
                 toast.success('User archived successfully.');
             }
 
@@ -389,6 +415,7 @@ function SuperAdminUsers() {
             toast.error(error.message || 'Failed to update user status.');
         } finally {
             setBusyId(null);
+            setArchiveDialog(initialArchiveDialog);
         }
     };
 
@@ -708,6 +735,13 @@ function SuperAdminUsers() {
                     }}
                 />
             ) : null}
+
+            <ConfirmationModal
+                isOpen={archiveDialog.isOpen}
+                onClose={handleCloseArchiveDialog}
+                onConfirm={handleConfirmArchiveToggle}
+                message={archiveDialog.message}
+            />
         </section>
     );
 }
