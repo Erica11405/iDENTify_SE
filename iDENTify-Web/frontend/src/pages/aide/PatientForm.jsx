@@ -1377,6 +1377,40 @@ function PatientForm({ userRole }) {
 		return text.split(",").map((item) => item.trim()).filter(Boolean);
 	};
 
+	const normalizeServiceLabel = (value) => String(value || "")
+		.toLowerCase()
+		.replace(/[^a-z0-9\s]/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+
+	const servicesMatch = (left, right) => (
+		left === right
+		|| left.includes(right)
+		|| right.includes(left)
+	);
+
+	const getRemainingServices = (incomingServices, existingServices) => {
+		const existingLabels = Array.from(new Set(
+			(existingServices || [])
+				.map((item) => normalizeServiceLabel(item))
+				.filter(Boolean)
+		));
+
+		const uniqueIncoming = [];
+		const seenIncoming = new Set();
+		(incomingServices || []).forEach((item) => {
+			const raw = String(item || "").trim();
+			const label = normalizeServiceLabel(raw);
+			if (!raw || !label || seenIncoming.has(label)) return;
+			seenIncoming.add(label);
+			uniqueIncoming.push({ raw, label });
+		});
+
+		return uniqueIncoming
+			.filter((incoming) => !existingLabels.some((existing) => servicesMatch(existing, incoming.label)))
+			.map((incoming) => incoming.raw);
+	};
+
 	const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
 
 	const resolveQueueItemForPayment = () => {
@@ -1573,10 +1607,38 @@ function PatientForm({ userRole }) {
 
 	const handleContinueExistingPayment = async (selectedMatch) => {
 		if (!patient || !paymentContext || !selectedMatch?.id) return;
+		const sessionQueueId = toPositiveInt(paymentContext?.queue_id);
+		const incomingServices = Array.isArray(paymentContext?.services)
+			? paymentContext.services.map((item) => String(item || "").trim()).filter(Boolean)
+			: [];
+		const remainingServicesFromMatch = Array.isArray(selectedMatch?.remaining_services)
+			? selectedMatch.remaining_services.map((item) => String(item || "").trim()).filter(Boolean)
+			: [];
+		const existingRecordServices = parseServiceListFromText(selectedMatch?.services_text || "");
+		const remainingServices = remainingServicesFromMatch.length > 0
+			? remainingServicesFromMatch
+			: getRemainingServices(incomingServices, existingRecordServices);
+		const splitPaymentContext = remainingServices.length > 0
+			? {
+				sourcePaymentId: Number(selectedMatch.id),
+				patient_id: toPositiveInt(paymentContext?.patient_id),
+				patient_name: paymentContext?.patient_name || patient?.full_name || "Unknown",
+				dentist_id: toPositiveInt(paymentContext?.dentist_id),
+				dentist_name: paymentContext?.dentist_name || "Unassigned",
+				appointment_id: toPositiveInt(paymentContext?.appointment_id),
+				queue_id: sessionQueueId,
+				visit_datetime: paymentContext?.visit_datetime || new Date().toLocaleString(),
+				services: remainingServices,
+			}
+			: null;
 
 		setIsSaving(true);
 		try {
 			await saveClinicalProgress();
+
+			if (sessionQueueId) {
+				await apiClient.updateQueueItem(sessionQueueId, { status: "Done" });
+			}
 
 			if (api.loadQueue) await api.loadQueue();
 			if (api.loadAppointments) await api.loadAppointments();
@@ -1586,7 +1648,13 @@ function PatientForm({ userRole }) {
 			setUnpaidServiceMatches([]);
 
 			toast.success("Progress saved. Continue payment from the existing balance record.");
-			navigate("/payments", { state: { focusPaymentId: Number(selectedMatch.id) } });
+			navigate("/payments", {
+				state: {
+					focusPaymentId: Number(selectedMatch.id),
+					sessionQueueId,
+					splitPaymentContext,
+				},
+			});
 		} catch (error) {
 			console.error(error);
 			toast.error(error?.message || "Failed to continue existing payment record.");
@@ -1615,13 +1683,19 @@ function PatientForm({ userRole }) {
 			setUnpaidServiceMatches([]);
 
 			const balanceDue = Number(savedPayment?.balance_due || 0);
-			if (balanceDue > 0) {
+			const isDeposit = Boolean(savedPayment?.is_deposit);
+
+			if (balanceDue > 0 && !isDeposit) {
 				toast.success("Progress saved. Payment record added to billing.");
 				navigate("/payments");
 				return;
 			}
 
-			toast.success("Appointment progress and payment saved.");
+			if (isDeposit && balanceDue > 0) {
+				toast.success("Session completed with deposit. Remaining balance is tracked in payments.");
+			} else {
+				toast.success("Appointment progress and payment saved.");
+			}
 			navigate("/history");
 		} catch (error) {
 			console.error(error);

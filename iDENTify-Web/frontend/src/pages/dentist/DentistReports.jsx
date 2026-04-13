@@ -534,45 +534,6 @@ function DentistReports() {
   const serviceDistribution = reportData?.serviceDistribution || [];
   const topService = serviceDistribution.length > 0 ? serviceDistribution[0].service : "N/A";
 
-  const exportPatientsToPDF = async () => {
-    if (!hasData || patientRows.length === 0) return;
-
-    try {
-      const jsPDFModule = await import("jspdf");
-      const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF;
-      const autoTableModule = await import("jspdf-autotable");
-      const autoTable = autoTableModule.default || autoTableModule;
-
-      const doc = new jsPDF();
-      const dateStr = rangeLabel(startDate, endDate);
-
-      doc.setFontSize(18);
-      doc.text(`Patient List - ${dentistName}`, 14, 15);
-
-      doc.setFontSize(11);
-      doc.setTextColor(100);
-      doc.text(`Date Range: ${dateStr}`, 14, 22);
-
-      autoTable(doc, {
-        startY: 30,
-        head: [["Patient Name", "Date & Time", "Reason / Procedure", "Status"]],
-        body: patientRows.map((row) => [
-          row.full_name || "Unknown",
-          formatAppointmentDateTime(row.appointment_datetime),
-          row.reason || "Unspecified",
-          row.status || "Done",
-        ]),
-        styles: { fontSize: 10 },
-      });
-
-      const from = toDateParam(startDate);
-      const to = toDateParam(endDate);
-      doc.save(`dentist_patients_${safeFilePart(dentistName)}_${from}_to_${to}.pdf`);
-    } catch (err) {
-      console.error("Failed to export patient details PDF", err);
-    }
-  };
-
   const exportToPDF = async () => {
     if (!hasData) return;
 
@@ -615,6 +576,23 @@ function DentistReports() {
           : [["No completed procedures found", "0"]],
       });
 
+      const servicesTableEndY = doc.lastAutoTable?.finalY || finalY + 20;
+      doc.text(`Patient Details (${patientRows.length})`, 14, servicesTableEndY + 15);
+
+      autoTable(doc, {
+        startY: servicesTableEndY + 20,
+        head: [["Patient Name", "Date & Time", "Reason / Procedure", "Status"]],
+        body: patientRows.length
+          ? patientRows.map((row) => [
+            row.full_name || "Unknown",
+            formatAppointmentDateTime(row.appointment_datetime),
+            row.reason || "Unspecified",
+            row.status || "Done",
+          ])
+          : [["No completed patient appointments found for this range.", "-", "-", "-"]],
+        styles: { fontSize: 9 },
+      });
+
       const from = toDateParam(startDate);
       const to = toDateParam(endDate);
       doc.save(`dentist_report_${safeFilePart(dentistName)}_${from}_to_${to}.pdf`);
@@ -645,9 +623,26 @@ function DentistReports() {
         }))
       );
 
+      const patientSheet = XLSX.utils.json_to_sheet(
+        (patientRows.length
+          ? patientRows
+          : [{
+            full_name: "No completed patient appointments found for this range.",
+            appointment_datetime: "-",
+            reason: "-",
+            status: "-",
+          }]).map((row) => ({
+          "Patient Name": row.full_name || "Unknown",
+          "Date & Time": formatAppointmentDateTime(row.appointment_datetime),
+          "Reason / Procedure": row.reason || "Unspecified",
+          Status: row.status || "Done",
+        }))
+      );
+
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, summarySheet, "Summary");
       XLSX.utils.book_append_sheet(workbook, serviceSheet, "Service Distribution");
+      XLSX.utils.book_append_sheet(workbook, patientSheet, "Patient Details");
 
       const from = toDateParam(startDate);
       const to = toDateParam(endDate);
@@ -677,68 +672,74 @@ function DentistReports() {
 
   return (
     <section className="dentist-reports-page">
-      <h1>Dentist Reports</h1>
-      <p className="dentist-reports-subtitle">
-        Your own analytics only: patients handled and service distribution by selected date range.
-      </p>
-      <p className="dentist-reports-identity">
-        Dentist: {dentistName}
-      </p>
+      <div className="dentist-reports-header">
+        <div className="dentist-reports-title-wrap">
+          <h1 className="dentist-reports-title">Dentist Reports</h1>
+          <p className="dentist-reports-subtitle">
+            Your own analytics only: patients handled and service distribution by selected date range.
+          </p>
+          <p className="dentist-reports-identity">
+            Dentist: {dentistName}
+          </p>
 
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "1rem" }}>
-        <button type="button" onClick={() => applyRange("daily")} className={`export-btn ${rangeType === "daily" ? "pdf" : ""}`}>Today</button>
-        <button type="button" onClick={() => applyRange("weekly")} className={`export-btn ${rangeType === "weekly" ? "pdf" : ""}`}>Past Week</button>
-        <button type="button" onClick={() => applyRange("monthly")} className={`export-btn ${rangeType === "monthly" ? "pdf" : ""}`}>Past Month</button>
-        <button type="button" onClick={() => applyRange("yearly")} className={`export-btn ${rangeType === "yearly" ? "pdf" : ""}`}>Past Year</button>
-      </div>
+          <div className="dentist-reports-range-buttons">
+            <button type="button" onClick={() => applyRange("daily")} className={`export-btn ${rangeType === "daily" ? "pdf" : ""}`}>Today</button>
+            <button type="button" onClick={() => applyRange("weekly")} className={`export-btn ${rangeType === "weekly" ? "pdf" : ""}`}>Past Week</button>
+            <button type="button" onClick={() => applyRange("monthly")} className={`export-btn ${rangeType === "monthly" ? "pdf" : ""}`}>Past Month</button>
+            <button type="button" onClick={() => applyRange("yearly")} className={`export-btn ${rangeType === "yearly" ? "pdf" : ""}`}>Past Year</button>
+          </div>
+        </div>
 
-      <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", flexWrap: "wrap", marginTop: "0.9rem" }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-          <span style={{ fontSize: "0.8rem", color: "#64748b" }}>Start Date</span>
-          <input
-            type="date"
-            value={toDateParam(startDate)}
-            onChange={(e) => {
-              setRangeType("custom");
-              setStartDate(parseDateInput(e.target.value));
-            }}
-          />
-        </label>
+        <div className="dentist-reports-controls">
+          <label className="dentist-date-picker-container">
+            <span className="dentist-small-label">Start Date</span>
+            <input
+              className="dentist-date-input"
+              type="date"
+              value={toDateParam(startDate)}
+              onChange={(e) => {
+                setRangeType("custom");
+                setStartDate(parseDateInput(e.target.value));
+              }}
+            />
+          </label>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-          <span style={{ fontSize: "0.8rem", color: "#64748b" }}>End Date</span>
-          <input
-            type="date"
-            value={toDateParam(endDate)}
-            min={toDateParam(startDate)}
-            onChange={(e) => {
-              setRangeType("custom");
-              setEndDate(parseDateInput(e.target.value));
-            }}
-          />
-        </label>
+          <label className="dentist-date-picker-container">
+            <span className="dentist-small-label">End Date</span>
+            <input
+              className="dentist-date-input"
+              type="date"
+              value={toDateParam(endDate)}
+              min={toDateParam(startDate)}
+              onChange={(e) => {
+                setRangeType("custom");
+                setEndDate(parseDateInput(e.target.value));
+              }}
+            />
+          </label>
+
+          <div className="dentist-export-buttons">
+            <button type="button" className="export-btn pdf" onClick={exportToPDF} disabled={!hasData}>
+              Export PDF
+            </button>
+            <button type="button" className="export-btn excel" onClick={exportToExcel} disabled={!hasData}>
+              Export Excel
+            </button>
+          </div>
+        </div>
       </div>
 
       <p className="dentist-reports-range-label">
         Range: {rangeLabel(startDate, endDate)}
       </p>
 
-      <div style={{ display: "flex", gap: "0.7rem", marginBottom: "1rem", flexWrap: "wrap" }}>
-        <button type="button" className="export-btn pdf" onClick={exportToPDF} disabled={!hasData}>
-          Export PDF
-        </button>
-        <button type="button" className="export-btn excel" onClick={exportToExcel} disabled={!hasData}>
-          Export Excel
-        </button>
-      </div>
-
-      {loading ? <p>Loading your report...</p> : null}
-      {!loading && error ? <p style={{ color: "#dc2626" }}>{error}</p> : null}
+      {loading ? <p className="dentist-reports-loading">Loading your report...</p> : null}
+      {!loading && error ? <p className="dentist-reports-error">{error}</p> : null}
 
       {!loading && !error ? (
         <>
           <div className="dentist-report-section">
-            <h3 className="dentist-report-subtitle">Summary</h3>
+            <h3 className="dentist-report-subtitle">Summary ({rangeLabel(startDate, endDate)})</h3>
             <table className="dentist-report-table">
               <thead>
                 <tr>
@@ -800,9 +801,6 @@ function DentistReports() {
           <div className="dentist-report-section">
             <div className="dentist-report-section-head">
               <h3 className="dentist-report-subtitle">Patient Details ({patientRows.length})</h3>
-              <button type="button" className="export-btn pdf" onClick={exportPatientsToPDF} disabled={patientRows.length === 0}>
-                Export Patient List PDF
-              </button>
             </div>
             <div className="dentist-report-table-wrap">
               <table className="dentist-report-table">
@@ -835,6 +833,12 @@ function DentistReports() {
               </table>
             </div>
           </div>
+
+          {!hasData ? (
+            <div className="dentist-report-section dentist-report-empty-section">
+              <p className="dentist-report-empty-cell">No report data available for the selected date range.</p>
+            </div>
+          ) : null}
         </>
       ) : null}
     </section>

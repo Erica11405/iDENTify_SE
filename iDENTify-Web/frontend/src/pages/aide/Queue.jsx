@@ -497,7 +497,7 @@ function Queue() {
   const queueWithDetails = useMemo(
     () => {
       const sortedForNumbering = [...queue]
-        .filter(q => q.status !== 'Cancelled')
+        .filter((q) => !["Done", "Cancelled", "No-Show"].includes(String(q.status || "")))
         .sort((a, b) => {
             const timeA = a.time_added ? new Date(String(a.time_added).replace(' ', 'T')).getTime() : 0;
             const timeB = b.time_added ? new Date(String(b.time_added).replace(' ', 'T')).getTime() : 0;
@@ -510,7 +510,7 @@ function Queue() {
       });
 
       return queue
-        .filter((item) => item.status !== "Done")
+        .filter((item) => !["Done", "Cancelled", "No-Show"].includes(String(item.status || "")))
         .map((item, index) => {
           const patient = patients.find((p) => String(p.id) === String(item.patient_id));
           const patientName = patient ? (patient.name || patient.full_name) : (item.full_name || "Unknown");
@@ -591,6 +591,7 @@ function Queue() {
                       value={q.status}
                       onChange={(e) => handleStatusChange(q.id, e.target.value)}
                     >
+                      <option value="Scheduled">Scheduled</option>
                       <option value="Checked-In">Checked-In</option>
                       <option value="Waiting">Waiting</option>
                       <option value="On Chair">On Chair</option>

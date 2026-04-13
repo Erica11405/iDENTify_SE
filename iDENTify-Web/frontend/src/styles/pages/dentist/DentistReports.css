@@ -1,31 +1,141 @@
 .dentist-reports-page {
-  padding: 1.5rem;
+  padding: 2rem;
+}
+
+.dentist-reports-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.dentist-reports-title-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.dentist-reports-title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .dentist-reports-subtitle {
-  margin-top: 0.25rem;
+  margin: 0.35rem 0 0;
   color: #64748b;
 }
 
 .dentist-reports-identity {
-  margin-top: 0.3rem;
+  margin: 0.3rem 0 0;
   color: #0f172a;
   font-weight: 600;
 }
 
+.dentist-reports-range-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.dentist-reports-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.dentist-date-picker-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.dentist-small-label {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.dentist-date-input {
+  min-width: 170px;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #1f2937;
+  background: #ffffff;
+}
+
+.dentist-export-buttons {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.dentist-reports-page .export-btn {
+  padding: 0.8rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.dentist-reports-page .export-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.dentist-reports-page .export-btn.pdf {
+  background-color: #ff6b6b;
+  color: #ffffff;
+}
+
+.dentist-reports-page .export-btn.pdf:hover:not(:disabled) {
+  background-color: #e55a5a;
+}
+
+.dentist-reports-page .export-btn.excel {
+  background-color: #51cf66;
+  color: #ffffff;
+}
+
+.dentist-reports-page .export-btn.excel:hover:not(:disabled) {
+  background-color: #48b85c;
+}
+
 .dentist-reports-range-label {
-  margin-top: 0.8rem;
-  margin-bottom: 1rem;
+  margin: 0.4rem 0 1rem;
   color: #475569;
   font-size: 0.9rem;
 }
 
+.dentist-reports-loading {
+  margin: 0.6rem 0 1rem;
+  color: #64748b;
+}
+
+.dentist-reports-error {
+  margin: 0.6rem 0 1rem;
+  color: #dc2626;
+  font-weight: 600;
+}
+
 .dentist-report-section {
-  margin-top: 1rem;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  margin-bottom: 1.25rem;
+  background: #ffffff;
   border-radius: 12px;
-  padding: 1rem;
+  padding: 1.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eef2f7;
+}
+
+.dentist-report-empty-section {
+  margin-top: 0;
 }
 
 .dentist-report-section-head {
@@ -38,8 +148,9 @@
 }
 
 .dentist-report-subtitle {
-  margin: 0;
-  font-size: 1rem;
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+  font-weight: 700;
   color: #0f172a;
 }
 
@@ -50,13 +161,13 @@
 .dentist-report-table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
+  background: #ffffff;
 }
 
 .dentist-report-table th,
 .dentist-report-table td {
   text-align: left;
-  padding: 0.65rem;
+  padding: 0.8rem;
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -74,8 +185,46 @@
   color: #64748b;
 }
 
+@media (max-width: 900px) {
+  .dentist-reports-header {
+    align-items: stretch;
+  }
+
+  .dentist-reports-controls {
+    width: 100%;
+  }
+
+  .dentist-export-buttons {
+    width: 100%;
+  }
+
+  .dentist-reports-page .export-btn {
+    flex: 1;
+    min-width: 140px;
+  }
+}
+
 @media (max-width: 640px) {
   .dentist-reports-page {
     padding: 1rem;
+  }
+
+  .dentist-reports-title {
+    font-size: 1.55rem;
+  }
+
+  .dentist-date-picker-container,
+  .dentist-date-input {
+    width: 100%;
+  }
+
+  .dentist-report-section {
+    padding: 1rem;
+  }
+
+  .dentist-report-table th,
+  .dentist-report-table td {
+    padding: 0.65rem;
+    font-size: 0.9rem;
   }
 }

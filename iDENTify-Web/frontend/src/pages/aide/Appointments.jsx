@@ -314,6 +314,7 @@
 
 
 import React, { useMemo, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import "../../styles/pages/aide/Appointments.css";
 import EditAppointmentModal from "../../components/EditAppointmentModal";
@@ -335,8 +336,17 @@ function toMinutes(timeString) {
   return hour * 60 + minute;
 }
 
+function toSqlDateTime(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return `${safeDate.getFullYear()}-${pad(safeDate.getMonth() + 1)}-${pad(safeDate.getDate())} ${pad(safeDate.getHours())}:${pad(safeDate.getMinutes())}:${pad(safeDate.getSeconds())}`;
+}
+
 function Appointments() {
   const api = useApi();
+  const navigate = useNavigate();
 
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
 
@@ -426,7 +436,7 @@ function Appointments() {
             ) : (
               data.map((a) => {
                 const s = (a.status || "").toLowerCase().trim();
-                const canAddToQueue = s === "scheduled";
+                const canStart = !["done", "cancelled", "declined", "no-show"].includes(s);
                 const apptDate = a.appointment_datetime ? new Date(a.appointment_datetime).toLocaleDateString() : "-";
 
                 return (
@@ -454,11 +464,11 @@ function Appointments() {
                         <button className="edit-btn" onClick={() => handleEdit(a)}>Edit</button>
                         <button
                           className="start-btn"
-                          onClick={() => handleAddToQueue(a)}
-                          style={!canAddToQueue ? { backgroundColor: '#adb5bd', cursor: 'not-allowed' } : {}}
-                          disabled={!canAddToQueue}
+                          onClick={() => handleStartTreatment(a)}
+                          style={!canStart ? { backgroundColor: '#adb5bd', cursor: 'not-allowed' } : {}}
+                          disabled={!canStart}
                         >
-                          Add to Queue
+                          Start
                         </button>
                         <button className="delete-btn" onClick={() => handleDelete(a)}>Delete</button>
                       </td>
@@ -473,35 +483,62 @@ function Appointments() {
     </div>
   );
 
-  const handleAddToQueue = async (appointment) => {
+  const handleStartTreatment = async (appointment) => {
     let patientId = appointment.patient_id;
     let fullPatientData = patients.find((p) => String(p.id) === String(patientId));
-    if (!fullPatientData) return;
-    const isAlreadyInQueue = queue.some((q) => String(q.patient_id) === String(patientId) && q.status !== 'Done' && q.status !== 'Cancelled');
-    if (isAlreadyInQueue) { toast.error("Patient is already in the active Queue!"); return; }
+
+    if (!fullPatientData) {
+      toast.error("Patient record is unavailable for this appointment.");
+      return;
+    }
+
     try {
-      await api.updateAppointment(appointment.id, { status: 'Checked-In' });
-      const now = new Date();
-      const pad = (n) => (n < 10 ? '0' + n : n);
-      const mysqlDateTime = now.getFullYear() + '-' +
-             pad(now.getMonth() + 1) + '-' +
-             pad(now.getDate()) + ' ' +
-             pad(now.getHours()) + ':' +
-             pad(now.getMinutes()) + ':' +
-             pad(now.getSeconds());
-      await api.addQueue({
-        patient_id: patientId,
-        appointment_id: appointment.id,
-        dentist_id: appointment.dentist_id || null,
-        source: "appointment",
-        status: "Checked-In",
-        notes: appointment.procedure || appointment.reason || "",
-        time_added: mysqlDateTime, // This successfully passes local time
+      let queueItem = queue.find((item) => String(item.appointment_id) === String(appointment.id));
+
+      // Legacy fallback for appointments created before auto-queue linkage.
+      if (!queueItem) {
+        const createdQueue = await api.addQueue({
+          patient_id: patientId,
+          appointment_id: appointment.id,
+          dentist_id: appointment.dentist_id || null,
+          source: "appointment",
+          status: "Checked-In",
+          notes: appointment.procedure || appointment.reason || "",
+          time_added: toSqlDateTime(),
+        });
+
+        if (api.loadQueue) await api.loadQueue();
+        queueItem = createdQueue || null;
+      }
+
+      const queueStatus = String(queueItem?.status || "").trim().toLowerCase();
+      if (queueItem?.id && ["scheduled", "waiting"].includes(queueStatus)) {
+        const updatedQueueItem = await api.updateQueueItem(queueItem.id, { status: "Checked-In" });
+        queueItem = updatedQueueItem?.id
+          ? updatedQueueItem
+          : { ...queueItem, status: "Checked-In" };
+      }
+
+      const assignedDentistName = dentists.find((d) => String(d.id) === String(appointment.dentist_id))?.name || "Unassigned";
+
+      navigate(`/patients/${patientId}`, {
+        state: {
+          dentistId: appointment.dentist_id || queueItem?.dentist_id || null,
+          assignedDentistName,
+          status: queueItem?.status || "Checked-In",
+          patientData: fullPatientData,
+          queueId: queueItem?.id || null,
+          appointment: {
+            ...appointment,
+            appointment_id: appointment.id,
+            queue_id: queueItem?.id || null,
+            procedure: appointment.procedure || appointment.reason || "",
+          },
+        },
       });
-      toast.success("Added to Queue.");
-      api.loadAppointments();
-      api.loadQueue();
-    } catch { toast.error("Failed to add to queue."); }
+    } catch {
+      toast.error("Failed to start appointment workflow.");
+    }
   };
 
   const handleFilterChange = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
@@ -555,9 +592,10 @@ function Appointments() {
 
       toast.success(data.isNewPatient ? "New patient and appointment added!" : "Appointment scheduled for existing patient.");
       setIsAddModalOpen(false);
-      api.loadAppointments();
+      await api.loadAppointments();
+      await api.loadQueue();
       if (data.isNewPatient) {
-        api.loadPatients();
+        await api.loadPatients();
       }
     } catch (err) { 
       console.error(err);

@@ -201,7 +201,7 @@ export default function HomeScreen() {
 							<Ionicons name="calendar-outline" size={32} color="#A0AEC0" />
 						</View>
 						<Text style={styles.emptyStateText}>No upcoming appointments</Text>
-						<TouchableOpacity onPress={() => router.push("/appointments/book")}>
+						<TouchableOpacity onPress={() => router.push("/appointments/select-service")}>
 							<Text style={styles.bookNowLink}>Book an appointment</Text>
 						</TouchableOpacity>
 					</View>
@@ -214,7 +214,7 @@ export default function HomeScreen() {
 						icon="add-circle"
 						label="Book"
 						color="#4C6EF5"
-						onPress={() => router.push("/appointments/book")}
+						onPress={() => router.push("/appointments/select-service")}
 					/>
 					<QuickAction
 						icon="list"

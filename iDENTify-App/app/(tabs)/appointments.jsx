@@ -448,7 +448,7 @@ export default function AppointmentsScreen() {
         <Text style={styles.headerTitle}>All Appointments</Text>
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => router.push("/appointments/book")}
+          onPress={() => router.push("/appointments/select-service")}
         >
           <Ionicons name="add" size={24} color="#fff" />
         </TouchableOpacity>

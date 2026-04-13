@@ -7,11 +7,7 @@ function isDateOnly(value) {
 }
 
 function getTodayDateOnly() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Manila" });
 }
 
 function toDateRange(startDate, endDate) {
@@ -125,24 +121,63 @@ function normalizeServiceLabel(value) {
     .trim();
 }
 
+function labelsMatch(left, right) {
+  return left === right || left.includes(right) || right.includes(left);
+}
+
+function toUniqueServiceEntries(value) {
+  const seen = new Set();
+  const entries = [];
+
+  normalizeServices(value).forEach((item) => {
+    const raw = String(item || "").trim();
+    const label = normalizeServiceLabel(raw);
+    if (!label || seen.has(label)) return;
+    seen.add(label);
+    entries.push({ raw, label });
+  });
+
+  return entries;
+}
+
+function splitIncomingServicesByExisting(existingServices, incomingServices) {
+  const existingEntries = toUniqueServiceEntries(existingServices);
+  const incomingEntries = toUniqueServiceEntries(incomingServices);
+
+  if (incomingEntries.length === 0) {
+    return {
+      matched_services: [],
+      remaining_services: [],
+      overlap_count: 0,
+      incoming_count: 0,
+    };
+  }
+
+  const matchedServices = [];
+  const remainingServices = [];
+
+  incomingEntries.forEach((incomingEntry) => {
+    const hasMatch = existingEntries.some((existingEntry) => (
+      labelsMatch(existingEntry.label, incomingEntry.label)
+    ));
+
+    if (hasMatch) {
+      matchedServices.push(incomingEntry.raw);
+    } else {
+      remainingServices.push(incomingEntry.raw);
+    }
+  });
+
+  return {
+    matched_services: matchedServices,
+    remaining_services: remainingServices,
+    overlap_count: matchedServices.length,
+    incoming_count: incomingEntries.length,
+  };
+}
+
 function hasServiceOverlap(existingServices, incomingServices) {
-  const existing = normalizeServices(existingServices)
-    .map(normalizeServiceLabel)
-    .filter(Boolean);
-
-  const incoming = normalizeServices(incomingServices)
-    .map(normalizeServiceLabel)
-    .filter(Boolean);
-
-  if (existing.length === 0 || incoming.length === 0) return false;
-
-  return existing.some((existingLabel) => (
-    incoming.some((incomingLabel) => (
-      existingLabel === incomingLabel
-      || existingLabel.includes(incomingLabel)
-      || incomingLabel.includes(existingLabel)
-    ))
-  ));
+  return splitIncomingServicesByExisting(existingServices, incomingServices).overlap_count > 0;
 }
 
 function formatServicesText(services) {
@@ -181,9 +216,70 @@ function getPaymentStatus(balanceDue) {
   return balanceDue <= 0 ? "Paid" : "Partial";
 }
 
+function getLinkedWorkflowStatus(balanceDue, isDeposit) {
+  return "Done";
+}
+
+function determineLinkedWorkflowStatusFromRows(rows, fallbackStatus) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return fallbackStatus;
+  }
+
+  return "Done";
+}
+
+async function resolveLinkedWorkflowStatus(connection, {
+  queueId,
+  appointmentId,
+  fallbackBalanceDue,
+  fallbackIsDeposit,
+}) {
+  const linkedQueueId = toOptionalInt(queueId);
+  const linkedAppointmentId = toOptionalInt(appointmentId);
+  const fallbackStatus = getLinkedWorkflowStatus(
+    roundMoney(fallbackBalanceDue),
+    Boolean(fallbackIsDeposit)
+  );
+
+  if (!linkedQueueId && !linkedAppointmentId) {
+    return fallbackStatus;
+  }
+
+  let rows = [];
+
+  if (linkedQueueId) {
+    const [queueRows] = await connection.query(
+      `SELECT balance_due, is_deposit FROM payment_records WHERE queue_id = ?`,
+      [linkedQueueId]
+    );
+    rows = queueRows;
+  }
+
+  if (rows.length === 0 && linkedAppointmentId) {
+    const [appointmentRows] = await connection.query(
+      `SELECT balance_due, is_deposit FROM payment_records WHERE appointment_id = ?`,
+      [linkedAppointmentId]
+    );
+    rows = appointmentRows;
+  }
+
+  return determineLinkedWorkflowStatusFromRows(rows, fallbackStatus);
+}
+
 async function syncQueueAndAppointmentStatus(connection, { queueId, appointmentId, status }) {
   let linkedAppointmentId = toOptionalInt(appointmentId);
-  const linkedQueueId = toOptionalInt(queueId);
+  let linkedQueueId = toOptionalInt(queueId);
+
+  if (!linkedQueueId && linkedAppointmentId) {
+    const [queueByAppointment] = await connection.query(
+      `SELECT id FROM walk_in_queue WHERE appointment_id = ? ORDER BY id DESC LIMIT 1`,
+      [linkedAppointmentId]
+    );
+
+    if (queueByAppointment.length > 0) {
+      linkedQueueId = toOptionalInt(queueByAppointment[0].id);
+    }
+  }
 
   if (linkedQueueId) {
     await connection.query(
@@ -266,7 +362,11 @@ router.get("/", async (req, res) => {
 
   try {
     const params = [start, end];
-    let whereSql = `WHERE DATE(COALESCE(latest_tx.created_at, pr.updated_at, pr.created_at)) BETWEEN ? AND ?`;
+    let whereSql = `
+      WHERE (
+        DATE(COALESCE(latest_tx.created_at, pr.updated_at, pr.created_at)) BETWEEN ? AND ?
+        OR pr.balance_due > 0
+      )`;
 
     if (keyword) {
       const term = `%${keyword}%`;
@@ -300,7 +400,7 @@ router.get("/", async (req, res) => {
           LIMIT 1
         )
       ${whereSql}
-      ORDER BY COALESCE(latest_tx.created_at, pr.updated_at, pr.created_at) DESC, pr.id DESC`,
+      ORDER BY (pr.balance_due > 0) DESC, COALESCE(latest_tx.created_at, pr.updated_at, pr.created_at) DESC, pr.id DESC`,
       params
     );
 
@@ -319,7 +419,11 @@ router.get("/by-queue/:queueId", async (req, res) => {
 
   try {
     const [rows] = await db.query(
-      `SELECT id FROM payment_records WHERE queue_id = ? LIMIT 1`,
+      `SELECT id
+       FROM payment_records
+       WHERE queue_id = ?
+       ORDER BY updated_at DESC, id DESC
+       LIMIT 1`,
       [queueId]
     );
 
@@ -381,9 +485,34 @@ router.post("/unpaid-matches", async (req, res) => {
 
     const matches = rows
       .map(mapPaymentRow)
-      .filter((row) => hasServiceOverlap(row.services_text, incomingServices));
+      .map((row) => {
+        const split = splitIncomingServicesByExisting(row.services_text, incomingServices);
+        return {
+          ...row,
+          matched_services: split.matched_services,
+          remaining_services: split.remaining_services,
+          overlap_count: split.overlap_count,
+          incoming_count: split.incoming_count,
+          can_split: split.remaining_services.length > 0,
+        };
+      })
+      .filter((row) => row.overlap_count > 0)
+      .sort((a, b) => {
+        if (b.overlap_count !== a.overlap_count) {
+          return b.overlap_count - a.overlap_count;
+        }
 
-    return res.json({ matches });
+        if (a.remaining_services.length !== b.remaining_services.length) {
+          return a.remaining_services.length - b.remaining_services.length;
+        }
+
+        return Number(b.id || 0) - Number(a.id || 0);
+      });
+
+    return res.json({
+      incoming_services: toUniqueServiceEntries(incomingServices).map((entry) => entry.raw),
+      matches,
+    });
   } catch (error) {
     console.error("Error fetching unpaid payment matches:", error);
     return res.status(500).json({ message: "Failed to fetch unpaid payment matches." });
@@ -427,6 +556,7 @@ router.post("/", async (req, res) => {
   const totalDue = toMoney(req.body.total_due, { allowZero: false });
   const amountPaidNow = toMoney(req.body.amount_paid_now ?? req.body.amount_paid, { allowZero: false });
   const isDeposit = normalizeBoolean(req.body.is_deposit, false);
+  const allowSplitRecord = normalizeBoolean(req.body.allow_split_record, false);
   const paymentMethod = normalizeMethod(req.body.payment_method);
 
   if (!patientId) {
@@ -468,13 +598,11 @@ router.post("/", async (req, res) => {
   const changeAmount = paymentMethod === "cash" ? roundMoney(cashReceived - amountPaidNow) : null;
   const balanceDue = roundMoney(Math.max(totalDue - amountPaidNow, 0));
   const paymentStatus = getPaymentStatus(balanceDue);
-  const linkedStatus = balanceDue > 0 ? "Payment / Billing" : "Done";
-
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
 
-    if (queueId) {
+    if (queueId && !allowSplitRecord) {
       const [queueExisting] = await connection.query(
         `SELECT id FROM payment_records WHERE queue_id = ? LIMIT 1`,
         [queueId]
@@ -488,7 +616,7 @@ router.post("/", async (req, res) => {
       }
     }
 
-    if (appointmentId) {
+    if (appointmentId && !allowSplitRecord) {
       const [appointmentExisting] = await connection.query(
         `SELECT id FROM payment_records WHERE appointment_id = ? LIMIT 1`,
         [appointmentId]
@@ -560,6 +688,13 @@ router.post("/", async (req, res) => {
       ]
     );
 
+    const linkedStatus = await resolveLinkedWorkflowStatus(connection, {
+      queueId,
+      appointmentId,
+      fallbackBalanceDue: balanceDue,
+      fallbackIsDeposit: isDeposit,
+    });
+
     await syncQueueAndAppointmentStatus(connection, {
       queueId,
       appointmentId,
@@ -576,7 +711,9 @@ router.post("/", async (req, res) => {
     console.error("Error creating payment record:", error);
 
     if (error && error.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({ message: "A payment record already exists for this visit." });
+      return res.status(409).json({
+        message: "A payment record already exists for this visit. If split billing is intended, apply the split-payment index migration first.",
+      });
     }
 
     return res.status(500).json({ message: "Failed to create payment record." });
@@ -649,7 +786,6 @@ router.put("/:id", async (req, res) => {
     }
 
     const nextPaymentStatus = getPaymentStatus(nextBalanceDue);
-    const nextLinkedStatus = nextBalanceDue > 0 ? "Payment / Billing" : "Done";
 
     const setClauses = [
       "total_due = ?",
@@ -684,6 +820,13 @@ router.put("/:id", async (req, res) => {
       `UPDATE payment_records SET ${setClauses.join(", ")} WHERE id = ?`,
       values
     );
+
+    const nextLinkedStatus = await resolveLinkedWorkflowStatus(connection, {
+      queueId: current.queue_id,
+      appointmentId: current.appointment_id,
+      fallbackBalanceDue: nextBalanceDue,
+      fallbackIsDeposit: nextIsDeposit,
+    });
 
     await syncQueueAndAppointmentStatus(connection, {
       queueId: current.queue_id,
@@ -795,7 +938,6 @@ router.post("/:id/installments", async (req, res) => {
     }
 
     const nextPaymentStatus = getPaymentStatus(nextBalanceDue);
-    const nextLinkedStatus = nextBalanceDue > 0 ? "Payment / Billing" : "Done";
     const changeAmount = paymentMethod === "cash" ? roundMoney(cashReceived - amountPaidNow) : null;
 
     await connection.query(
@@ -854,6 +996,13 @@ router.post("/:id/installments", async (req, res) => {
       `UPDATE payment_records SET ${setClauses.join(", ")} WHERE id = ?`,
       values
     );
+
+    const nextLinkedStatus = await resolveLinkedWorkflowStatus(connection, {
+      queueId: current.queue_id,
+      appointmentId: current.appointment_id,
+      fallbackBalanceDue: nextBalanceDue,
+      fallbackIsDeposit: nextIsDeposit,
+    });
 
     await syncQueueAndAppointmentStatus(connection, {
       queueId: current.queue_id,

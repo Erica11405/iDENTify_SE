@@ -1,0 +1,23 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "frontend-lint-build",
+			"type": "shell",
+			"command": "Push-Location iDENTify-Web/frontend; npm run lint -- --max-warnings=0; npm run build; Pop-Location",
+			"isBackground": false
+		},
+		{
+			"label": "backend-payments-route-check",
+			"type": "shell",
+			"command": "Push-Location iDENTify-Web/backend; node -e \"require('./routes/payments'); console.log('payments-route-ok')\"; Pop-Location",
+			"isBackground": false
+		},
+		{
+			"label": "backend-payments-route-check-2",
+			"type": "shell",
+			"command": "Push-Location iDENTify-Web/backend; node -e \"require('./routes/payments')\"; Write-Output 'payments-route-ok'; Pop-Location",
+			"isBackground": false
+		}
+	]
+}

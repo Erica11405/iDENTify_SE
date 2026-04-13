@@ -167,6 +167,65 @@ function getPhDateTime() {
          pad(d.getSeconds());
 }
 
+function toPositiveInt(value) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+const QUEUE_STATUS_MAP = {
+  "waiting": "Waiting",
+  "checked in": "Checked-In",
+  "checked-in": "Checked-In",
+  "checkedin": "Checked-In",
+  "on chair": "On Chair",
+  "on-chair": "On Chair",
+  "treatment": "Treatment",
+  "serving": "Treatment",
+  "payment / billing": "Payment / Billing",
+  "payment/billing": "Payment / Billing",
+  "payment": "Payment / Billing",
+  "billing": "Payment / Billing",
+  "scheduled": "Scheduled",
+  "done": "Done",
+  "cancelled": "Cancelled",
+  "no-show": "No-Show",
+  "no show": "No-Show",
+  "noshow": "No-Show",
+};
+
+function normalizeQueueStatus(value, fallback = null) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return fallback;
+  return QUEUE_STATUS_MAP[normalized] || fallback;
+}
+
+function formatSqlDateTime(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function normalizeQueueDateTime(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  const withoutMillis = text.replace(/\.\d+/, "");
+  const normalized = withoutMillis.replace("T", " ").replace(/Z$/i, "").trim();
+  const sqlMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})(?::(\d{2}))?$/);
+  if (sqlMatch) {
+    const [, datePart, hhmm, ss] = sqlMatch;
+    return `${datePart} ${hhmm}:${ss || "00"}`;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return `${normalized} 00:00:00`;
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return formatSqlDateTime(parsed);
+}
+
 router.get("/status", async (req, res) => {
   const { patient_id } = req.query;
 
@@ -181,7 +240,7 @@ router.get("/status", async (req, res) => {
        FROM walk_in_queue q
        LEFT JOIN patients p ON q.patient_id = p.id
        LEFT JOIN dentists d ON q.dentist_id = d.id
-       WHERE q.status != 'Cancelled'
+       WHERE q.status NOT IN ('Done', 'Cancelled', 'No-Show')
        AND DATE(q.time_added) = ? 
        ORDER BY q.time_added ASC`,
        [phToday]
@@ -234,11 +293,11 @@ router.get("/", async (req, res) => {
     // Only filter by current date if NOT in history mode
     if (history !== 'true') {
       const phToday = getPhDateOnly();
-      sql += ` WHERE DATE(q.time_added) = ? `;
+      sql += ` WHERE DATE(q.time_added) = ? AND q.status NOT IN ('Done', 'Cancelled', 'No-Show') `;
       params.push(phToday);
     }
 
-    sql += ` ORDER BY FIELD(q.status, 'On Chair', 'Treatment', 'Checked-In', 'Waiting', 'Payment / Billing', 'Done', 'Cancelled'), time_added ASC`;
+    sql += ` ORDER BY FIELD(q.status, 'On Chair', 'Treatment', 'Checked-In', 'Waiting', 'Scheduled', 'Payment / Billing', 'Done', 'Cancelled'), time_added ASC`;
     
     const [rows] = await db.query(sql, params);
     res.json(rows);
@@ -251,15 +310,42 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   // Capture 'time_added' sent from the frontend
   const { patient_id, dentist_id, appointment_id, source, status, notes, checkedInTime, time_added } = req.body;
+  const patientId = toPositiveInt(patient_id);
+  const dentistId = toPositiveInt(dentist_id);
+  const appointmentId = toPositiveInt(appointment_id);
+  const normalizedStatus = normalizeQueueStatus(status, "Checked-In");
+
+  if (!patientId) {
+    return res.status(400).json({ message: "patient_id is required." });
+  }
 
   // Use frontend local time, fallback to generated PH time, or final fallback to JS Date
-  const insertTime = time_added || checkedInTime || getPhDateTime();
+  const insertTime = normalizeQueueDateTime(time_added || checkedInTime) || getPhDateTime();
+  const queueSource = String(source || (appointmentId ? "appointment" : "walk-in")).trim() || null;
+  const queueNotes = String(notes || "").trim();
 
   try {
+    if (appointmentId) {
+      const [existingRows] = await db.query(
+        `SELECT q.*, p.full_name, d.name as dentist_name
+         FROM walk_in_queue q
+         LEFT JOIN patients p ON q.patient_id = p.id
+         LEFT JOIN dentists d ON q.dentist_id = d.id
+         WHERE q.appointment_id = ?
+         ORDER BY q.id DESC
+         LIMIT 1`,
+        [appointmentId]
+      );
+
+      if (existingRows.length > 0) {
+        return res.status(200).json(existingRows[0]);
+      }
+    }
+
     const [result] = await db.query(
       `INSERT INTO walk_in_queue (patient_id, dentist_id, appointment_id, source, status, notes, time_added)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [patient_id, dentist_id, appointment_id, source, status, notes, insertTime]
+      [patientId, dentistId, appointmentId, queueSource, normalizedStatus, queueNotes, insertTime]
     );
 
     const [rows] = await db.query(
@@ -281,24 +367,34 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
+  const queueId = toPositiveInt(id);
+  const normalizedStatus = normalizeQueueStatus(status, null);
+
+  if (!queueId) {
+    return res.status(400).json({ message: "Invalid queue id." });
+  }
+
+  if (!normalizedStatus) {
+    return res.status(400).json({ message: "Invalid queue status." });
+  }
 
   try {
     await db.query(
       `UPDATE walk_in_queue SET status = ? WHERE id = ?`,
-      [status, id]
+      [normalizedStatus, queueId]
     );
 
-    const [qItem] = await db.query("SELECT appointment_id FROM walk_in_queue WHERE id = ?", [id]);
+    const [qItem] = await db.query("SELECT appointment_id FROM walk_in_queue WHERE id = ?", [queueId]);
     
     if (qItem.length > 0 && qItem[0].appointment_id) {
        await db.query(
          `UPDATE appointments SET status = ? WHERE id = ?`,
-         [status, qItem[0].appointment_id]
+         [normalizedStatus, qItem[0].appointment_id]
        );
-       console.log(`[Sync] Updated Linked Appointment ${qItem[0].appointment_id} to status: ${status}`);
+       console.log(`[Sync] Updated Linked Appointment ${qItem[0].appointment_id} to status: ${normalizedStatus}`);
     }
 
-    res.json({ message: "Queue item updated and synchronized", id, status });
+    res.json({ message: "Queue item updated and synchronized", id: queueId, status: normalizedStatus });
   } catch (err) {
     console.error("Error updating queue:", err);
     res.status(500).json({ message: "Failed to update queue" });

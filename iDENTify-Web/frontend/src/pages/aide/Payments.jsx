@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import apiClient from "../../api/apiClient";
 import PaymentModal from "../../components/PaymentModal";
+import "../../styles/pages/aide/Payments.css";
 
 function toDateParam(date) {
   if (!date) return "";
@@ -28,9 +29,10 @@ function formatDateTime(value) {
   const parsed = parseDateTime(value);
   if (!parsed) return "-";
 
-  return `${parsed.toLocaleDateString()} ${parsed.toLocaleTimeString([], {
+  return `${parsed.toLocaleDateString("en-PH", { timeZone: "Asia/Manila" })} ${parsed.toLocaleTimeString("en-PH", {
     hour: "numeric",
     minute: "2-digit",
+    timeZone: "Asia/Manila",
   })}`;
 }
 
@@ -51,11 +53,74 @@ function formatMethodLabel(value) {
 }
 
 function rangeLabel(startDate, endDate) {
-  return `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`;
+  return `${startDate.toLocaleDateString("en-PH", { timeZone: "Asia/Manila" })} to ${endDate.toLocaleDateString("en-PH", { timeZone: "Asia/Manila" })}`;
 }
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function buildNormalizedOptions(values) {
+  const optionMap = new Map();
+
+  (values || []).forEach((value) => {
+    const label = String(value || "").trim();
+    if (!label) return;
+    const normalized = normalizeText(label);
+    if (!normalized) return;
+    if (!optionMap.has(normalized)) {
+      optionMap.set(normalized, label);
+    }
+  });
+
+  return Array.from(optionMap.entries())
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function toPositiveInt(value) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+function normalizeServices(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+
+  const text = String(value || "").trim();
+  if (!text) return [];
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+    }
+  } catch {
+    // Ignore parse errors and fall back to comma split.
+  }
+
+  return text.split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+function sanitizeSplitContext(rawContext) {
+  if (!rawContext || typeof rawContext !== "object") return null;
+
+  const services = normalizeServices(rawContext.services || rawContext.remaining_services);
+  if (services.length === 0) return null;
+
+  return {
+    sourcePaymentId: toPositiveInt(rawContext.sourcePaymentId),
+    patient_id: toPositiveInt(rawContext.patient_id),
+    patient_name: String(rawContext.patient_name || "").trim() || "Unknown",
+    dentist_id: toPositiveInt(rawContext.dentist_id),
+    dentist_name: String(rawContext.dentist_name || "").trim() || "Unassigned",
+    appointment_id: toPositiveInt(rawContext.appointment_id),
+    queue_id: toPositiveInt(rawContext.queue_id),
+    visit_datetime: String(rawContext.visit_datetime || "").trim() || null,
+    services,
+  };
 }
 
 function isBillingRecord(row) {
@@ -68,6 +133,7 @@ function isPaidRecord(row) {
 
 function Payments() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [paymentRows, setPaymentRows] = useState([]);
@@ -77,9 +143,16 @@ function Payments() {
   const [endDate, setEndDate] = useState(new Date());
 
   const [search, setSearch] = useState("");
+  const [dentistFilter, setDentistFilter] = useState("all");
+  const [serviceFilter, setServiceFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [busyId, setBusyId] = useState(null);
   const [openingRecordId, setOpeningRecordId] = useState(null);
   const [focusHandled, setFocusHandled] = useState(false);
+  const [continuationPaymentId, setContinuationPaymentId] = useState(null);
+  const [continuationQueueId, setContinuationQueueId] = useState(null);
+  const [splitSourcePaymentId, setSplitSourcePaymentId] = useState(null);
+  const [splitCreateContext, setSplitCreateContext] = useState(null);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
@@ -105,6 +178,10 @@ function Payments() {
 
   useEffect(() => {
     setFocusHandled(false);
+    setContinuationPaymentId(null);
+    setContinuationQueueId(null);
+    setSplitSourcePaymentId(null);
+    setSplitCreateContext(null);
   }, [location.key]);
 
   const filteredRows = useMemo(() => {
@@ -112,26 +189,44 @@ function Payments() {
 
     return (paymentRows || [])
       .filter((row) => {
-        if (!needle) return true;
-
         const patientName = normalizeText(row.patient_name);
-        const dentistName = normalizeText(row.dentist_name);
-        const serviceNames = normalizeText(row.services_text);
-        const status = normalizeText(row.payment_status);
-        const method = normalizeText(row.latest_payment_method);
 
-        return patientName.includes(needle)
-          || dentistName.includes(needle)
-          || serviceNames.includes(needle)
-          || status.includes(needle)
-          || method.includes(needle);
+        if (needle && !patientName.includes(needle)) {
+          return false;
+        }
+
+        if (dentistFilter !== "all" && normalizeText(row.dentist_name) !== dentistFilter) {
+          return false;
+        }
+
+        if (statusFilter !== "all" && normalizeText(row.payment_status) !== statusFilter) {
+          return false;
+        }
+
+        if (serviceFilter !== "all") {
+          const rowServices = normalizeServices(row.services || row.services_text).map((serviceName) => normalizeText(serviceName));
+          if (!rowServices.includes(serviceFilter)) {
+            return false;
+          }
+        }
+
+        return true;
       })
       .sort((a, b) => {
         const aDate = parseDateTime(a.latest_payment_at || a.updated_at || a.created_at)?.getTime() || 0;
         const bDate = parseDateTime(b.latest_payment_at || b.updated_at || b.created_at)?.getTime() || 0;
         return bDate - aDate;
       });
-  }, [paymentRows, search]);
+  }, [paymentRows, search, dentistFilter, serviceFilter, statusFilter]);
+
+  const dentistOptions = useMemo(() => buildNormalizedOptions((paymentRows || []).map((row) => row.dentist_name)), [paymentRows]);
+
+  const serviceOptions = useMemo(() => {
+    const services = (paymentRows || []).flatMap((row) => normalizeServices(row.services || row.services_text));
+    return buildNormalizedOptions(services);
+  }, [paymentRows]);
+
+  const statusOptions = useMemo(() => buildNormalizedOptions((paymentRows || []).map((row) => row.payment_status)), [paymentRows]);
 
   const totals = useMemo(() => {
     const billing = filteredRows.filter((row) => isBillingRecord(row)).length;
@@ -186,13 +281,23 @@ function Payments() {
     if (busyId || openingRecordId) return;
     setIsPaymentModalOpen(false);
     setSelectedRecord(null);
+    if (splitCreateContext) {
+      setSplitCreateContext(null);
+      setSplitSourcePaymentId(null);
+    }
   };
 
   useEffect(() => {
-    const focusPaymentId = Number(location.state?.focusPaymentId || 0);
+    const focusPaymentId = toPositiveInt(location.state?.focusPaymentId);
+    const sessionQueueId = toPositiveInt(location.state?.sessionQueueId);
+    const splitContext = sanitizeSplitContext(location.state?.splitPaymentContext);
     if (!focusPaymentId || focusHandled) return;
 
     setFocusHandled(true);
+    setContinuationPaymentId(focusPaymentId);
+    setContinuationQueueId(sessionQueueId);
+    setSplitCreateContext(splitContext);
+    setSplitSourcePaymentId(toPositiveInt(location.state?.splitPaymentContext?.sourcePaymentId) || focusPaymentId);
 
     const openFocusedRecord = async () => {
       setOpeningRecordId(focusPaymentId);
@@ -224,11 +329,40 @@ function Payments() {
         ...payload,
       });
 
+      const shouldOpenSplitCreate = Boolean(
+        splitCreateContext
+        && Number(splitSourcePaymentId || continuationPaymentId) === Number(selectedRecord.id)
+      );
+
+      const shouldSyncContinuationQueue = Boolean(
+        continuationQueueId
+        && continuationPaymentId
+        && Number(continuationPaymentId) === Number(selectedRecord.id)
+      );
+
+      if (shouldSyncContinuationQueue) {
+        try {
+          await apiClient.updateQueueItem(continuationQueueId, { status: "Done" });
+        } catch (syncError) {
+          console.error("Failed to sync queue status after installment", syncError);
+          toast.error("Payment saved, but queue status sync failed.");
+        } finally {
+          setContinuationPaymentId(null);
+          setContinuationQueueId(null);
+        }
+      }
+
       toast.success("Payment installment saved.");
 
       setIsPaymentModalOpen(false);
       setSelectedRecord(null);
       await loadPayments();
+
+      if (shouldOpenSplitCreate) {
+        toast.success("Proceed to collect payment for remaining services.");
+        setIsPaymentModalOpen(true);
+        return;
+      }
 
       if (Number(updated?.balance_due || 0) <= 0) {
         toast.success("Payment is now fully settled.");
@@ -240,7 +374,81 @@ function Payments() {
     }
   };
 
+  const handleCreateSplitPayment = async (payload) => {
+    if (!splitCreateContext) return;
+
+    const totalDue = Number(payload?.total_due || 0);
+    const amountPaidNow = Number(payload?.amount_paid_now || 0);
+    if (!Number.isFinite(totalDue) || totalDue <= 0) {
+      toast.error("Enter a valid total amount due for remaining services.");
+      return;
+    }
+
+    if (!Number.isFinite(amountPaidNow) || amountPaidNow < totalDue) {
+      toast.error("Remaining services must be fully paid.");
+      return;
+    }
+
+    setBusyId(splitCreateContext.sourcePaymentId || -1);
+    try {
+      await apiClient.createPaymentRecord({
+        ...splitCreateContext,
+        ...payload,
+        queue_id: splitCreateContext.queue_id,
+        appointment_id: splitCreateContext.appointment_id,
+        services: splitCreateContext.services,
+        is_deposit: false,
+        allow_split_record: true,
+        notes: `Split payment after continuing record #${splitCreateContext.sourcePaymentId || "N/A"}`,
+      });
+
+      toast.success("Payment for remaining services saved.");
+
+      setIsPaymentModalOpen(false);
+      setSelectedRecord(null);
+      setSplitCreateContext(null);
+      setSplitSourcePaymentId(null);
+      setContinuationQueueId(null);
+      setContinuationPaymentId(null);
+      await loadPayments();
+
+      if (location.state?.focusPaymentId || location.state?.splitPaymentContext) {
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    } catch (err) {
+      if (err?.status === 409) {
+        toast.error(err?.message || "Split payment is blocked. Run the split-payment DB index migration and retry.");
+      } else {
+        toast.error(err.message || "Failed to save payment for remaining services.");
+      }
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const splitModalSummary = useMemo(() => {
+    if (!splitCreateContext) return {};
+    return {
+      patient_name: splitCreateContext.patient_name,
+      dentist_name: splitCreateContext.dentist_name,
+      visit_datetime: splitCreateContext.visit_datetime,
+      services: splitCreateContext.services,
+    };
+  }, [splitCreateContext]);
+
+  const isSplitCreateMode = Boolean(splitCreateContext);
+
   const modalInitialValues = useMemo(() => {
+    if (isSplitCreateMode) {
+      return {
+        total_due: "",
+        is_deposit: false,
+        already_paid: 0,
+        payment_method: "cash",
+        amount_paid_now: "",
+      };
+    }
+
     if (!selectedRecord) return {};
 
     const balanceDue = Number(selectedRecord.balance_due || 0);
@@ -251,25 +459,27 @@ function Payments() {
       payment_method: "cash",
       amount_paid_now: balanceDue > 0 ? balanceDue : 0,
     };
-  }, [selectedRecord]);
+  }, [isSplitCreateMode, selectedRecord]);
 
   return (
-    <section style={{ padding: "1.5rem" }}>
-      <h1>Payments</h1>
-      <p style={{ marginTop: "0.25rem", color: "#64748b" }}>
-        Review billing records, add installments, and finalize pending balances.
-      </p>
+    <section className="payments-page">
+      <div className="payments-header">
+        <h1 className="payments-title">Payments</h1>
+        <p className="payments-subtitle">
+          Review billing records, add installments, and finalize pending balances.
+        </p>
+      </div>
 
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "1rem" }}>
+      <div className="payments-range-buttons">
         <button type="button" onClick={() => applyRange("daily")} className={`export-btn ${rangeType === "daily" ? "pdf" : ""}`}>Today</button>
         <button type="button" onClick={() => applyRange("weekly")} className={`export-btn ${rangeType === "weekly" ? "pdf" : ""}`}>Past Week</button>
         <button type="button" onClick={() => applyRange("monthly")} className={`export-btn ${rangeType === "monthly" ? "pdf" : ""}`}>Past Month</button>
         <button type="button" onClick={() => applyRange("yearly")} className={`export-btn ${rangeType === "yearly" ? "pdf" : ""}`}>Past Year</button>
       </div>
 
-      <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", flexWrap: "wrap", marginTop: "0.9rem" }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-          <span style={{ fontSize: "0.8rem", color: "#64748b" }}>Start Date</span>
+      <div className="payments-filters">
+        <label className="filter-group">
+          <span>Start Date</span>
           <input
             type="date"
             value={toDateParam(startDate)}
@@ -280,8 +490,8 @@ function Payments() {
           />
         </label>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-          <span style={{ fontSize: "0.8rem", color: "#64748b" }}>End Date</span>
+        <label className="filter-group">
+          <span>End Date</span>
           <input
             type="date"
             value={toDateParam(endDate)}
@@ -293,97 +503,133 @@ function Payments() {
           />
         </label>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem", minWidth: "260px" }}>
-          <span style={{ fontSize: "0.8rem", color: "#64748b" }}>Search</span>
+        <label className="filter-group search-filter-group">
+          <span>Search Patient</span>
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Patient, dentist, services, status"
+            placeholder="Patient name"
           />
         </label>
 
-        <button type="button" onClick={loadPayments} disabled={loading}>
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
+        <label className="filter-group">
+          <span>Dentist</span>
+          <select value={dentistFilter} onChange={(e) => setDentistFilter(e.target.value)}>
+            <option value="all">All Dentists</option>
+            {dentistOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="filter-group">
+          <span>Service</span>
+          <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)}>
+            <option value="all">All Services</option>
+            {serviceOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="filter-group">
+          <span>Status</span>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="all">All Statuses</option>
+            {statusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
-      <p style={{ marginTop: "0.8rem", marginBottom: "1rem", color: "#475569", fontSize: "0.9rem" }}>
-        Range: {rangeLabel(startDate, endDate)}
-      </p>
+      <p className="payments-range-note">Range: {rangeLabel(startDate, endDate)}</p>
+      <p className="payments-range-note">Outstanding balances are always shown, even outside the selected range.</p>
 
-      {loading ? <p>Loading payment records...</p> : null}
-      {!loading && error ? <p style={{ color: "#dc2626" }}>{error}</p> : null}
+      {loading ? <p className="payments-loading">Loading payment records...</p> : null}
+      {!loading && error ? <p className="payments-error">{error}</p> : null}
 
       {!loading && !error ? (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "0.75rem" }}>
-            <article style={{ border: "1px solid #e5e7eb", borderRadius: "10px", padding: "0.7rem 0.9rem", background: "#fff" }}>
-              <p style={{ margin: 0, color: "#64748b", fontSize: "0.8rem" }}>In Billing Queue</p>
-              <p style={{ margin: "0.25rem 0 0 0", fontWeight: 700, fontSize: "1.35rem" }}>{totals.billing}</p>
+          <div className="payments-summary-grid">
+            <article className="payments-summary-card">
+              <p>In Billing Queue</p>
+              <h3>{totals.billing}</h3>
             </article>
-            <article style={{ border: "1px solid #e5e7eb", borderRadius: "10px", padding: "0.7rem 0.9rem", background: "#fff" }}>
-              <p style={{ margin: 0, color: "#64748b", fontSize: "0.8rem" }}>Paid / Completed</p>
-              <p style={{ margin: "0.25rem 0 0 0", fontWeight: 700, fontSize: "1.35rem" }}>{totals.paid}</p>
+            <article className="payments-summary-card">
+              <p>Paid / Completed</p>
+              <h3>{totals.paid}</h3>
             </article>
-            <article style={{ border: "1px solid #e5e7eb", borderRadius: "10px", padding: "0.7rem 0.9rem", background: "#fff" }}>
-              <p style={{ margin: 0, color: "#64748b", fontSize: "0.8rem" }}>Total Payment Records</p>
-              <p style={{ margin: "0.25rem 0 0 0", fontWeight: 700, fontSize: "1.35rem" }}>{totals.total}</p>
+            <article className="payments-summary-card">
+              <p>Total Payment Records</p>
+              <h3>{totals.total}</h3>
             </article>
-            <article style={{ border: "1px solid #e5e7eb", borderRadius: "10px", padding: "0.7rem 0.9rem", background: "#fff" }}>
-              <p style={{ margin: 0, color: "#64748b", fontSize: "0.8rem" }}>Total Billed</p>
-              <p style={{ margin: "0.25rem 0 0 0", fontWeight: 700, fontSize: "1.1rem" }}>{formatCurrency(totals.billedAmount)}</p>
+            <article className="payments-summary-card">
+              <p>Total Billed</p>
+              <h3>{formatCurrency(totals.billedAmount)}</h3>
             </article>
-            <article style={{ border: "1px solid #e5e7eb", borderRadius: "10px", padding: "0.7rem 0.9rem", background: "#fff" }}>
-              <p style={{ margin: 0, color: "#64748b", fontSize: "0.8rem" }}>Collected</p>
-              <p style={{ margin: "0.25rem 0 0 0", fontWeight: 700, fontSize: "1.1rem" }}>{formatCurrency(totals.collectedAmount)}</p>
+            <article className="payments-summary-card">
+              <p>Collected</p>
+              <h3>{formatCurrency(totals.collectedAmount)}</h3>
             </article>
           </div>
 
-          <div style={{ marginTop: "1rem", overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", background: "#fff" }}>
+          <div className="payments-table-container">
+            <table className="payments-table">
               <thead>
                 <tr>
-                  <th style={{ textAlign: "left", padding: "0.6rem", borderBottom: "1px solid #d1d5db" }}>Patient</th>
-                  <th style={{ textAlign: "left", padding: "0.6rem", borderBottom: "1px solid #d1d5db" }}>Dentist</th>
-                  <th style={{ textAlign: "left", padding: "0.6rem", borderBottom: "1px solid #d1d5db" }}>Last Payment</th>
-                  <th style={{ textAlign: "left", padding: "0.6rem", borderBottom: "1px solid #d1d5db" }}>Services</th>
-                  <th style={{ textAlign: "left", padding: "0.6rem", borderBottom: "1px solid #d1d5db" }}>Due</th>
-                  <th style={{ textAlign: "left", padding: "0.6rem", borderBottom: "1px solid #d1d5db" }}>Paid</th>
-                  <th style={{ textAlign: "left", padding: "0.6rem", borderBottom: "1px solid #d1d5db" }}>Balance</th>
-                  <th style={{ textAlign: "left", padding: "0.6rem", borderBottom: "1px solid #d1d5db" }}>Deposit</th>
-                  <th style={{ textAlign: "left", padding: "0.6rem", borderBottom: "1px solid #d1d5db" }}>Status</th>
-                  <th style={{ textAlign: "left", padding: "0.6rem", borderBottom: "1px solid #d1d5db" }}>Latest Method</th>
-                  <th style={{ textAlign: "left", padding: "0.6rem", borderBottom: "1px solid #d1d5db" }}>Action</th>
+                  <th>Patient</th>
+                  <th>Dentist</th>
+                  <th>Last Payment</th>
+                  <th>Services</th>
+                  <th>Due</th>
+                  <th>Paid</th>
+                  <th>Balance</th>
+                  <th>Deposit</th>
+                  <th>Status</th>
+                  <th>Latest Method</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan="11" style={{ padding: "0.9rem", color: "#64748b" }}>
+                    <td colSpan="11" className="payments-empty-state">
                       No payment records found for this range.
                     </td>
                   </tr>
                 ) : (
                   filteredRows.map((row) => (
                     <tr key={row.id}>
-                      <td style={{ padding: "0.55rem", borderBottom: "1px solid #f1f5f9" }}>{row.patient_name || "Unknown"}</td>
-                      <td style={{ padding: "0.55rem", borderBottom: "1px solid #f1f5f9" }}>{row.dentist_name || "Unassigned"}</td>
-                      <td style={{ padding: "0.55rem", borderBottom: "1px solid #f1f5f9" }}>{formatDateTime(row.latest_payment_at || row.updated_at || row.created_at)}</td>
-                      <td style={{ padding: "0.55rem", borderBottom: "1px solid #f1f5f9", maxWidth: "220px" }}>{row.services_text || "-"}</td>
-                      <td style={{ padding: "0.55rem", borderBottom: "1px solid #f1f5f9" }}>{formatCurrency(row.total_due)}</td>
-                      <td style={{ padding: "0.55rem", borderBottom: "1px solid #f1f5f9" }}>{formatCurrency(row.amount_paid)}</td>
-                      <td style={{ padding: "0.55rem", borderBottom: "1px solid #f1f5f9", fontWeight: 600 }}>{formatCurrency(row.balance_due)}</td>
-                      <td style={{ padding: "0.55rem", borderBottom: "1px solid #f1f5f9" }}>{row.is_deposit ? "Yes" : "No"}</td>
-                      <td style={{ padding: "0.55rem", borderBottom: "1px solid #f1f5f9" }}>{row.payment_status || "-"}</td>
-                      <td style={{ padding: "0.55rem", borderBottom: "1px solid #f1f5f9" }}>{formatMethodLabel(row.latest_payment_method)}</td>
-                      <td style={{ padding: "0.55rem", borderBottom: "1px solid #f1f5f9" }}>
+                      <td>{row.patient_name || "Unknown"}</td>
+                      <td>{row.dentist_name || "Unassigned"}</td>
+                      <td>{formatDateTime(row.latest_payment_at || row.updated_at || row.created_at)}</td>
+                      <td className="payments-services-cell">{row.services_text || "-"}</td>
+                      <td>{formatCurrency(row.total_due)}</td>
+                      <td>{formatCurrency(row.amount_paid)}</td>
+                      <td className="payments-balance-cell">{formatCurrency(row.balance_due)}</td>
+                      <td>{row.is_deposit ? "Yes" : "No"}</td>
+                      <td>{row.payment_status || "-"}</td>
+                      <td>{formatMethodLabel(row.latest_payment_method)}</td>
+                      <td>
                         {isBillingRecord(row) ? (
-                          <button type="button" onClick={() => handleOpenRecord(row)} disabled={busyId === row.id || openingRecordId === row.id}>
-                            {busyId === row.id ? "Saving..." : openingRecordId === row.id ? "Loading..." : "Review / Add Payment"}
+                          <button
+                            type="button"
+                            className="review-btn"
+                            onClick={() => handleOpenRecord(row)}
+                            disabled={busyId === row.id || openingRecordId === row.id}
+                          >
+                            {busyId === row.id ? "Saving..." : openingRecordId === row.id ? "Loading..." : "Update / Add Payment"}
                           </button>
                         ) : (
-                          <span style={{ color: "#166534", fontWeight: 600 }}>Paid</span>
+                          <span className="status-paid-text">Paid</span>
                         )}
                       </td>
                     </tr>
@@ -398,12 +644,13 @@ function Payments() {
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={handleCloseRecord}
-        onSubmit={handleSaveInstallment}
+        onSubmit={isSplitCreateMode ? handleCreateSplitPayment : handleSaveInstallment}
         isSubmitting={Boolean(busyId)}
-        summary={selectedRecord || {}}
-        transactions={selectedRecord?.transactions || []}
+        summary={isSplitCreateMode ? splitModalSummary : (selectedRecord || {})}
+        transactions={isSplitCreateMode ? [] : (selectedRecord?.transactions || [])}
         initialValues={modalInitialValues}
-        mode="edit"
+        mode={isSplitCreateMode ? "create" : "edit"}
+        unpaidMatches={[]}
       />
     </section>
   );

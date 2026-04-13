@@ -594,7 +594,11 @@ router.post("/", async (req, res) => {
 
   if (!appointment_datetime) return res.status(400).json({ message: "Invalid time format" });
 
+  let connection;
   try {
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
     const finalReason = buildReasonText(services, procedure);
     const durationMinutes = await resolveDurationMinutes({
       services,
@@ -607,7 +611,7 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: "Invalid computed end time." });
     }
 
-    const [existingConflict] = await db.query(
+    const [existingConflict] = await connection.query(
       `SELECT id FROM appointments 
        WHERE dentist_id = ? 
        AND status NOT IN ('Cancelled', 'Declined')
@@ -617,16 +621,38 @@ router.post("/", async (req, res) => {
     );
 
     if (existingConflict.length > 0) {
+      await connection.rollback();
       return res.status(409).json({ message: "This time slot is already booked for this dentist. Please select another time." });
     }
 
-    const [result] = await db.query(
+    const [result] = await connection.query(
       `INSERT INTO appointments (patient_id, dentist_id, appointment_datetime, end_datetime, reason, notes, status)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [patient_id, dentist_id, appointment_datetime, endDateTime, finalReason, notes || "", status || 'Scheduled']
     );
+
+    const [existingQueueRows] = await connection.query(
+      `SELECT id FROM walk_in_queue WHERE appointment_id = ? LIMIT 1`,
+      [result.insertId]
+    );
+
+    if (existingQueueRows.length === 0) {
+      await connection.query(
+        `INSERT INTO walk_in_queue (patient_id, dentist_id, appointment_id, source, status, notes, time_added)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          patient_id,
+          dentist_id,
+          result.insertId,
+          "appointment",
+          status || "Scheduled",
+          finalReason || notes || "",
+          appointment_datetime,
+        ]
+      );
+    }
     
-    const [rows] = await db.query(
+    const [rows] = await connection.query(
       `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name  
          FROM appointments a 
          JOIN patients p ON a.patient_id = p.id 
@@ -634,10 +660,19 @@ router.post("/", async (req, res) => {
          WHERE a.id = ?`,
         [result.insertId]
     );
+
+    await connection.commit();
     res.status(201).json(rows[0]);
   } catch (err) {
+    if (connection) {
+      await connection.rollback();
+    }
     console.error("Save error:", err);
     res.status(500).json({ message: "Database save failed" });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
 

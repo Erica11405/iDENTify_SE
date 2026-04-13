@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS `walk_in_queue` (
 );
 
 -- PAYMENT RECORDS TABLE
--- Stores one billing record per appointment/queue context.
+-- Stores billing records for appointment/queue context.
+-- Multiple records are allowed to support split flows (existing deposit + new one-time services).
 CREATE TABLE IF NOT EXISTS `payment_records` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `patient_id` INT NOT NULL,
@@ -109,8 +110,8 @@ CREATE TABLE IF NOT EXISTS `payment_records` (
   `notes` TEXT,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY `uniq_payment_queue` (`queue_id`),
-  UNIQUE KEY `uniq_payment_appointment` (`appointment_id`),
+  INDEX `idx_payment_queue` (`queue_id`),
+  INDEX `idx_payment_appointment` (`appointment_id`),
   INDEX `idx_payment_patient` (`patient_id`),
   INDEX `idx_payment_status` (`payment_status`),
   INDEX `idx_payment_created` (`created_at`),

@@ -2,6 +2,7 @@ const mysql = require("mysql2");
 require("dotenv").config();
 
 let poolConfig = {};
+const DB_TIMEZONE = process.env.DB_TIMEZONE || "+08:00";
 
 const forceIndividualDbConfig =
   process.env.DB_FORCE_INDIVIDUAL === "1" ||
@@ -69,10 +70,19 @@ if (!forceIndividualDbConfig && process.env.DATABASE_URL) {
   };
 }
 
+poolConfig.timezone = DB_TIMEZONE;
 const pool = mysql.createPool(poolConfig);
 
 pool.on('error', (err) => {
   console.error('Database pool error:', err);
+});
+
+pool.on('connection', (connection) => {
+  connection.query("SET time_zone = ?", [DB_TIMEZONE], (error) => {
+    if (error) {
+      console.error("Failed to set DB session timezone:", error.message || error);
+    }
+  });
 });
 
 module.exports = pool.promise();
