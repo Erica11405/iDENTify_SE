@@ -762,7 +762,7 @@ export const upsertToothCondition = async (payload) => {
 };
 
 export const getTreatmentTimeline = async (patientId, year) => {
-    const res = await fetch(`${API_BASE}/treatment-timeline/${patientId}?record_year=${year}`);
+    const res = await fetch(`${API_BASE}/treatment-timeline/${patientId}?year=${year}`);
     return handleResponse(res);
 };
 
@@ -776,7 +776,7 @@ export const addTreatmentTimelineEntry = async (payload) => {
 };
 
 export const getMedications = async (patientId, year) => {
-    const res = await fetch(`${API_BASE}/medications/${patientId}?record_year=${year}`);
+    const res = await fetch(`${API_BASE}/medications/${patientId}?year=${year}`);
     return handleResponse(res);
 };
 

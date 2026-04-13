@@ -56,7 +56,7 @@ router.get("/record/:treatment_id", async (req, res) => {
 router.get("/:patient_id", async (req, res) => {
   try {
     const { patient_id } = req.params;
-    const { year } = req.query;
+    const year = req.query.year || req.query.record_year;
 
     let query = "SELECT * FROM medications WHERE patient_id = ?";
     const params = [patient_id];

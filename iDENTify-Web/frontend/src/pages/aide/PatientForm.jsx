@@ -1225,10 +1225,12 @@ function PatientForm({ userRole }) {
 				setToothStatuses(newToothStatuses);
 
 				const timeline = await apiClient.getTreatmentTimeline(id, selectedYear);
-				setTimelineEntries(timeline || []);
+				const timelineForYear = (timeline || []).filter((entry) => Number(entry?.record_year || selectedYear) === Number(selectedYear));
+				setTimelineEntries(timelineForYear);
 
 				const meds = await apiClient.getMedications(id, selectedYear);
-				setMedications(meds || []);
+				const medsForYear = (meds || []).filter((entry) => Number(entry?.record_year || selectedYear) === Number(selectedYear));
+				setMedications(medsForYear);
 
 				let dbAppointments = allAppointments;
 				if (!dbAppointments || dbAppointments.length === 0) {
@@ -1261,7 +1263,9 @@ function PatientForm({ userRole }) {
 				const cleanDate = now.toLocaleDateString();
 				const cleanTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-				if (linkedAppointment) {
+				const shouldAutofillFromLinkedAppointment = Number(selectedYear) === 1;
+
+				if (linkedAppointment && shouldAutofillFromLinkedAppointment) {
 					let procData = 
 						linkedAppointment.reason || 
 						linkedAppointment.procedure || 

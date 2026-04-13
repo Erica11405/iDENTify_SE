@@ -80,7 +80,7 @@ router.get("/record/:id", async (req, res) => {
 // Existing route: Fetch all records for a patient
 router.get("/:patientId", async (req, res) => {
   const { patientId } = req.params;
-  const { year } = req.query;
+  const year = req.query.year || req.query.record_year;
 
   try {
     let query = "SELECT * FROM treatment_timeline WHERE patient_id = ?";
