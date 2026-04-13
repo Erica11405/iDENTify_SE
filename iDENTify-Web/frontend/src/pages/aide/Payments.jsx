@@ -470,39 +470,43 @@ function Payments() {
         </p>
       </div>
 
-      <div className="payments-range-buttons">
-        <button type="button" onClick={() => applyRange("daily")} className={`export-btn ${rangeType === "daily" ? "pdf" : ""}`}>Today</button>
-        <button type="button" onClick={() => applyRange("weekly")} className={`export-btn ${rangeType === "weekly" ? "pdf" : ""}`}>Past Week</button>
-        <button type="button" onClick={() => applyRange("monthly")} className={`export-btn ${rangeType === "monthly" ? "pdf" : ""}`}>Past Month</button>
-        <button type="button" onClick={() => applyRange("yearly")} className={`export-btn ${rangeType === "yearly" ? "pdf" : ""}`}>Past Year</button>
+      <div className="payments-top-controls">
+        <div className="payments-range-buttons">
+          <button type="button" onClick={() => applyRange("daily")} className={`export-btn ${rangeType === "daily" ? "pdf" : ""}`}>Today</button>
+          <button type="button" onClick={() => applyRange("weekly")} className={`export-btn ${rangeType === "weekly" ? "pdf" : ""}`}>Past Week</button>
+          <button type="button" onClick={() => applyRange("monthly")} className={`export-btn ${rangeType === "monthly" ? "pdf" : ""}`}>Past Month</button>
+          <button type="button" onClick={() => applyRange("yearly")} className={`export-btn ${rangeType === "yearly" ? "pdf" : ""}`}>Past Year</button>
+        </div>
+
+        <div className="payments-date-filters">
+          <label className="filter-group compact-filter">
+            <span>Start Date</span>
+            <input
+              type="date"
+              value={toDateParam(startDate)}
+              onChange={(e) => {
+                setRangeType("custom");
+                setStartDate(parseDateInput(e.target.value));
+              }}
+            />
+          </label>
+
+          <label className="filter-group compact-filter">
+            <span>End Date</span>
+            <input
+              type="date"
+              value={toDateParam(endDate)}
+              min={toDateParam(startDate)}
+              onChange={(e) => {
+                setRangeType("custom");
+                setEndDate(parseDateInput(e.target.value));
+              }}
+            />
+          </label>
+        </div>
       </div>
 
-      <div className="payments-filters">
-        <label className="filter-group">
-          <span>Start Date</span>
-          <input
-            type="date"
-            value={toDateParam(startDate)}
-            onChange={(e) => {
-              setRangeType("custom");
-              setStartDate(parseDateInput(e.target.value));
-            }}
-          />
-        </label>
-
-        <label className="filter-group">
-          <span>End Date</span>
-          <input
-            type="date"
-            value={toDateParam(endDate)}
-            min={toDateParam(startDate)}
-            onChange={(e) => {
-              setRangeType("custom");
-              setEndDate(parseDateInput(e.target.value));
-            }}
-          />
-        </label>
-
+      <div className="payments-filters-row">
         <label className="filter-group search-filter-group">
           <span>Search Patient</span>
           <input
@@ -513,7 +517,7 @@ function Payments() {
           />
         </label>
 
-        <label className="filter-group">
+        <label className="filter-group inline-filter">
           <span>Dentist</span>
           <select value={dentistFilter} onChange={(e) => setDentistFilter(e.target.value)}>
             <option value="all">All Dentists</option>
@@ -525,7 +529,7 @@ function Payments() {
           </select>
         </label>
 
-        <label className="filter-group">
+        <label className="filter-group inline-filter">
           <span>Service</span>
           <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)}>
             <option value="all">All Services</option>
@@ -537,7 +541,7 @@ function Payments() {
           </select>
         </label>
 
-        <label className="filter-group">
+        <label className="filter-group inline-filter">
           <span>Status</span>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="all">All Statuses</option>

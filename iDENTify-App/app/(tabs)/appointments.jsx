@@ -437,6 +437,8 @@ export default function AppointmentsScreen() {
     switch (status) {
       case 'Done': return { bg: '#DCFCE7', text: '#166534' };
       case 'Cancelled': return { bg: '#FEE2E2', text: '#991B1B' };
+      case 'No-Show': return { bg: '#E2E8F0', text: '#475569' };
+      case 'Missed': return { bg: '#E2E8F0', text: '#475569' };
       case 'Checked-In': return { bg: '#DBEAFE', text: '#1E40AF' };
       default: return { bg: '#FEF3C7', text: '#92400E' };
     }

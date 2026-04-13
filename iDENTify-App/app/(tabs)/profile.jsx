@@ -519,6 +519,7 @@
 // });
 
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -536,6 +537,21 @@ export default function ProfileScreen() {
   const { signOut } = useAuth();
   const router = useRouter();
   const [patientData, setPatientData] = useState(null);
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Log Out",
+      "Are you sure you want to log out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Log Out",
+          style: "destructive",
+          onPress: () => signOut(),
+        },
+      ],
+    );
+  };
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -637,7 +653,7 @@ export default function ProfileScreen() {
       {/* LOGOUT BUTTON */}
       <TouchableOpacity
         style={styles.logoutBtn}
-        onPress={signOut}
+        onPress={handleLogout}
         activeOpacity={0.8}
       >
         <Ionicons name="log-out-outline" size={20} color="#EF4444" />

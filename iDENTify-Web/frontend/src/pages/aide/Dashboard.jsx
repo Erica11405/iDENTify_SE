@@ -388,7 +388,7 @@ function Dashboard() {
   const totalAppointments = appointments.length;
   const nextPatient = queue.find(q => q.status === 'Waiting' || q.status === 'Checked-In');
   const patientsInBilling = queue.filter(q => q.status === 'Payment / Billing').length;
-  const cancelledCount = appointments.filter(a => a.status === 'Cancelled' || a.status === 'No-Show').length;
+  const cancelledCount = appointments.filter(a => a.status === 'Cancelled' || a.status === 'No-Show' || a.status === 'Missed').length;
   const cancellationRate = totalAppointments > 0 ? Math.round((cancelledCount / totalAppointments) * 100) : 0;
 
   // 4. CHART DATA LOGIC

@@ -21,7 +21,22 @@
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
+  margin-bottom: 0;
+}
+
+.payments-top-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.payments-date-filters {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+  justify-content: flex-end;
 }
 
 .export-btn {
@@ -50,10 +65,11 @@
   border-color: #e55a5a;
 }
 
-.payments-filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
+.payments-filters-row {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
   background-color: #f8f9fa;
   padding: 1.25rem;
   border-radius: 12px;
@@ -63,6 +79,15 @@
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+}
+
+.compact-filter {
+  min-width: 190px;
+}
+
+.inline-filter {
+  min-width: 185px;
+  flex: 1 1 185px;
 }
 
 .filter-group span {
@@ -81,6 +106,7 @@
 
 .search-filter-group {
   min-width: 260px;
+  flex: 1.4 1 280px;
 }
 
 .payments-range-note {
@@ -196,6 +222,28 @@
 @media (max-width: 768px) {
   .payments-page {
     padding: 1rem;
+  }
+
+  .payments-top-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .payments-date-filters {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .payments-filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inline-filter,
+  .search-filter-group,
+  .compact-filter {
+    min-width: 100%;
+    flex: 1 1 100%;
   }
 
   .payments-title {

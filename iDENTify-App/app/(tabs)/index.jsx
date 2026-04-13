@@ -75,8 +75,10 @@ export default function HomeScreen() {
 				const myAppts = allAppts
 					.filter((a) => {
 						const apptDate = parseDate(a.appointment_datetime);
+						const status = String(a.status || '').trim().toLowerCase();
+						const isInactive = ['done', 'cancelled', 'no-show', 'missed'].includes(status);
 						// Show appointments if they are Today or Future AND active
-						return apptDate >= todayStart && a.status !== 'Done' && a.status !== 'Cancelled';
+						return apptDate >= todayStart && !isInactive;
 					})
 					.sort((a, b) => {
 						return parseDate(a.appointment_datetime) - parseDate(b.appointment_datetime);

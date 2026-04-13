@@ -134,6 +134,7 @@ function DentistAppointments() {
   // 1. Fetch real appointments and patients from the global store
   const allAppointments = useAppStore((state) => state.appointments || []);
   const patients = useAppStore((state) => state.patients || []);
+  const queue = useAppStore((state) => state.queue || []);
 
   // 2. Get dynamically logged-in user
   const currentUser = useAppStore((state) => state.user); 
@@ -148,7 +149,17 @@ function DentistAppointments() {
     // Load data when page mounts
     api.loadAppointments();
     api.loadPatients();
+    api.loadQueue();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toDateKey = (value) => {
+    if (!value) return null;
+    const parsed = new Date(String(value).replace(' ', 'T'));
+    if (Number.isNaN(parsed.getTime())) {
+      return String(value).split('T')[0]?.split(' ')[0] || null;
+    }
+    return parsed.toLocaleDateString('en-CA');
+  };
 
   // 4. Filter appointments by BOTH Dentist ID and the Selected Date
   const myAppointments = allAppointments.filter(appt => {
@@ -157,10 +168,18 @@ function DentistAppointments() {
     
     // Match the date
     // Extract just the 'YYYY-MM-DD' part from the database datetime string
-    const apptDateStr = appt.appointment_datetime ? appt.appointment_datetime.split('T')[0] : null;
+    const apptDateStr = toDateKey(appt.appointment_datetime);
     const isSelectedDate = apptDateStr === selectedDate;
 
     return isMyPatient && isSelectedDate;
+  });
+
+  const walkInPatients = queue.filter((entry) => {
+    const isWalkIn = String(entry.source || '').trim().toLowerCase() === 'walk-in';
+    const isMyPatient = Number(entry.dentist_id) === Number(currentDentistId);
+    const queueDateStr = toDateKey(entry.time_added || entry.checkedInTime);
+    const isSelectedDate = queueDateStr === selectedDate;
+    return isWalkIn && isMyPatient && isSelectedDate;
   });
 
   return (
@@ -224,6 +243,63 @@ function DentistAppointments() {
                       <button 
                         className="review-chart-btn"
                         onClick={() => navigate(`/patients/${appt.patient_id}`)} 
+                      >
+                        Review Form
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="appointments-card" style={{ marginTop: '20px' }}>
+        <h2 className="appointments-title" style={{ fontSize: '1.2rem', marginBottom: '0.85rem' }}>Walk-In Patients</h2>
+        <table className="appointments-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Patient Name</th>
+              <th>Concern / Notes</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {walkInPatients.length === 0 ? (
+              <tr>
+                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>
+                  No walk-in patients found for {new Date(selectedDate).toLocaleDateString()}.
+                </td>
+              </tr>
+            ) : (
+              walkInPatients.map((entry) => {
+                const patientName = patients.find((p) => Number(p.id) === Number(entry.patient_id))?.name
+                  || patients.find((p) => Number(p.id) === Number(entry.patient_id))?.full_name
+                  || entry.full_name
+                  || 'Unknown Patient';
+
+                const queueTime = entry.time_added || entry.checkedInTime;
+                const formattedTime = queueTime
+                  ? new Date(String(queueTime).replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : 'N/A';
+
+                return (
+                  <tr key={entry.id}>
+                    <td style={{ fontWeight: 'bold' }}>{formattedTime}</td>
+                    <td className="patient-name-cell">{patientName}</td>
+                    <td>{entry.notes || 'Walk-in consultation'}</td>
+                    <td>
+                      <span className={`appt-status-badge ${entry.status?.toLowerCase() || 'scheduled'}`}>
+                        {entry.status || 'Waiting'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="review-chart-btn"
+                        onClick={() => navigate(`/patients/${entry.patient_id}`)}
                       >
                         Review Form
                       </button>

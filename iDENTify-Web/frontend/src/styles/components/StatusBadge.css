@@ -51,6 +51,11 @@
   color: #495057;
 }
 
+.status-badge.missed {
+  background-color: #f1f3f5;
+  color: #495057;
+}
+
 .status-badge.cancelled {
   background-color: #dee2e6;
   color: #6c757d;

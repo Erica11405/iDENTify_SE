@@ -1,14 +1,29 @@
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from "react-native";
+import { Alert, View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { API } from "../../constants/Api";
 import { Ionicons } from "@expo/vector-icons";
+
+const CANCELLATION_LOCK_MINUTES = 24 * 60;
+
+function parseDateTime(value) {
+  if (!value) return null;
+  const parsed = new Date(String(value).replace(" ", "T"));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getMinutesUntil(value) {
+  const parsed = parseDateTime(value);
+  if (!parsed) return null;
+  return Math.floor((parsed.getTime() - Date.now()) / 60000);
+}
 
 export default function AppointmentDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -54,8 +69,56 @@ export default function AppointmentDetails() {
     switch (status) {
       case 'Done': return { bg: '#DCFCE7', text: '#166534' }; // Green
       case 'Cancelled': return { bg: '#FEE2E2', text: '#991B1B' }; // Red
+      case 'No-Show': return { bg: '#E2E8F0', text: '#475569' };
+      case 'Missed': return { bg: '#E2E8F0', text: '#475569' };
       case 'Checked-In': return { bg: '#DBEAFE', text: '#1E40AF' }; // Blue
       default: return { bg: '#FEF3C7', text: '#92400E' }; // Yellow/Orange
+    }
+  };
+
+  const appointmentDate = parseDateTime(appointment.appointment_datetime);
+  const statusKey = String(appointment.status || "").trim().toLowerCase();
+  const minutesUntilAppointment = getMinutesUntil(appointment.appointment_datetime);
+  const isTerminalStatus = ["done", "cancelled", "no-show", "missed"].includes(statusKey);
+  const canCancel = !isTerminalStatus
+    && Number.isFinite(minutesUntilAppointment)
+    && minutesUntilAppointment > CANCELLATION_LOCK_MINUTES;
+
+  const cancelHint = isTerminalStatus
+    ? "This appointment can no longer be cancelled."
+    : (!Number.isFinite(minutesUntilAppointment)
+      ? "Cancellation window unavailable."
+      : (minutesUntilAppointment <= CANCELLATION_LOCK_MINUTES
+        ? "Cancellation is locked within 24 hours of the appointment time."
+        : "You can cancel this appointment now."));
+
+  const performCancellation = async () => {
+    if (!canCancel || cancelling) {
+      Alert.alert("Cancellation Locked", "You can only cancel at least 24 hours before the appointment time.");
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const res = await fetch(`${API.appointments}/${appointment.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "Cancelled" }),
+      });
+
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        Alert.alert("Unable to Cancel", payload?.message || "This appointment cannot be cancelled right now.");
+        return;
+      }
+
+      setAppointment(payload || { ...appointment, status: "Cancelled" });
+      Alert.alert("Appointment Cancelled", "Your appointment has been cancelled.");
+    } catch (error) {
+      console.error("Failed to cancel appointment", error);
+      Alert.alert("Network Error", "Failed to cancel appointment. Please try again.");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -104,14 +167,14 @@ export default function AppointmentDetails() {
           <DetailItem
             icon="calendar-outline"
             label="Date"
-            value={new Date(appointment.appointment_datetime).toLocaleDateString(undefined, {
+            value={(appointmentDate || new Date()).toLocaleDateString(undefined, {
               weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
             })}
           />
           <DetailItem
             icon="time-outline"
             label="Time"
-            value={new Date(appointment.appointment_datetime).toLocaleTimeString([], {
+            value={(appointmentDate || new Date()).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
             })}
@@ -125,6 +188,28 @@ export default function AppointmentDetails() {
             <Text style={styles.notesText}>{appointment.notes}</Text>
           </View>
         )}
+      </View>
+
+      <View style={styles.cancelSection}>
+        <TouchableOpacity
+          style={[styles.cancelButton, (!canCancel || cancelling) && styles.cancelButtonDisabled]}
+          onPress={() => {
+            Alert.alert(
+              "Cancel Appointment",
+              "Are you sure you want to cancel this appointment?",
+              [
+                { text: "No", style: "cancel" },
+                { text: "Yes", style: "destructive", onPress: performCancellation },
+              ],
+            );
+          }}
+          activeOpacity={0.85}
+          disabled={!canCancel || cancelling}
+        >
+          <Ionicons name="close-circle-outline" size={18} color="#FFFFFF" />
+          <Text style={styles.cancelButtonText}>{cancelling ? "Cancelling..." : "Cancel Appointment"}</Text>
+        </TouchableOpacity>
+        <Text style={styles.cancelHint}>{cancelHint}</Text>
       </View>
 
       {/* Footer Info */}
@@ -297,6 +382,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#854D0E",
     lineHeight: 20,
+  },
+
+  cancelSection: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  cancelButton: {
+    backgroundColor: "#EF4444",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  cancelButtonDisabled: {
+    backgroundColor: "#94A3B8",
+  },
+  cancelButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  cancelHint: {
+    marginTop: 8,
+    color: "#64748B",
+    fontSize: 12,
+    textAlign: "center",
   },
 
   /* FOOTER */

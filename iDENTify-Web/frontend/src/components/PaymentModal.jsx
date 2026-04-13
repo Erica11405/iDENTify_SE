@@ -28,10 +28,18 @@ function formatDateTime(value) {
   const parsed = new Date(String(value).replace(" ", "T"));
   if (Number.isNaN(parsed.getTime())) return "-";
 
-  return `${parsed.toLocaleDateString()} ${parsed.toLocaleTimeString([], {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
     hour: "numeric",
     minute: "2-digit",
-  })}`;
+    hour12: true,
+  }).formatToParts(parsed);
+
+  const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${lookup.year}-${lookup.month}-${lookup.day} ${lookup.hour}:${lookup.minute} ${(lookup.dayPeriod || "").toUpperCase()}`.trim();
 }
 
 function formatMethodLabel(value) {
@@ -245,7 +253,7 @@ function PaymentModal({
         <div className="payment-summary-card">
           <p><strong>Patient:</strong> {summary.patient_name || "Unknown"}</p>
           <p><strong>Dentist:</strong> {summary.dentist_name || "Unassigned"}</p>
-          <p><strong>Date and Time:</strong> {summary.visit_datetime || "Not set"}</p>
+          <p><strong>Date and Time:</strong> {summary.visit_datetime || summary.created_at ? formatDateTime(summary.visit_datetime || summary.created_at) : "Not set"}</p>
           <p><strong>Services:</strong></p>
           <div className="payment-service-list">
             {services.length > 0 ? services.map((service) => (

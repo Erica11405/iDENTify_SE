@@ -85,7 +85,7 @@ function SuperAdminDashboard() {
 
     const chartData = useMemo(() => {
         const { start, end } = getCurrentWeekRange();
-        const ignoredStatuses = new Set(['cancelled', 'no-show', 'declined']);
+        const ignoredStatuses = new Set(['cancelled', 'no-show', 'missed', 'declined']);
 
         const labelMap = new Map();
         dentists.forEach((dentist) => {

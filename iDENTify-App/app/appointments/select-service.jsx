@@ -141,6 +141,24 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator }
 import { useRouter } from 'expo-router';
 import { API } from '../../constants/Api'; 
 
+function formatEstimatedDuration(value) {
+  const minutes = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(minutes) || minutes <= 0) return 'Estimated Time: 30 mins';
+
+  if (minutes % 60 === 0) {
+    const hours = minutes / 60;
+    return `Estimated Time: ${hours} hr${hours > 1 ? 's' : ''}`;
+  }
+
+  if (minutes > 60) {
+    const hours = Math.floor(minutes / 60);
+    const remaining = minutes % 60;
+    return `Estimated Time: ${hours} hr${hours > 1 ? 's' : ''} ${remaining} mins`;
+  }
+
+  return `Estimated Time: ${minutes} mins`;
+}
+
 export default function SelectServiceScreen() {
   const router = useRouter();
   
@@ -217,6 +235,7 @@ export default function SelectServiceScreen() {
               <Text style={styles.servicePrice}>
                  Estimated: ₱{item.min_price} - ₱{item.max_price}
               </Text>
+              <Text style={styles.serviceDuration}>{formatEstimatedDuration(item.estimated_duration)}</Text>
             </View>
             <View style={styles.arrowIcon}>
                 <Text style={{ color: '#1B93D5', fontSize: 18 }}>→</Text>
@@ -270,6 +289,11 @@ const styles = StyleSheet.create({
   servicePrice: {
     fontSize: 14,
     color: '#666',
+  },
+  serviceDuration: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 3,
   },
   arrowIcon: {
     justifyContent: 'center',

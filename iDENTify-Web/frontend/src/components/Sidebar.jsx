@@ -170,6 +170,7 @@ import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import useAppStore from "../store/useAppStore";
 import ProfileModal from "./ProfileModal"; // <-- Import the new modal component
+import ConfirmationModal from "./ConfirmationModal";
 
 // Icons
 import DashboardIcon from "../assets/dashboard.svg";
@@ -192,8 +193,14 @@ function Sidebar({ role }) {
     
     // State to control the profile modal
     const [showProfileModal, setShowProfileModal] = useState(false);
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
 
     const handleLogout = () => {
+        setShowLogoutModal(true);
+    };
+
+    const confirmLogout = () => {
+        setShowLogoutModal(false);
         resetStore();
         navigate('/');
     };
@@ -272,8 +279,8 @@ function Sidebar({ role }) {
                                 <span>Dashboard</span>
                             </NavLink>
                             <NavLink to="/appointments" className={({ isActive }) => isActive ? 'active' : ''}>
-                                <img src={AppointmentIcon} alt="Appointments" />
-                                <span>Appointments</span>
+                                <img src={AppointmentIcon} alt="Patients" />
+                                <span>Patients</span>
                             </NavLink>
                             <NavLink to="/reports" className={({ isActive }) => isActive ? 'active' : ''}>
                                 <img src={ReportIcon} alt="Reports" />
@@ -323,6 +330,13 @@ function Sidebar({ role }) {
                 onClose={() => setShowProfileModal(false)} 
                 user={user}
                 role={role}
+            />
+
+            <ConfirmationModal
+                isOpen={showLogoutModal}
+                onClose={() => setShowLogoutModal(false)}
+                onConfirm={confirmLogout}
+                message="Are you sure you want to log out?"
             />
         </>
     );

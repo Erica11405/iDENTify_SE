@@ -147,6 +147,8 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const CANCELLATION_LOCK_MINUTES = 24 * 60;
+const SQL_PH_NOW = "DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR)";
 
 // --- TIMEZONE HELPERS FOR PHILIPPINES (Asia/Manila) ---
 function getPhDateOnly() {
@@ -192,6 +194,7 @@ const QUEUE_STATUS_MAP = {
   "no-show": "No-Show",
   "no show": "No-Show",
   "noshow": "No-Show",
+  "missed": "No-Show",
 };
 
 function normalizeQueueStatus(value, fallback = null) {
@@ -224,6 +227,20 @@ function normalizeQueueDateTime(value) {
   const parsed = new Date(text);
   if (Number.isNaN(parsed.getTime())) return null;
   return formatSqlDateTime(parsed);
+}
+
+async function getMinutesUntilAppointment(appointmentId) {
+  const [rows] = await db.query(
+    `SELECT TIMESTAMPDIFF(MINUTE, ${SQL_PH_NOW}, appointment_datetime) AS minutes_until
+     FROM appointments
+     WHERE id = ?
+     LIMIT 1`,
+    [appointmentId]
+  );
+
+  if (!rows.length) return null;
+  const minutesUntil = Number(rows[0]?.minutes_until);
+  return Number.isFinite(minutesUntil) ? minutesUntil : null;
 }
 
 router.get("/status", async (req, res) => {
@@ -379,19 +396,37 @@ router.put("/:id", async (req, res) => {
   }
 
   try {
+    const [qItemRows] = await db.query("SELECT appointment_id FROM walk_in_queue WHERE id = ?", [queueId]);
+    if (!qItemRows.length) {
+      return res.status(404).json({ message: "Queue item not found." });
+    }
+
+    const linkedAppointmentId = toPositiveInt(qItemRows[0].appointment_id);
+    if (normalizedStatus === "Cancelled" && linkedAppointmentId) {
+      const minutesUntil = await getMinutesUntilAppointment(linkedAppointmentId);
+
+      if (minutesUntil === null) {
+        return res.status(400).json({ message: "Unable to evaluate cancellation window." });
+      }
+
+      if (minutesUntil <= CANCELLATION_LOCK_MINUTES) {
+        return res.status(400).json({
+          message: "Appointments can only be cancelled at least 24 hours before the appointment time.",
+        });
+      }
+    }
+
     await db.query(
       `UPDATE walk_in_queue SET status = ? WHERE id = ?`,
       [normalizedStatus, queueId]
     );
 
-    const [qItem] = await db.query("SELECT appointment_id FROM walk_in_queue WHERE id = ?", [queueId]);
-    
-    if (qItem.length > 0 && qItem[0].appointment_id) {
+    if (linkedAppointmentId) {
        await db.query(
          `UPDATE appointments SET status = ? WHERE id = ?`,
-         [normalizedStatus, qItem[0].appointment_id]
+         [normalizedStatus, linkedAppointmentId]
        );
-       console.log(`[Sync] Updated Linked Appointment ${qItem[0].appointment_id} to status: ${normalizedStatus}`);
+       console.log(`[Sync] Updated Linked Appointment ${linkedAppointmentId} to status: ${normalizedStatus}`);
     }
 
     res.json({ message: "Queue item updated and synchronized", id: queueId, status: normalizedStatus });

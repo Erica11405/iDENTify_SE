@@ -412,7 +412,7 @@ function Appointments() {
     };
   }, [appointments, dentists, filters, selectedDate]);
 
-  const renderTable = (data, title, showActions = false) => (
+  const renderTable = (data, title, { showActions = false, showEdit = true } = {}) => (
     <div className="appointments-section">
       <h3 className="section-subtitle">{title}</h3>
       <div className="appointments-table-container">
@@ -436,7 +436,7 @@ function Appointments() {
             ) : (
               data.map((a) => {
                 const s = (a.status || "").toLowerCase().trim();
-                const canStart = !["done", "cancelled", "declined", "no-show"].includes(s);
+                const canStart = !["done", "cancelled", "declined", "no-show", "missed"].includes(s);
                 const apptDate = a.appointment_datetime ? new Date(a.appointment_datetime).toLocaleDateString() : "-";
 
                 return (
@@ -461,7 +461,7 @@ function Appointments() {
                     </td>
                     {showActions && (
                       <td>
-                        <button className="edit-btn" onClick={() => handleEdit(a)}>Edit</button>
+                        {showEdit ? <button className="edit-btn" onClick={() => handleEdit(a)}>Edit</button> : null}
                         <button
                           className="start-btn"
                           onClick={() => handleStartTreatment(a)}
@@ -649,11 +649,14 @@ function Appointments() {
         <StatusBadge status="Scheduled" /><StatusBadge status="Checked-In" /><StatusBadge status="Done" />
       </div>
 
-      {renderTable(selectedDateAppointments, `Appointments for ${new Date(selectedDate).toLocaleDateString()}`, true)}
+      {renderTable(selectedDateAppointments, `Appointments for ${new Date(selectedDate).toLocaleDateString()}`, {
+        showActions: true,
+        showEdit: false,
+      })}
       
       <hr style={{ margin: '3rem 0', border: 'none', borderTop: '2px dashed #e2e8f0' }} />
       
-      {renderTable(tomorrowAppointments, "Tomorrow's Preview", false)}
+      {renderTable(tomorrowAppointments, "Tomorrow's Preview", { showActions: false })}
 
       {isEditModalOpen && <EditAppointmentModal appointment={selectedAppointment} onSave={handleSaveAppointment} onCancel={handleCloseModal} dentists={dentists} />}
       {isAddModalOpen && <AddAppointmentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} dentists={dentists} onSave={handleAddAppointment} />}

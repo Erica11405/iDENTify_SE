@@ -406,6 +406,8 @@ const router = express.Router();
 const db = require("../db");
 
 const DEFAULT_DURATION_MINUTES = 30;
+const CANCELLATION_LOCK_MINUTES = 24 * 60;
+const SQL_PH_NOW = "DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR)";
 
 function parseTime(dateTimeStr) {
   if (!dateTimeStr) return null;
@@ -512,6 +514,37 @@ async function resolveDurationMinutes({ services, procedure, durationHint }) {
   }, 0);
 }
 
+async function syncOverdueAppointmentsToMissed() {
+  await db.query(
+    `UPDATE appointments
+     SET status = 'Missed'
+     WHERE status = 'Scheduled'
+       AND appointment_datetime <= ${SQL_PH_NOW}`
+  );
+
+  await db.query(
+    `UPDATE walk_in_queue q
+     JOIN appointments a ON a.id = q.appointment_id
+     SET q.status = 'No-Show'
+     WHERE a.status = 'Missed'
+       AND q.status NOT IN ('Done', 'Cancelled', 'No-Show')`
+  );
+}
+
+async function getMinutesUntilAppointment(appointmentId) {
+  const [rows] = await db.query(
+    `SELECT TIMESTAMPDIFF(MINUTE, ${SQL_PH_NOW}, appointment_datetime) AS minutes_until
+     FROM appointments
+     WHERE id = ?
+     LIMIT 1`,
+    [appointmentId]
+  );
+
+  if (!rows.length) return null;
+  const minutesUntil = Number(rows[0]?.minutes_until);
+  return Number.isFinite(minutesUntil) ? minutesUntil : null;
+}
+
 // --- CHECK DAILY LIMIT ---
 router.get("/check-limit", async (req, res) => {
   const { dentist_id, date } = req.query;
@@ -557,6 +590,7 @@ router.get("/", async (req, res) => {
   query += " ORDER BY a.appointment_datetime ASC";
 
   try {
+    await syncOverdueAppointmentsToMissed();
     const [rows] = await db.query(query, params);
     res.json(rows);
   } catch (err) {
@@ -567,6 +601,7 @@ router.get("/", async (req, res) => {
 // --- GET SINGLE APPOINTMENT ---
 router.get("/:id", async (req, res) => {
   try {
+    await syncOverdueAppointmentsToMissed();
     // ADDED: LEFT JOIN to fetch the dentist's name
     const [rows] = await db.query(
       `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name 
@@ -684,6 +719,8 @@ router.put("/:id", async (req, res) => {
   const values = [];
 
   try {
+    await syncOverdueAppointmentsToMissed();
+
     const [currentRows] = await db.query(
       `SELECT id, dentist_id, appointment_datetime, reason, end_datetime FROM appointments WHERE id = ? LIMIT 1`,
       [id]
@@ -694,6 +731,23 @@ router.put("/:id", async (req, res) => {
     }
 
     const currentAppt = currentRows[0];
+    const requestedStatus = String(fields.status || "").trim().toLowerCase();
+    const isCancelling = requestedStatus === "cancelled";
+
+    if (isCancelling && String(currentAppt.status || "").trim().toLowerCase() !== "cancelled") {
+      const minutesUntil = await getMinutesUntilAppointment(id);
+
+      if (minutesUntil === null) {
+        return res.status(400).json({ message: "Unable to evaluate cancellation window." });
+      }
+
+      if (minutesUntil <= CANCELLATION_LOCK_MINUTES) {
+        return res.status(400).json({
+          message: "Appointments can only be cancelled at least 24 hours before the appointment time.",
+        });
+      }
+    }
+
     const nextDentistId = fields.dentist_id || currentAppt.dentist_id;
 
     const parsedStart = fields.timeStart ? parseTime(fields.timeStart) : null;
