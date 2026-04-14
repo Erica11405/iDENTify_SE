@@ -102,22 +102,35 @@ export default function RecordDetails() {
   const router = useRouter();
   const [record, setRecord] = useState(null);
   const [medications, setMedications] = useState([]);
+  const [medicationsUnavailable, setMedicationsUnavailable] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const formatPeso = (value) => {
+    const amount = Number.parseFloat(String(value ?? ""));
+    if (!Number.isFinite(amount)) return "Not recorded";
+    return `PHP ${amount.toFixed(2)}`;
+  };
 
   useEffect(() => {
     const fetchDetailAndMeds = async () => {
       try {
-        // Fetch the Record Details
+        setMedicationsUnavailable(false);
         const res = await fetch(`${API.records}/record/${id}`);
         if (!res.ok) throw new Error("Failed to fetch record.");
         const data = await res.json();
         setRecord(data);
 
-        // Fetch Medications using the specific record ID
-        const medsRes = await fetch(`${API.medications}/record/${id}`);
-        if (medsRes.ok) {
+        try {
+          const medsRes = await fetch(`${API.medications}/record/${id}`);
+          if (!medsRes.ok) {
+            throw new Error("Failed to fetch medications.");
+          }
           const medsData = await medsRes.json();
-          setMedications(medsData);
+          setMedications(Array.isArray(medsData) ? medsData : []);
+        } catch (medsError) {
+          console.error("Medication fetch error:", medsError);
+          setMedications([]);
+          setMedicationsUnavailable(true);
         }
       } catch (error) {
         console.error("Error:", error);
@@ -152,10 +165,17 @@ export default function RecordDetails() {
 
       <Text style={styles.date}>{record.start_time}</Text>
       <Text style={styles.procedure}>{record.procedure_text}</Text>
-      
-      <View style={styles.row}>
-        <Ionicons name="person-outline" size={18} color="#64748B" />
-        <Text style={styles.provider}>Dr. {record.provider}</Text>
+
+      <Text style={styles.sectionLabel}>Appointment Details</Text>
+      <View style={styles.detailCard}>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Appointed Dentist</Text>
+          <Text style={styles.detailValue}>{record.provider ? `Dr. ${record.provider}` : "Not recorded"}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Price Paid</Text>
+          <Text style={styles.detailValue}>{formatPeso(record.price)}</Text>
+        </View>
       </View>
 
       <View style={styles.divider} />
@@ -166,11 +186,13 @@ export default function RecordDetails() {
       <View style={styles.dividerLarge} />
 
       <Text style={styles.sectionLabel}>Prescribed Medications</Text>
-      {medications.length === 0 ? (
+      {medicationsUnavailable ? (
+        <Text style={styles.notes}>Medication details are currently unavailable for this session.</Text>
+      ) : medications.length === 0 ? (
         <Text style={styles.notes}>No active medications.</Text>
       ) : (
         medications.map((med, index) => (
-          <View key={index} style={styles.medCard}>
+          <View key={med.id || index} style={styles.medCard}>
             <Ionicons name="flask-outline" size={24} color="#20C997" style={{ marginRight: 12 }} />
             <View style={{ flex: 1 }}>
               <Text style={styles.medName}>{med.medicine}</Text>
@@ -196,9 +218,11 @@ const styles = StyleSheet.create({
   backButton: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginLeft: -8 },
   backText: { fontSize: 16, color: "#1E293B", marginLeft: 6, fontWeight: "600" },
   date: { color: "#1B93D5", fontWeight: "bold", marginBottom: 5 },
-  procedure: { fontSize: 24, fontWeight: "800", color: "#1E293B", marginBottom: 10 },
-  row: { flexDirection: "row", alignItems: "center", marginBottom: 20 },
-  provider: { marginLeft: 8, color: "#64748B", fontSize: 16 },
+  procedure: { fontSize: 24, fontWeight: "800", color: "#1E293B", marginBottom: 16 },
+  detailCard: { backgroundColor: "#F8FAFC", borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 20 },
+  detailRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  detailLabel: { color: "#64748B", fontWeight: "700", fontSize: 12, textTransform: "uppercase" },
+  detailValue: { color: "#1E293B", fontWeight: "700", fontSize: 15, flexShrink: 1, textAlign: "right" },
   divider: { height: 1, backgroundColor: "#F1F5F9", marginBottom: 20 },
   dividerLarge: { height: 1, backgroundColor: "#F1F5F9", marginVertical: 24 },
   sectionLabel: { fontSize: 12, fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", marginBottom: 8 },

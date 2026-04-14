@@ -173,12 +173,14 @@ CREATE TABLE IF NOT EXISTS `treatment_timeline` (
 CREATE TABLE IF NOT EXISTS `medications` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `patient_id` INT,
+  `treatment_id` INT,
   `record_year` INT NOT NULL DEFAULT 1,
   `medicine` VARCHAR(255) NOT NULL,
   `dosage` VARCHAR(255),
   `frequency` VARCHAR(255),
   `notes` TEXT,
-  FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE
+  FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`treatment_id`) REFERENCES `treatment_timeline`(`id`) ON DELETE SET NULL
 );
 
 -- INITIAL DATA SEEDING

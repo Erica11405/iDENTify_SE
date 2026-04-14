@@ -540,6 +540,8 @@ export default function ConfirmAppointment() {
   const [familyMembers, setFamilyMembers] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showPatientModal, setShowPatientModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingSlot, setPendingSlot] = useState(null);
 
   // Availability State
   const [dailyCount, setDailyCount] = useState(0);
@@ -841,6 +843,30 @@ export default function ConfirmAppointment() {
     }
   };
 
+  const selectedPatientName = selectedPatient
+    ? (selectedPatient.full_name || `${selectedPatient.first_name || ""} ${selectedPatient.last_name || ""}`.trim() || "Unknown")
+    : "Profile Not Found";
+
+  const selectedDentistName = String(doctor || dentist?.name || "Assigned Dentist");
+
+  const handleOpenConfirmation = (slot) => {
+    if (!slot || slot.type !== "open") return;
+    setPendingSlot(slot);
+    setShowConfirmModal(true);
+  };
+
+  const handleCloseConfirmation = () => {
+    setShowConfirmModal(false);
+    setPendingSlot(null);
+  };
+
+  const handleConfirmBooking = async () => {
+    if (!pendingSlot || loading) return;
+    const slotToBook = pendingSlot;
+    handleCloseConfirmation();
+    await bookAppointment(slotToBook);
+  };
+
   if (fetchingData) {
     return <View style={styles.loadingCenter}><ActivityIndicator size="large" color="#1B93D5" /></View>;
   }
@@ -875,9 +901,7 @@ export default function ConfirmAppointment() {
         <View style={{ flex: 1 }}>
           <Text style={styles.selectorLabel}>Booking For</Text>
           <Text style={styles.selectorValue}>
-            {selectedPatient 
-              ? (selectedPatient.full_name || `${selectedPatient.first_name || ''} ${selectedPatient.last_name || ''}`.trim() || "Unknown") 
-              : "Profile Not Found"}
+            {selectedPatientName}
           </Text>
         </View>
         <Ionicons name="chevron-down" size={20} color="#64748B" />
@@ -936,13 +960,13 @@ export default function ConfirmAppointment() {
             <ActivityIndicator size="large" color="#1B93D5" style={{ marginVertical: 20 }} />
           ) : (
             availableSlots.map((slot, i) => {
-              const isDisabled = slot.type !== 'open' || isLimitReached;
+              const isDisabled = slot.type !== 'open' || isLimitReached || showConfirmModal;
               const isLabel = slot.type === 'lunch' || slot.type === 'break';
               return (
                 <TouchableOpacity
                   key={i}
                   style={[styles.timeButton, isDisabled && styles.bookedTimeButton]}
-                  onPress={() => bookAppointment(slot)}
+                  onPress={() => handleOpenConfirmation(slot)}
                   activeOpacity={0.7}
                   disabled={isDisabled}
                 >
@@ -994,6 +1018,54 @@ export default function ConfirmAppointment() {
             <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowPatientModal(false)}>
               <Text style={styles.modalCloseText}>Cancel</Text>
             </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showConfirmModal}
+        onRequestClose={handleCloseConfirmation}
+      >
+        <Pressable style={styles.modalOverlay} onPress={handleCloseConfirmation}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Confirm Appointment</Text>
+
+            <View style={styles.confirmDetailRow}>
+              <Text style={styles.confirmDetailLabel}>Service</Text>
+              <Text style={styles.confirmDetailValue}>{selectedServiceName || "Checkup"}</Text>
+            </View>
+            <View style={styles.confirmDetailRow}>
+              <Text style={styles.confirmDetailLabel}>Dentist</Text>
+              <Text style={styles.confirmDetailValue}>{selectedDentistName}</Text>
+            </View>
+            <View style={styles.confirmDetailRow}>
+              <Text style={styles.confirmDetailLabel}>Date</Text>
+              <Text style={styles.confirmDetailValue}>{selectedDate}</Text>
+            </View>
+            <View style={styles.confirmDetailRow}>
+              <Text style={styles.confirmDetailLabel}>Time</Text>
+              <Text style={styles.confirmDetailValue}>{pendingSlot?.label || "-"}</Text>
+            </View>
+            <View style={styles.confirmDetailRow}>
+              <Text style={styles.confirmDetailLabel}>Patient</Text>
+              <Text style={styles.confirmDetailValue}>{selectedPatientName}</Text>
+            </View>
+
+            <View style={styles.confirmActions}>
+              <TouchableOpacity style={styles.confirmCancelBtn} onPress={handleCloseConfirmation}>
+                <Text style={styles.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.confirmPrimaryBtn, loading && styles.confirmPrimaryBtnDisabled]}
+                onPress={handleConfirmBooking}
+                disabled={loading}
+              >
+                <Text style={styles.confirmPrimaryText}>{loading ? "Booking..." : "Confirm"}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </Pressable>
       </Modal>
@@ -1061,5 +1133,14 @@ const styles = StyleSheet.create({
   optionIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   optionText: { flex: 1, fontSize: 16, color: '#334155', fontWeight: '600' },
   modalCloseBtn: { marginTop: 12, padding: 16, alignItems: 'center' },
-  modalCloseText: { color: '#64748B', fontWeight: '600' }
+  modalCloseText: { color: '#64748B', fontWeight: '600' },
+  confirmDetailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  confirmDetailLabel: { fontSize: 13, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' },
+  confirmDetailValue: { fontSize: 15, fontWeight: '700', color: '#1E293B', flexShrink: 1, textAlign: 'right' },
+  confirmActions: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  confirmCancelBtn: { flex: 1, borderRadius: 12, borderWidth: 1, borderColor: '#CBD5E1', paddingVertical: 12, alignItems: 'center' },
+  confirmCancelText: { color: '#475569', fontWeight: '700' },
+  confirmPrimaryBtn: { flex: 1, borderRadius: 12, backgroundColor: '#1B93D5', paddingVertical: 12, alignItems: 'center' },
+  confirmPrimaryBtnDisabled: { opacity: 0.7 },
+  confirmPrimaryText: { color: 'white', fontWeight: '700' }
 });
