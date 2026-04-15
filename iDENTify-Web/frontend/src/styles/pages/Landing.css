@@ -1,0 +1,82 @@
+.landing-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f4f7f6;
+    font-family: Arial, sans-serif;
+    padding: 20px;
+}
+
+.landing-content {
+    background: #ffffff;
+    padding: 40px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    max-width: 800px;
+    width: 100%;
+}
+
+.landing-logo {
+    width: 80px;
+    margin-bottom: 20px;
+}
+
+.landing-actions {
+    display: flex;
+    justify-content: space-around;
+    gap: 20px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+}
+
+.action-card {
+    background: #f9f9f9;
+    padding: 30px;
+    border-radius: 8px;
+    flex: 1;
+    min-width: 250px;
+    border: 1px solid #eee;
+}
+
+.action-card h2 {
+    color: #333;
+    margin-bottom: 15px;
+}
+
+.action-card p {
+    color: #666;
+    margin-bottom: 25px;
+    line-height: 1.5;
+}
+
+.download-btn {
+    display: inline-block;
+    background-color: #28a745;
+    color: white;
+    padding: 12px 24px;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+.download-btn:hover {
+    background-color: #218838;
+}
+
+.login-link {
+    display: inline-block;
+    background-color: #007bff;
+    color: white;
+    padding: 12px 24px;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+.login-link:hover {
+    background-color: #0056b3;
+}
