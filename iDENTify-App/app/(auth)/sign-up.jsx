@@ -371,8 +371,6 @@ import {
   Platform,
   StyleSheet,
   Alert,
-  Modal,
-  Pressable,
 } from "react-native";
 import { useSignUp } from "@clerk/clerk-expo";
 import { Link, useRouter } from "expo-router";
@@ -393,9 +391,6 @@ export default function SignUpScreen() {
   const [birthdate, setBirthdate] = useState("");
   const [dateObject, setDateObject] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [sex, setSex] = useState("");
-  const [phone, setPhone] = useState("");
-  const [showSexModal, setShowSexModal] = useState(false);
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -449,16 +444,6 @@ export default function SignUpScreen() {
         return;
     }
 
-    if (!sex.trim()) {
-      Alert.alert("Missing Information", "Please select your sex.");
-      return;
-    }
-
-    if (!phone.trim()) {
-      Alert.alert("Missing Information", "Please enter your phone number.");
-      return;
-    }
-
     try {
       await signUp.create({
         emailAddress: emailAddress.trim(),
@@ -501,8 +486,8 @@ export default function SignUpScreen() {
               email: emailAddress.trim(),
               birthdate: birthdate.trim(), // Sent to your database
               address: "Update your profile",
-              contact_number: phone.trim(),
-              gender: sex
+              contact_number: "",
+              gender: "Unspecified"
             })
           });
 
@@ -614,22 +599,6 @@ export default function SignUpScreen() {
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={styles.inputPicker} onPress={() => setShowSexModal(true)}>
-            <Text style={{ color: sex ? '#1E293B' : '#9CA3AF', fontSize: 16 }}>
-              {sex || "Select Sex"}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color="#9CA3AF" style={styles.pickerIcon} />
-          </TouchableOpacity>
-
-          <TextInput
-            value={phone}
-            placeholder="Phone Number"
-            placeholderTextColor="#9CA3AF"
-            onChangeText={setPhone}
-            style={styles.input}
-            keyboardType="phone-pad"
-          />
-
           <TextInput
             autoCapitalize="none"
             autoCorrect={false}
@@ -677,31 +646,6 @@ export default function SignUpScreen() {
           </View>
         </View>
       </ScrollView>
-
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={showSexModal}
-        onRequestClose={() => setShowSexModal(false)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowSexModal(false)}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Sex</Text>
-            {['Male', 'Female'].map((option) => (
-              <TouchableOpacity
-                key={option}
-                style={styles.modalOption}
-                onPress={() => {
-                  setSex(option);
-                  setShowSexModal(false);
-                }}
-              >
-                <Text style={styles.modalOptionText}>{option}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -829,36 +773,5 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     color: "#1A7FCC",
     fontWeight: "700",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    width: "80%",
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 20,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 16,
-    textAlign: "center",
-    color: "#1E293B",
-  },
-  modalOption: {
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-  },
-  modalOptionText: {
-    fontSize: 16,
-    textAlign: "center",
-    color: "#1A7FCC",
-    fontWeight: "600",
   },
 });
