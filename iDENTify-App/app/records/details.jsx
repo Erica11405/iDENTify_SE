@@ -111,6 +111,16 @@ export default function RecordDetails() {
     return `PHP ${amount.toFixed(2)}`;
   };
 
+  const getDentistDisplay = () => {
+    if (!record?.dentist_name) return "Not recorded";
+    return `Dr. ${record.dentist_name}`;
+  };
+
+  const getProviderDisplay = () => {
+    if (!record?.provider) return "Not recorded";
+    return record.provider;
+  };
+
   useEffect(() => {
     const fetchDetailAndMeds = async () => {
       try {
@@ -170,7 +180,11 @@ export default function RecordDetails() {
       <View style={styles.detailCard}>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Appointed Dentist</Text>
-          <Text style={styles.detailValue}>{record.provider ? `Dr. ${record.provider}` : "Not recorded"}</Text>
+          <Text style={styles.detailValue}>{getDentistDisplay()}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Provider</Text>
+          <Text style={styles.detailValue}>{getProviderDisplay()}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Price Paid</Text>

@@ -1813,11 +1813,6 @@ function PatientForm({ userRole }) {
 		} catch (error) { console.error(error); toast.error("Failed to add entry"); }
 	};
 
-	const deleteTimelineEntry = async (entryId) => {
-		if (isVisitReadOnly) return;
-		try { await apiClient.deleteTreatmentTimelineEntry(entryId); setTimelineEntries(prev => (prev || []).filter(entry => entry.id !== entryId)); } catch (error) { console.error(error); }
-	};
-
     // Modified to auto-fill dosage
 	const updateMedicationForm = (field, value) => {
         setMedicationForm((prev) => {
@@ -2121,9 +2116,7 @@ function PatientForm({ userRole }) {
                                         <div style={{ fontSize: '13px', color: '#475569', fontWeight: '500' }}>{entry.provider || "Dental Aide"}</div>
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                                    {!isVisitReadOnly && <button className="small-btn danger" onClick={() => deleteTimelineEntry(entry.id)} style={{ padding: '5px 10px', fontSize: '11px', background: '#fee2e2', color: '#ef4444', border: 'none', fontWeight: 'bold' }}>Delete</button>}
-                                </div>
+								<div style={{ display: 'flex', gap: '15px', alignItems: 'center' }} />
 							</div>
 						))}
 					</div>

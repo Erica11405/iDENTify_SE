@@ -349,6 +349,28 @@ export default function FamilyMembers() {
     return rel ? rel.replace('Relation:', '').trim() : "Family Member";
   };
 
+  const getAgeDisplay = (member) => {
+    const vitalsAge = Number.parseInt(String(member?.vitals?.age ?? ""), 10);
+    if (Number.isFinite(vitalsAge) && vitalsAge >= 0) {
+      return `${vitalsAge} years old`;
+    }
+
+    if (!member?.birthdate) return "N/A";
+
+    const birthDate = new Date(member.birthdate);
+    if (Number.isNaN(birthDate.getTime())) return "N/A";
+
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age -= 1;
+    }
+
+    if (!Number.isFinite(age) || age < 0) return "N/A";
+    return `${age} years old`;
+  };
+
   const confirmDelete = (id) => {
     Alert.alert("Delete Member", "Are you sure you want to remove this family member? This action cannot be undone.", [
       { text: "Cancel", style: "cancel" },
@@ -428,7 +450,7 @@ export default function FamilyMembers() {
                 <View style={styles.infoGrid}>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Age</Text>
-                    <Text style={styles.infoValue}>{selectedMember.vitals?.age ? `${selectedMember.vitals.age} years old` : "N/A"}</Text>
+                    <Text style={styles.infoValue}>{getAgeDisplay(selectedMember)}</Text>
                   </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Gender</Text>

@@ -327,7 +327,7 @@ import ConfirmationModal from "../../components/ConfirmationModal";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
 
-function History() {
+function History({ pageTitle = "Patient History", forcedDentistId = null }) {
     const navigate = useNavigate();
     const api = useApi();
     const queue = useAppStore((state) => state.queue);
@@ -346,6 +346,8 @@ function History() {
 
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+
+    const hasForcedDentistScope = forcedDentistId !== null && forcedDentistId !== undefined && String(forcedDentistId).trim() !== "";
 
     useEffect(() => {
         const loadData = async () => {
@@ -368,6 +370,10 @@ function History() {
         () =>
             queue
                 .filter((item) => item.status === "Done")
+                .filter((item) => {
+                    if (!hasForcedDentistScope) return true;
+                    return String(item.dentist_id || "") === String(forcedDentistId);
+                })
                 .map((item) => {
                     const patient = patients.find((p) => String(p.id) === String(item.patient_id));
                     const patientName = patient ? (patient.full_name || patient.name) : (item.full_name || "Unknown");
@@ -394,7 +400,7 @@ function History() {
                     };
                 })
                 .sort((a, b) => b.rawDate - a.rawDate),
-        [queue, patients, dentists, appointments]
+        [queue, patients, dentists, appointments, hasForcedDentistScope, forcedDentistId]
     );
 
     const uniqueProcedures = useMemo(() => {
@@ -487,7 +493,7 @@ function History() {
     return (
         <div className="history-page">
             <div className="history-header">
-                <h2 className="history-title">Patient History</h2>
+                <h2 className="history-title">{pageTitle}</h2>
             </div>
 
             <div className="history-filters">
@@ -502,19 +508,21 @@ function History() {
                     />
                 </div>
 
-                <div className="filter-group">
-                    <label htmlFor="dentist-filter">Dentist</label>
-                    <select
-                        id="dentist-filter"
-                        value={filters.dentist}
-                        onChange={(e) => handleFilterChange("dentist", e.target.value)}
-                    >
-                        <option value="all">All Dentists</option>
-                        {uniqueDentists.map((d, i) => (
-                            <option key={i} value={d}>{d}</option>
-                        ))}
-                    </select>
-                </div>
+                {!hasForcedDentistScope ? (
+                    <div className="filter-group">
+                        <label htmlFor="dentist-filter">Dentist</label>
+                        <select
+                            id="dentist-filter"
+                            value={filters.dentist}
+                            onChange={(e) => handleFilterChange("dentist", e.target.value)}
+                        >
+                            <option value="all">All Dentists</option>
+                            {uniqueDentists.map((d, i) => (
+                                <option key={i} value={d}>{d}</option>
+                            ))}
+                        </select>
+                    </div>
+                ) : null}
 
                 <div className="filter-group">
                     <label htmlFor="procedure-filter">Procedure</label>
@@ -530,7 +538,7 @@ function History() {
                     </select>
                 </div>
 
-                {(filters.date || filters.dentist !== 'all' || filters.procedure !== 'all') && (
+                {(filters.date || (!hasForcedDentistScope && filters.dentist !== 'all') || filters.procedure !== 'all') && (
                     <div className="filter-group" style={{ justifyContent: 'flex-end' }}>
                         <label>&nbsp;</label>
                         <button

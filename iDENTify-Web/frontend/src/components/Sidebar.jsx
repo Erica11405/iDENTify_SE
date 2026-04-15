@@ -282,6 +282,14 @@ function Sidebar({ role }) {
                                 <img src={AppointmentIcon} alt="Patients" />
                                 <span>Patients</span>
                             </NavLink>
+                            <NavLink to="/history" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={ReportIcon} alt="History" />
+                                <span>History</span>
+                            </NavLink>
+                            <NavLink to="/payments" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={AppointmentIcon} alt="Payments" />
+                                <span>Payments</span>
+                            </NavLink>
                             <NavLink to="/reports" className={({ isActive }) => isActive ? 'active' : ''}>
                                 <img src={ReportIcon} alt="Reports" />
                                 <span>Reports</span>

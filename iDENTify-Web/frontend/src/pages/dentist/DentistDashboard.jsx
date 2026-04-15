@@ -213,14 +213,35 @@
 
 import React, { useEffect, useMemo } from "react";
 import "../../styles/pages/dentist/DentistDashboard.css";
+import ServicePopularityChartCard from "../../components/ServicePopularityChartCard";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function resolveDentistId(user, dentists) {
+  if (!user) return null;
+  if (user.dentist_id) return Number(user.dentist_id);
+
+  const matched = (dentists || []).find((dentist) => {
+    if (String(dentist.user_id || "") === String(user.id || "")) return true;
+    if (normalizeEmail(dentist.email) && normalizeEmail(dentist.email) === normalizeEmail(user.email)) return true;
+    if (dentist.name && user.name && String(dentist.name).trim() === String(user.name).trim()) return true;
+    return false;
+  });
+
+  if (matched?.id) return Number(matched.id);
+  return Number(user.id || 0) || null;
+}
 
 function DentistDashboard() {
   const api = useApi();
   
   // ADDED 'dentists' to the store pull so we can find your true ID
   const { user, appointments, dentists } = useAppStore();
+  const myDentistId = useMemo(() => resolveDentistId(user, dentists), [user, dentists]);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -250,20 +271,10 @@ function DentistDashboard() {
     
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
 
-    // 1. CROSS-REFERENCE: Find the actual Dentist profile for the logged-in user
-    // This bridges the gap between 'Account ID' and 'Dentist ID'
-    const myDentistProfile = dentists?.find(d => 
-        d.name === user?.name || 
-        d.email === user?.email || 
-        String(d.user_id) === String(user?.id)
-    );
-
-    const myActualDentistId = myDentistProfile ? myDentistProfile.id : user?.id;
-
     return appointments.filter(a => {
       // 2. ULTRA-SAFE ID MATCH: Check true dentist ID, account ID, or exact Name
       const isMyAppointment = 
-          String(a.dentist_id) === String(myActualDentistId) ||
+          String(a.dentist_id) === String(myDentistId) ||
           String(a.dentist_id) === String(user?.id) ||
           a.dentist_name === user?.name ||
           a.dentist === user?.name;
@@ -282,7 +293,7 @@ function DentistDashboard() {
 
       return apptDate === today;
     });
-  }, [appointments, user, dentists]);
+  }, [appointments, user, myDentistId]);
 
   return (
     <div className="dashboard-wrapper">
@@ -347,6 +358,13 @@ function DentistDashboard() {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="dashboard-section table-card" style={{ marginTop: "1rem" }}>
+        <ServicePopularityChartCard
+          title="Most Booked Services"
+          dentistId={myDentistId}
+        />
       </div>
     </div>
   );

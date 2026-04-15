@@ -131,7 +131,12 @@ function isPaidRecord(row) {
   return Number(row?.balance_due || 0) <= 0;
 }
 
-function Payments() {
+function Payments({
+  pageTitle = "Payments",
+  pageSubtitle = "Review billing records, add installments, and finalize pending balances.",
+  forcedDentistId = null,
+  hideDentistFilter = false,
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -155,6 +160,8 @@ function Payments() {
   const [splitCreateContext, setSplitCreateContext] = useState(null);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+
+  const hasForcedDentistScope = forcedDentistId !== null && forcedDentistId !== undefined && String(forcedDentistId).trim() !== "";
 
   const loadPayments = async () => {
     setLoading(true);
@@ -199,6 +206,10 @@ function Payments() {
           return false;
         }
 
+        if (hasForcedDentistScope && String(row.dentist_id || "") !== String(forcedDentistId)) {
+          return false;
+        }
+
         if (statusFilter !== "all" && normalizeText(row.payment_status) !== statusFilter) {
           return false;
         }
@@ -217,7 +228,7 @@ function Payments() {
         const bDate = parseDateTime(b.latest_payment_at || b.updated_at || b.created_at)?.getTime() || 0;
         return bDate - aDate;
       });
-  }, [paymentRows, search, dentistFilter, serviceFilter, statusFilter]);
+  }, [paymentRows, search, dentistFilter, serviceFilter, statusFilter, hasForcedDentistScope, forcedDentistId]);
 
   const dentistOptions = useMemo(() => buildNormalizedOptions((paymentRows || []).map((row) => row.dentist_name)), [paymentRows]);
 
@@ -464,10 +475,8 @@ function Payments() {
   return (
     <section className="payments-page">
       <div className="payments-header">
-        <h1 className="payments-title">Payments</h1>
-        <p className="payments-subtitle">
-          Review billing records, add installments, and finalize pending balances.
-        </p>
+        <h1 className="payments-title">{pageTitle}</h1>
+        <p className="payments-subtitle">{pageSubtitle}</p>
       </div>
 
       <div className="payments-top-controls">
@@ -517,17 +526,19 @@ function Payments() {
           />
         </label>
 
-        <label className="filter-group inline-filter">
-          <span>Dentist</span>
-          <select value={dentistFilter} onChange={(e) => setDentistFilter(e.target.value)}>
-            <option value="all">All Dentists</option>
-            {dentistOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!hideDentistFilter ? (
+          <label className="filter-group inline-filter">
+            <span>Dentist</span>
+            <select value={dentistFilter} onChange={(e) => setDentistFilter(e.target.value)}>
+              <option value="all">All Dentists</option>
+              {dentistOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <label className="filter-group inline-filter">
           <span>Service</span>

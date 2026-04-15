@@ -278,6 +278,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import "../../styles/pages/aide/Dashboard.css";
 import WeeklyBarChart from "../../components/WeeklyBarChart.jsx";
+import ServicePopularityChartCard from "../../components/ServicePopularityChartCard";
 import AddWalkInModal from "../../components/AddWalkInModal";
 import AddAppointmentModal from "../../components/AddAppointmentModal";
 import useAppStore from "../../store/useAppStore";
@@ -540,6 +541,10 @@ function Dashboard() {
         <div className="dashboard-section full-width">
           <h3 className="dashboard-subtitle">Last 7 Days Activity</h3>
           <WeeklyBarChart chartData={chartData} />
+        </div>
+
+        <div className="dashboard-section full-width">
+          <ServicePopularityChartCard title="Most Booked Services" />
         </div>
       </div>
       

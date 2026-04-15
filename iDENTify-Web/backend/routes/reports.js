@@ -137,6 +137,41 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
+function toDateParam(value, fallback) {
+  const raw = String(value || "").trim();
+  if (!raw) return fallback;
+
+  const dateOnly = raw.split("T")[0];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return fallback;
+  return dateOnly;
+}
+
+function toPositiveInt(value) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+function normalizeServiceToken(token, sourceType) {
+  const cleaned = String(token || "").replace(/\s+/g, " ").trim();
+  if (cleaned) return cleaned;
+  return sourceType === "walk-in" ? "Walk-in" : "Unspecified";
+}
+
+function splitServiceText(value, sourceType) {
+  const normalized = String(value || "").replace(/\r/g, "\n");
+  const tokens = normalized
+    .split(/[,;\n]+/)
+    .map((token) => normalizeServiceToken(token, sourceType))
+    .filter(Boolean);
+
+  if (!tokens.length) {
+    return [sourceType === "walk-in" ? "Walk-in" : "Unspecified"];
+  }
+
+  return [...new Set(tokens)];
+}
+
 router.get("/", async (req, res) => {
   try {
     const { startDate, endDate, date } = req.query;
@@ -293,6 +328,115 @@ router.get("/", async (req, res) => {
   } catch (err) {
     console.error("Reports API Error:", err);
     res.status(500).json({ message: "Failed to load reports" });
+  }
+});
+
+router.get("/services/popularity", async (req, res) => {
+  const today = new Date().toISOString().split("T")[0];
+  const start = toDateParam(req.query.startDate || req.query.date, today);
+  const end = toDateParam(req.query.endDate, start);
+  const dentistId = toPositiveInt(req.query.dentistId);
+
+  if (start > end) {
+    return res.status(400).json({
+      message: "Invalid date range. startDate must be less than or equal to endDate.",
+    });
+  }
+
+  try {
+    const appointmentConditions = [
+      "DATE(a.appointment_datetime) BETWEEN ? AND ?",
+      "a.status IN ('Done', 'Completed')",
+    ];
+    const appointmentParams = [start, end];
+
+    if (dentistId) {
+      appointmentConditions.push("a.dentist_id = ?");
+      appointmentParams.push(dentistId);
+    }
+
+    const walkInConditions = [
+      "DATE(q.time_added) BETWEEN ? AND ?",
+      "q.source = 'walk-in'",
+      "q.status IN ('Done', 'Completed')",
+    ];
+    const walkInParams = [start, end];
+
+    if (dentistId) {
+      walkInConditions.push("q.dentist_id = ?");
+      walkInParams.push(dentistId);
+    }
+
+    const [appointmentRows] = await db.query(
+      `SELECT COALESCE(NULLIF(TRIM(a.reason), ''), 'Unspecified') AS service_text
+       FROM appointments a
+       WHERE ${appointmentConditions.join(" AND ")}`,
+      appointmentParams
+    );
+
+    const [walkInRows] = await db.query(
+      `SELECT COALESCE(NULLIF(TRIM(q.notes), ''), 'Walk-in') AS service_text
+       FROM walk_in_queue q
+       WHERE ${walkInConditions.join(" AND ")}`,
+      walkInParams
+    );
+
+    const counters = new Map();
+    const totals = {
+      appointments: 0,
+      walkIns: 0,
+      overall: 0,
+    };
+
+    const ensureCounter = (service) => {
+      if (!counters.has(service)) {
+        counters.set(service, {
+          service,
+          appointmentCount: 0,
+          walkInCount: 0,
+          totalCount: 0,
+        });
+      }
+      return counters.get(service);
+    };
+
+    appointmentRows.forEach((row) => {
+      const tokens = splitServiceText(row?.service_text, "appointment");
+      tokens.forEach((service) => {
+        const entry = ensureCounter(service);
+        entry.appointmentCount += 1;
+        entry.totalCount += 1;
+        totals.appointments += 1;
+        totals.overall += 1;
+      });
+    });
+
+    walkInRows.forEach((row) => {
+      const tokens = splitServiceText(row?.service_text, "walk-in");
+      tokens.forEach((service) => {
+        const entry = ensureCounter(service);
+        entry.walkInCount += 1;
+        entry.totalCount += 1;
+        totals.walkIns += 1;
+        totals.overall += 1;
+      });
+    });
+
+    const services = [...counters.values()].sort((a, b) => {
+      if (b.totalCount !== a.totalCount) return b.totalCount - a.totalCount;
+      return a.service.localeCompare(b.service);
+    });
+
+    res.json({
+      startDate: start,
+      endDate: end,
+      dentistId: dentistId || null,
+      totals,
+      services,
+    });
+  } catch (error) {
+    console.error("Error building service popularity report:", error);
+    res.status(500).json({ message: "Failed to load service popularity data." });
   }
 });
 

@@ -420,12 +420,13 @@
 
 
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import apiClient from "../../api/apiClient";
 import useApi from "../../hooks/useApi";
 import useAppStore from "../../store/useAppStore";
+import WeeklyBarChart from "../../components/WeeklyBarChart";
 import "../../styles/pages/aide/Reports.css";
 
 function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics and exports.", showSummaryCards = true }) {
@@ -496,7 +497,7 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
 
-  const getDentistName = (d) => {
+  const getDentistName = useCallback((d) => {
     if (!d) return "Unknown Dentist";
     let name = d.name || d.dentist_name;
     
@@ -512,7 +513,7 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
     }
     
     return name || "Unassigned / Unknown";
-  };
+  }, [dentists]);
 
   // FILTER OUT DENTAL AIDES FROM PERFORMANCE DATA
   const filteredDentistPerformance = (dentistPerformance || []).filter(dp => {
@@ -522,6 +523,33 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
     }
     return true;
   });
+
+  const rankedDentists = useMemo(() => {
+    return filteredDentistPerformance
+      .map((dentist) => ({
+        dentist,
+        name: getDentistName(dentist),
+        patientsHandled: Number(dentist?.patientsHandled || 0),
+      }))
+      .sort((a, b) => {
+        if (b.patientsHandled !== a.patientsHandled) return b.patientsHandled - a.patientsHandled;
+        return a.name.localeCompare(b.name);
+      });
+  }, [filteredDentistPerformance, getDentistName]);
+
+  const dentistPerformanceChartData = useMemo(() => {
+    return {
+      labels: rankedDentists.map((item) => item.name),
+      appointments: rankedDentists.map((item) => item.patientsHandled),
+      appointmentsLabel: "Patients Handled",
+      singleSeries: true,
+      showLegend: false,
+      xTickFontSize: 12,
+      yTickFontSize: 12,
+      xTickMaxRotation: 25,
+      xTickMinRotation: 0,
+    };
+  }, [rankedDentists]);
 
   const openDentistPatients = async (dentist) => {
     setSelectedDentist(dentist);
@@ -777,36 +805,33 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
 
           <div className="report-section">
             <h3 className="report-subtitle">Dentist Performance</h3>
-            <table className="report-table">
-              <thead>
-                <tr>
-                  <th>Dentist</th>
-                  <th>Patients Handled</th>
-                  <th>Treatment Distribution</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredDentistPerformance.length === 0 ? (
-                  <tr><td colSpan="3">No performance data for this date range.</td></tr>
-                ) : (
-                  filteredDentistPerformance.map((dentist, index) => (
-                    <tr key={dentist.id || index}>
-                      <td>
-                        <button type="button" className="dentist-link" onClick={() => openDentistPatients(dentist)}>
-                          {getDentistName(dentist)}
-                        </button>
-                      </td>
-                      <td>{dentist.patientsHandled}</td>
-                      <td>
-                        {Object.entries(dentist.treatmentDistribution || {})
-                          .map(([key, value]) => `${key}: ${value}`)
-                          .join(", ") || "-"}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+            {rankedDentists.length === 0 ? (
+              <p style={{ margin: 0, color: '#64748b' }}>No performance data for this date range.</p>
+            ) : (
+              <>
+                <div style={{ minHeight: '320px' }}>
+                  <WeeklyBarChart chartData={dentistPerformanceChartData} />
+                </div>
+
+                <div className="dentist-performance-links-wrap">
+                  <p className="dentist-performance-links-note">
+                    Click a dentist name to view the patient list.
+                  </p>
+                  <div className="dentist-performance-links">
+                    {rankedDentists.map((item) => (
+                      <button
+                        key={`${item.dentist.id || item.name}`}
+                        type="button"
+                        className="dentist-link dentist-performance-link"
+                        onClick={() => openDentistPatients(item.dentist)}
+                      >
+                        {item.name} ({item.patientsHandled})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}

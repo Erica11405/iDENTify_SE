@@ -822,7 +822,7 @@ export default function AddFamilyMember() {
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Set nickname/relationship</Text>
+        <Text style={styles.label}>Set relationship</Text>
         <TextInput style={styles.input} value={relationship} onChangeText={setRelationship} placeholder="e.g. Son, Wife" placeholderTextColor="#9CA3AF" />
         <Text style={styles.label}>Given name</Text>
         <TextInput style={styles.input} value={givenName} onChangeText={setGivenName} placeholder="First Name" placeholderTextColor="#9CA3AF" />

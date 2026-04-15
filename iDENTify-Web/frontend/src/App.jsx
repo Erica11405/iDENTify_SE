@@ -117,8 +117,9 @@ import Payments from './pages/aide/Payments';
 // --- Dentist Pages ---
 import DentistDashboard from './pages/dentist/DentistDashboard';
 import DentistAppointments from './pages/dentist/DentistAppointments';
-import DentistSettings from './pages/dentist/DentistSettings';
 import DentistReports from './pages/dentist/DentistReports';
+import DentistHistory from './pages/dentist/DentistHistory';
+import DentistPayments from './pages/dentist/DentistPayments';
 
 // --- Super Admin Pages ---
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
@@ -150,6 +151,8 @@ function App() {
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/dashboard" element={<DentistDashboard />} />
                         <Route path="/appointments" element={<DentistAppointments />} />
+                        <Route path="/history" element={<DentistHistory />} />
+                        <Route path="/payments" element={<DentistPayments />} />
                         <Route path="/reports" element={<DentistReports />} />
                         <Route path="/patients/:id" element={<PatientForm />} />
                         <Route path="*" element={<Navigate to="/dashboard" replace />} />

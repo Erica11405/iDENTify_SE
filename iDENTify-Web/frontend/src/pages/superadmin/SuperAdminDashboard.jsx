@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../api/apiClient';
 import WeeklyBarChart from '../../components/WeeklyBarChart';
+import ServicePopularityChartCard from '../../components/ServicePopularityChartCard';
 import '../../styles/pages/dentist/DentistSettings.css';
 
 function isArchived(user) {
@@ -154,6 +155,10 @@ function SuperAdminDashboard() {
                             Current week: {chartData.rangeLabel}
                         </p>
                         <WeeklyBarChart chartData={chartData} />
+                    </div>
+
+                    <div className="settings-form-card" style={{ marginTop: '1rem' }}>
+                        <ServicePopularityChartCard title="Most Booked Services" />
                     </div>
                 </>
             ) : null}

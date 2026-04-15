@@ -231,3 +231,35 @@ tbody tr:hover {
 .modal-state.error {
   color: #e03131;
 }
+
+.dentist-performance-links-wrap {
+  margin-top: 1rem;
+  border-top: 1px solid #edf2f7;
+  padding-top: 0.85rem;
+}
+
+.dentist-performance-links-note {
+  margin: 0 0 0.6rem 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.dentist-performance-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dentist-performance-link {
+  border: 1px solid #dbe7f0;
+  background: #f8fbfe;
+  color: #1f4d6b;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.dentist-performance-link:hover {
+  background: #eaf3fb;
+}

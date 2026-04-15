@@ -624,6 +624,18 @@ export const getReports = async (date) => {
     return handleResponse(res);
 };
 
+export const getServicePopularityReport = async ({ startDate, endDate, date, dentistId } = {}) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    if (date) params.set('date', date);
+    if (dentistId) params.set('dentistId', String(dentistId));
+    const query = params.toString();
+
+    const res = await fetch(`${API_BASE}/reports/services/popularity${query ? `?${query}` : ''}`);
+    return handleResponse(res);
+};
+
 export const getDentistPatientsForReport = async (dentistId, { startDate, endDate, date } = {}) => {
     const params = new URLSearchParams();
     if (startDate) params.set('startDate', startDate);
@@ -807,7 +819,7 @@ const api = {
     getQueue, addQueueItem, updateQueueItem, deleteQueueItem,
     getAppointments, createAppointment, checkAppointmentLimit, updateAppointment,
     getPayments, getPaymentById, getPaymentByQueueId, getUnpaidPaymentMatches, createPaymentRecord, updatePaymentRecord, addPaymentInstallment,
-    getReports, getDentistPatientsForReport, getDentistReportSummary, get,
+    getReports, getServicePopularityReport, getDentistPatientsForReport, getDentistReportSummary, get,
     getServices, createService, updateService, deleteService,
     getClinicMedications, createClinicMedication, updateClinicMedication, deleteClinicMedication,
     getDentistTypes, createDentistType, updateDentistType, deleteDentistType,
