@@ -1263,17 +1263,38 @@ function PatientForm({ userRole }) {
 				const cleanDate = now.toLocaleDateString();
 				const cleanTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-				const shouldAutofillFromLinkedAppointment = Number(selectedYear) === 1;
+				const shouldAutofillFromLinkedAppointment = Boolean(linkedAppointment);
 
-				if (linkedAppointment && shouldAutofillFromLinkedAppointment) {
+				if (shouldAutofillFromLinkedAppointment) {
 					let procData = 
 						linkedAppointment.reason || 
 						linkedAppointment.procedure || 
 						linkedAppointment.procedures || 
 						linkedAppointment.service || 
 						linkedAppointment.services || 
-						linkedAppointment.dental_service || 
+						linkedAppointment.dental_service ||
+						linkedAppointment.notes || 
 						"";
+
+					if ((!procData || (typeof procData === 'string' && procData.trim() === "")) && Array.isArray(queue)) {
+						const activeQueueItem = queue.find((item) => (
+							String(item.patient_id) === String(id)
+							&& item.status?.toLowerCase() !== "done"
+							&& item.status?.toLowerCase() !== "cancelled"
+						));
+
+						if (activeQueueItem) {
+							procData =
+								activeQueueItem.reason ||
+								activeQueueItem.procedure ||
+								activeQueueItem.procedures ||
+								activeQueueItem.service ||
+								activeQueueItem.services ||
+								activeQueueItem.dental_service ||
+								activeQueueItem.notes ||
+								"";
+						}
+					}
 					
 					if (typeof procData === 'string' && procData.trim() !== "") {
 						try {
