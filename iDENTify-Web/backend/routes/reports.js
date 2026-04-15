@@ -1,6 +1,95 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+let dentistArchiveColumnsCache = null;
+
+async function getDentistArchiveColumns() {
+  if (dentistArchiveColumnsCache !== null) {
+    return dentistArchiveColumnsCache;
+  }
+
+  try {
+    const [rows] = await db.query(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_schema = DATABASE()
+         AND table_name = 'dentists'
+         AND column_name IN ('is_archived', 'archived_at')`
+    );
+
+    const columnNames = new Set(
+      rows.map((row) => String(row.column_name || row.COLUMN_NAME || '').toLowerCase())
+    );
+
+    dentistArchiveColumnsCache = {
+      hasIsArchived: columnNames.has('is_archived'),
+      hasArchivedAt: columnNames.has('archived_at'),
+    };
+  } catch (_error) {
+    dentistArchiveColumnsCache = {
+      hasIsArchived: false,
+      hasArchivedAt: false,
+    };
+  }
+
+  return dentistArchiveColumnsCache;
+}
+
+function buildArchiveRecordCondition({ dentistAlias, recordDateExpr, hasIsArchived, hasArchivedAt }) {
+  if (hasIsArchived && hasArchivedAt) {
+    return `(COALESCE(${dentistAlias}.is_archived, 0) = 0 OR ${recordDateExpr} < COALESCE(${dentistAlias}.archived_at, NOW()))`;
+  }
+
+  if (hasArchivedAt) {
+    return `${recordDateExpr} < COALESCE(${dentistAlias}.archived_at, NOW())`;
+  }
+
+  if (hasIsArchived) {
+    return `COALESCE(${dentistAlias}.is_archived, 0) = 0`;
+  }
+
+  return '1=1';
+}
+
+function buildArchivedDentistHavingClause({ hasIsArchived, hasArchivedAt }) {
+  if (hasIsArchived) {
+    return 'COALESCE(d.is_archived, 0) = 0 OR COUNT(h.record_id) > 0';
+  }
+
+  if (hasArchivedAt) {
+    return 'd.archived_at IS NULL OR COUNT(h.record_id) > 0';
+  }
+
+  return 'COUNT(h.record_id) > 0';
+}
+
+function buildDentistGroupByClause({ hasIsArchived, hasArchivedAt }) {
+  const columns = ['d.id', 'd.name'];
+
+  if (hasIsArchived) {
+    columns.push('d.is_archived');
+  }
+
+  if (hasArchivedAt) {
+    columns.push('d.archived_at');
+  }
+
+  return columns.join(', ');
+}
+
+function buildDentistSelectColumns({ hasIsArchived, hasArchivedAt }) {
+  const columns = ['d.id', 'd.name'];
+
+  if (hasIsArchived) {
+    columns.push('COALESCE(d.is_archived, 0) AS is_archived');
+  }
+
+  if (hasArchivedAt) {
+    columns.push('d.archived_at AS archived_at');
+  }
+
+  return columns.join(',\n        ');
+}
 
 function toDateParam(value, fallback) {
   const raw = String(value || "").trim();
@@ -40,6 +129,29 @@ function splitServiceText(value, sourceType) {
 router.get("/", async (req, res) => {
   try {
     const { startDate, endDate, date } = req.query;
+    const archiveColumns = await getDentistArchiveColumns();
+    const handledArchiveCondition = buildArchiveRecordCondition({
+      dentistAlias: 'd',
+      recordDateExpr: 'h.handled_at',
+      hasIsArchived: archiveColumns.hasIsArchived,
+      hasArchivedAt: archiveColumns.hasArchivedAt,
+    });
+    const appointmentArchiveCondition = buildArchiveRecordCondition({
+      dentistAlias: 'd',
+      recordDateExpr: 'a.appointment_datetime',
+      hasIsArchived: archiveColumns.hasIsArchived,
+      hasArchivedAt: archiveColumns.hasArchivedAt,
+    });
+    const walkInArchiveCondition = buildArchiveRecordCondition({
+      dentistAlias: 'd',
+      recordDateExpr: 'q.time_added',
+      hasIsArchived: archiveColumns.hasIsArchived,
+      hasArchivedAt: archiveColumns.hasArchivedAt,
+    });
+    const dentistSelectColumns = buildDentistSelectColumns(archiveColumns);
+    const dentistGroupByClause = buildDentistGroupByClause(archiveColumns);
+    const dentistHavingClause = buildArchivedDentistHavingClause(archiveColumns);
+
     // Default to today if no dates are provided (supports legacy 'date' param too)
     const start = startDate || date || new Date().toISOString().split('T')[0];
     const end = endDate || start;
@@ -104,8 +216,7 @@ router.get("/", async (req, res) => {
     // 2. Dentist Performance
     const [dentistPerformance] = await db.query(`
       SELECT
-        d.id,
-        d.name,
+        ${dentistSelectColumns},
         COUNT(h.record_id) AS patientsHandled,
         COALESCE(AVG(h.duration_minutes), 0) AS avgTimePerPatient
       FROM dentists d
@@ -113,6 +224,7 @@ router.get("/", async (req, res) => {
         SELECT
           CAST(a.id AS CHAR) AS record_id,
           a.dentist_id,
+          a.appointment_datetime AS handled_at,
           TIMESTAMPDIFF(MINUTE, a.appointment_datetime, a.end_datetime) AS duration_minutes
         FROM appointments a
         WHERE DATE(a.appointment_datetime) BETWEEN ? AND ?
@@ -123,13 +235,16 @@ router.get("/", async (req, res) => {
         SELECT
           CONCAT('walkin-', q.id) AS record_id,
           q.dentist_id,
+          q.time_added AS handled_at,
           NULL AS duration_minutes
         FROM walk_in_queue q
         WHERE DATE(q.time_added) BETWEEN ? AND ?
           AND q.source = 'walk-in'
           AND q.status IN ('Done', 'Completed')
       ) h ON d.id = h.dentist_id
-      GROUP BY d.id, d.name
+        AND ${handledArchiveCondition}
+      GROUP BY ${dentistGroupByClause}
+      HAVING ${dentistHavingClause}
     `, [start, end, start, end]);
 
     // 3. Treatment Distribution
@@ -144,9 +259,11 @@ router.get("/", async (req, res) => {
           COALESCE(NULLIF(TRIM(a.reason), ''), 'Unspecified') AS treatment,
           COUNT(a.id) AS entry_count
         FROM appointments a
+        JOIN dentists d ON d.id = a.dentist_id
         WHERE DATE(a.appointment_datetime) BETWEEN ? AND ?
           AND a.status IN ('Done', 'Completed')
           AND a.dentist_id IS NOT NULL
+          AND ${appointmentArchiveCondition}
         GROUP BY a.dentist_id, COALESCE(NULLIF(TRIM(a.reason), ''), 'Unspecified')
 
         UNION ALL
@@ -156,10 +273,12 @@ router.get("/", async (req, res) => {
           COALESCE(NULLIF(TRIM(q.notes), ''), 'Walk-in') AS treatment,
           COUNT(q.id) AS entry_count
         FROM walk_in_queue q
+        JOIN dentists d ON d.id = q.dentist_id
         WHERE DATE(q.time_added) BETWEEN ? AND ?
           AND q.source = 'walk-in'
           AND q.status IN ('Done', 'Completed')
           AND q.dentist_id IS NOT NULL
+          AND ${walkInArchiveCondition}
         GROUP BY q.dentist_id, COALESCE(NULLIF(TRIM(q.notes), ''), 'Walk-in')
       ) distribution
       GROUP BY distribution.dentist_id, distribution.treatment
@@ -317,8 +436,28 @@ router.get("/dentist/:id/summary", async (req, res) => {
   const end = endDate || start;
 
   try {
+    const archiveColumns = await getDentistArchiveColumns();
+    const appointmentArchiveCondition = buildArchiveRecordCondition({
+      dentistAlias: 'd',
+      recordDateExpr: 'a.appointment_datetime',
+      hasIsArchived: archiveColumns.hasIsArchived,
+      hasArchivedAt: archiveColumns.hasArchivedAt,
+    });
+    const walkInArchiveCondition = buildArchiveRecordCondition({
+      dentistAlias: 'd',
+      recordDateExpr: 'q.time_added',
+      hasIsArchived: archiveColumns.hasIsArchived,
+      hasArchivedAt: archiveColumns.hasArchivedAt,
+    });
+    const dentistSelectColumns = [
+      'id',
+      'name',
+      archiveColumns.hasIsArchived ? 'COALESCE(is_archived, 0) AS is_archived' : null,
+      archiveColumns.hasArchivedAt ? 'archived_at' : null,
+    ].filter(Boolean).join(', ');
+
     const [dentistRows] = await db.query(
-      `SELECT id, name FROM dentists WHERE id = ? LIMIT 1`,
+      `SELECT ${dentistSelectColumns} FROM dentists WHERE id = ? LIMIT 1`,
       [dentistId]
     );
 
@@ -336,9 +475,11 @@ router.get("/dentist/:id/summary", async (req, res) => {
            a.patient_id,
            TIMESTAMPDIFF(MINUTE, a.appointment_datetime, a.end_datetime) AS duration_minutes
          FROM appointments a
+         JOIN dentists d ON d.id = a.dentist_id
          WHERE a.dentist_id = ?
            AND DATE(a.appointment_datetime) BETWEEN ? AND ?
            AND a.status IN ('Done', 'Completed')
+           AND ${appointmentArchiveCondition}
 
          UNION ALL
 
@@ -346,10 +487,12 @@ router.get("/dentist/:id/summary", async (req, res) => {
            q.patient_id,
            NULL AS duration_minutes
          FROM walk_in_queue q
+         JOIN dentists d ON d.id = q.dentist_id
          WHERE q.dentist_id = ?
            AND DATE(q.time_added) BETWEEN ? AND ?
            AND q.source = 'walk-in'
            AND q.status IN ('Done', 'Completed')
+           AND ${walkInArchiveCondition}
        ) handled`,
       [dentistId, start, end, dentistId, start, end]
     );
@@ -363,9 +506,11 @@ router.get("/dentist/:id/summary", async (req, res) => {
            COALESCE(NULLIF(TRIM(a.reason), ''), 'Unspecified') AS service,
            COUNT(*) AS entry_count
          FROM appointments a
+         JOIN dentists d ON d.id = a.dentist_id
          WHERE a.dentist_id = ?
            AND DATE(a.appointment_datetime) BETWEEN ? AND ?
            AND a.status IN ('Done', 'Completed')
+           AND ${appointmentArchiveCondition}
          GROUP BY COALESCE(NULLIF(TRIM(a.reason), ''), 'Unspecified')
 
          UNION ALL
@@ -374,10 +519,12 @@ router.get("/dentist/:id/summary", async (req, res) => {
            COALESCE(NULLIF(TRIM(q.notes), ''), 'Walk-in') AS service,
            COUNT(*) AS entry_count
          FROM walk_in_queue q
+         JOIN dentists d ON d.id = q.dentist_id
          WHERE q.dentist_id = ?
            AND DATE(q.time_added) BETWEEN ? AND ?
            AND q.source = 'walk-in'
            AND q.status IN ('Done', 'Completed')
+           AND ${walkInArchiveCondition}
          GROUP BY COALESCE(NULLIF(TRIM(q.notes), ''), 'Walk-in')
        ) distribution
        GROUP BY distribution.service
@@ -417,6 +564,20 @@ router.get("/dentist/:id/patients", async (req, res) => {
   const end = endDate || start;
 
   try {
+    const archiveColumns = await getDentistArchiveColumns();
+    const appointmentArchiveCondition = buildArchiveRecordCondition({
+      dentistAlias: 'd',
+      recordDateExpr: 'a.appointment_datetime',
+      hasIsArchived: archiveColumns.hasIsArchived,
+      hasArchivedAt: archiveColumns.hasArchivedAt,
+    });
+    const walkInArchiveCondition = buildArchiveRecordCondition({
+      dentistAlias: 'd',
+      recordDateExpr: 'q.time_added',
+      hasIsArchived: archiveColumns.hasIsArchived,
+      hasArchivedAt: archiveColumns.hasArchivedAt,
+    });
+
     const query = `
       SELECT
         history.appointment_id,
@@ -437,9 +598,11 @@ router.get("/dentist/:id/patients", async (req, res) => {
           a.status
         FROM patients p
         JOIN appointments a ON p.id = a.patient_id
+        JOIN dentists d ON d.id = a.dentist_id
         WHERE a.dentist_id = ?
           AND DATE(a.appointment_datetime) BETWEEN ? AND ?
           AND a.status IN ('Done', 'Completed')
+          AND ${appointmentArchiveCondition}
 
         UNION ALL
 
@@ -453,10 +616,12 @@ router.get("/dentist/:id/patients", async (req, res) => {
           q.status
         FROM patients p
         JOIN walk_in_queue q ON p.id = q.patient_id
+        JOIN dentists d ON d.id = q.dentist_id
         WHERE q.dentist_id = ?
           AND DATE(q.time_added) BETWEEN ? AND ?
           AND q.source = 'walk-in'
           AND q.status IN ('Done', 'Completed')
+          AND ${walkInArchiveCondition}
       ) history
       ORDER BY history.appointment_datetime ASC
     `;

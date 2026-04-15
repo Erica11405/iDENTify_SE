@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS `dentists` (
   `name` VARCHAR(255) NOT NULL,
   `specialty` VARCHAR(255),
   `status` VARCHAR(50) DEFAULT 'Available',
+  `is_archived` TINYINT(1) NOT NULL DEFAULT 0,
+  `archived_at` DATETIME NULL,
   `schedule` JSON
 );
 

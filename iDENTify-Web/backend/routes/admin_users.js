@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db');
 
 const ALLOWED_ROLES = new Set(['dentist', 'aide']);
+let hasDentistArchivedAtColumnCache = null;
 
 function normalizeRole(role) {
   const normalized = String(role || '').trim().toLowerCase();
@@ -14,6 +15,26 @@ async function syncDentistArchiveFlag(dentistId, isArchived) {
   if (!dentistId) return;
 
   try {
+    if (hasDentistArchivedAtColumnCache === null) {
+      const [rows] = await db.query("SHOW COLUMNS FROM dentists LIKE 'archived_at'");
+      hasDentistArchivedAtColumnCache = rows.length > 0;
+    }
+
+    if (hasDentistArchivedAtColumnCache) {
+      if (Number(isArchived) === 1) {
+        await db.query(
+          'UPDATE dentists SET is_archived = 1, archived_at = COALESCE(archived_at, NOW()) WHERE id = ?',
+          [dentistId]
+        );
+      } else {
+        await db.query(
+          'UPDATE dentists SET is_archived = 0, archived_at = NULL WHERE id = ?',
+          [dentistId]
+        );
+      }
+      return;
+    }
+
     await db.query('UPDATE dentists SET is_archived = ? WHERE id = ?', [isArchived, dentistId]);
   } catch (err) {
     if (err.code === 'ER_BAD_FIELD_ERROR') return;
