@@ -39,6 +39,7 @@ function App() {
     if (!user) {
         return (
             <Routes>
+                <Route path="/download" element={<Landing />} />
                 <Route path="/" element={<Login />} />
                 <Route path="/signup" element={<SignUp />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
@@ -49,6 +50,7 @@ function App() {
     // 2. If logged in, wrap the routes inside AppLayout
     return (
         <Routes>
+            <Route path="/download" element={<Landing />} />
             <Route element={<AppLayout userRole={user.role} />}>
                 {user.role === 'dentist' && (
                     <>
