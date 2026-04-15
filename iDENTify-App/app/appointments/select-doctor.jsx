@@ -807,12 +807,87 @@
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { API } from "../../constants/Api";
 
 export default function SelectDoctor() {
-  const { service, serviceName, serviceId, serviceDuration, servicePrice } = useLocalSearchParams();
-  const selectedServiceName = String(serviceName || service || "");
+  const { service, serviceName, serviceId, serviceIds, servicesJson, serviceDuration, servicePrice } = useLocalSearchParams();
+
+  const parsedServices = useMemo(() => {
+    if (!servicesJson) return [];
+
+    try {
+      const parsed = JSON.parse(String(servicesJson));
+      if (!Array.isArray(parsed)) return [];
+
+      return parsed
+        .map((item) => ({
+          id: item?.id,
+          name: String(item?.name || "").trim(),
+          estimated_duration: item?.estimated_duration,
+          min_price: item?.min_price,
+          max_price: item?.max_price,
+        }))
+        .filter((item) => item.name);
+    } catch (_err) {
+      return [];
+    }
+  }, [servicesJson]);
+
+  const selectedServiceNames = useMemo(() => {
+    if (parsedServices.length > 0) {
+      return parsedServices.map((item) => item.name).filter(Boolean);
+    }
+
+    const fallback = String(serviceName || service || "");
+    return fallback
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }, [parsedServices, serviceName, service]);
+
+  const selectedServiceName = selectedServiceNames.join(", ");
+
+  const selectedDurationMinutes = useMemo(() => {
+    const hinted = Number.parseInt(String(serviceDuration || ""), 10);
+    if (Number.isFinite(hinted) && hinted > 0) {
+      return hinted;
+    }
+
+    if (parsedServices.length === 0) {
+      return 30;
+    }
+
+    return parsedServices.reduce((total, item) => {
+      const duration = Number.parseInt(String(item.estimated_duration || ""), 10);
+      return total + (Number.isFinite(duration) && duration > 0 ? duration : 30);
+    }, 0);
+  }, [serviceDuration, parsedServices]);
+
+  const selectedServiceIds = useMemo(() => {
+    if (serviceIds) {
+      return String(serviceIds)
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    const fromParsed = parsedServices
+      .map((item) => (item.id === undefined || item.id === null ? "" : String(item.id)))
+      .filter(Boolean);
+
+    if (fromParsed.length > 0) {
+      return fromParsed;
+    }
+
+    return serviceId ? [String(serviceId)] : [];
+  }, [serviceIds, parsedServices, serviceId]);
+
+  const subtitleText = selectedServiceNames.length > 1
+    ? `${selectedServiceNames.length} services`
+    : (selectedServiceName || "Appointment");
+
+  const servicesParam = parsedServices.length > 0 ? JSON.stringify(parsedServices) : String(servicesJson || "");
   const router = useRouter();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -868,7 +943,7 @@ export default function SelectDoctor() {
         </TouchableOpacity>
 
         <Text style={styles.title}>Choose a Specialist</Text>
-        <Text style={styles.subtitle}>for {selectedServiceName || "Appointment"}</Text>
+        <Text style={styles.subtitle}>for {subtitleText}</Text>
       </View>
 
       {loading ? (
@@ -894,8 +969,10 @@ export default function SelectDoctor() {
                     docId: String(doc.id),
                     service: selectedServiceName,
                     serviceName: selectedServiceName,
-                    serviceId: String(serviceId || ""),
-                    serviceDuration: String(serviceDuration || "30"),
+                    serviceId: selectedServiceIds[0] || "",
+                    serviceIds: selectedServiceIds.join(","),
+                    servicesJson: servicesParam,
+                    serviceDuration: String(selectedDurationMinutes),
                     servicePrice: String(servicePrice || ""),
                   },
                 })

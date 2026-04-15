@@ -525,10 +525,72 @@ const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export default function ConfirmAppointment() {
   const router = useRouter();
   const { user } = useUser();
-  const { doctor, docId, service, serviceName, serviceId, serviceDuration, servicePrice } = useLocalSearchParams();
-  const selectedServiceName = String(serviceName || service || "").trim();
-  const parsedDuration = Number.parseInt(String(serviceDuration || ""), 10);
-  const selectedDurationMinutes = Number.isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : 30;
+  const { doctor, docId, service, serviceName, serviceId, serviceIds, servicesJson, serviceDuration, servicePrice } = useLocalSearchParams();
+
+  const parsedServices = useMemo(() => {
+    if (!servicesJson) return [];
+
+    try {
+      const parsed = JSON.parse(String(servicesJson));
+      if (!Array.isArray(parsed)) return [];
+
+      return parsed
+        .map((item) => ({
+          id: item?.id,
+          name: String(item?.name || "").trim(),
+          estimated_duration: item?.estimated_duration,
+        }))
+        .filter((item) => item.name);
+    } catch (_err) {
+      return [];
+    }
+  }, [servicesJson]);
+
+  const selectedServiceNames = useMemo(() => {
+    if (parsedServices.length > 0) {
+      return parsedServices.map((item) => item.name).filter(Boolean);
+    }
+
+    const fallback = String(serviceName || service || "");
+    return fallback
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }, [parsedServices, serviceName, service]);
+
+  const selectedServiceName = selectedServiceNames.join(", ").trim();
+
+  const selectedServiceIds = useMemo(() => {
+    if (serviceIds) {
+      return String(serviceIds)
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    const fromParsed = parsedServices
+      .map((item) => (item.id === undefined || item.id === null ? "" : String(item.id)))
+      .filter(Boolean);
+
+    if (fromParsed.length > 0) return fromParsed;
+    return serviceId ? [String(serviceId)] : [];
+  }, [serviceIds, parsedServices, serviceId]);
+
+  const selectedDurationMinutes = useMemo(() => {
+    const hinted = Number.parseInt(String(serviceDuration || ""), 10);
+    if (Number.isFinite(hinted) && hinted > 0) {
+      return hinted;
+    }
+
+    if (parsedServices.length === 0) {
+      return 30;
+    }
+
+    return parsedServices.reduce((total, item) => {
+      const duration = Number.parseInt(String(item.estimated_duration || ""), 10);
+      return total + (Number.isFinite(duration) && duration > 0 ? duration : 30);
+    }, 0);
+  }, [serviceDuration, parsedServices]);
 
   const [loading, setLoading] = useState(false);
   const [dentist, setDentist] = useState(null);
@@ -794,14 +856,20 @@ export default function ConfirmAppointment() {
     setLoading(true);
     try {
       const fullDateTimeStart = `${selectedDate} ${timeSlot.value}:00`;
+      const normalizedServices = selectedServiceNames.length > 0
+        ? selectedServiceNames
+        : [selectedServiceName || "Checkup"];
+      const parsedSingleServiceId = selectedServiceIds.length === 1
+        ? Number.parseInt(selectedServiceIds[0], 10)
+        : null;
 
       const payload = {
         patient_id: selectedPatient.id,
         dentist_id: docId,
         timeStart: fullDateTimeStart,
-        procedure: selectedServiceName || "Checkup",
-        services: [selectedServiceName || "Checkup"],
-        service_id: serviceId ? Number(serviceId) : undefined,
+        procedure: normalizedServices.join(", "),
+        services: normalizedServices,
+        service_id: Number.isFinite(parsedSingleServiceId) ? parsedSingleServiceId : undefined,
         estimated_duration_minutes: selectedDurationMinutes,
         status: "Scheduled",
         notes: "Booked via App"
@@ -913,7 +981,7 @@ export default function ConfirmAppointment() {
             <Ionicons name="clipboard" size={20} color="#1B93D5" />
           </View>
           <View>
-            <Text style={styles.summaryLabel}>Service</Text>
+            <Text style={styles.summaryLabel}>{selectedServiceNames.length > 1 ? "Services" : "Service"}</Text>
             <Text style={styles.summaryValue}>{selectedServiceName || "Checkup"}</Text>
             <Text style={styles.summaryLabel}>Duration</Text>
             <Text style={styles.summaryValue}>{selectedDurationMinutes} mins</Text>
@@ -1033,7 +1101,7 @@ export default function ConfirmAppointment() {
             <Text style={styles.modalTitle}>Confirm Appointment</Text>
 
             <View style={styles.confirmDetailRow}>
-              <Text style={styles.confirmDetailLabel}>Service</Text>
+              <Text style={styles.confirmDetailLabel}>{selectedServiceNames.length > 1 ? "Services" : "Service"}</Text>
               <Text style={styles.confirmDetailValue}>{selectedServiceName || "Checkup"}</Text>
             </View>
             <View style={styles.confirmDetailRow}>
