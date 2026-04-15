@@ -176,6 +176,10 @@ export default function SelectServiceScreen() {
         contentContainerStyle={styles.contentContainer}
         ListHeaderComponent={
           <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color="#1E293B" />
+              <Text style={styles.backText}>Back</Text>
+            </TouchableOpacity>
             <Text style={styles.title}>Book Appointment</Text>
             <Text style={styles.subtitle}>Select one or more services</Text>
           </View>
@@ -237,6 +241,20 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 14,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 14,
+    paddingRight: 10,
+    marginLeft: -4,
+  },
+  backText: {
+    fontSize: 16,
+    color: '#1E293B',
+    marginLeft: 6,
+    fontWeight: '600',
   },
   centerContainer: {
     flex: 1,
