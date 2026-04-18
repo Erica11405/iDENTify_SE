@@ -1,0 +1,12 @@
+{
+  "globalAdminUserId": "",
+  "aideUserId": "",
+  "dentistUserId": "",
+  "dentistId": "",
+  "globalAdminCandidates": [""],
+  "aideCandidates": [""],
+  "dentistUserCandidates": [""],
+  "dentistIdCandidates": [""],
+  "userIdScanMax": 0,
+  "dentistIdScanMax": 0
+}

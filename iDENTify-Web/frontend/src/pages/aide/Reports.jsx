@@ -52,13 +52,10 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
   useEffect(() => {
     const startStr = startDate.toISOString().split('T')[0];
     const endStr = endDate.toISOString().split('T')[0];
-    
-    // Fallback: If your useApi loadReports hook only accepts one date string,
-    // we bypass it to directly call apiClient so we can pass both parameters safely.
+
     const fetchReports = async () => {
       try {
-        const response = await apiClient.get(`/reports?startDate=${startStr}&endDate=${endStr}`);
-        useAppStore.setState({ reports: response.data || response });
+        await api.loadReports({ startDate: startStr, endDate: endStr });
       } catch (err) {
         console.error("Load reports failed", err);
       }
@@ -141,10 +138,11 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
     
     try {
       const targetId = dentist.id || dentist.dentist_id || "unassigned";
-      // Bypassing frontend wrapper functions to ensure range queries work flawlessly
-      const response = await apiClient.get(`/reports/dentist/${targetId}/patients?startDate=${startStr}&endDate=${endStr}`);
-      // Accessing response.data.patients handles Axios responses properly
-      setDentistPatients(response?.data?.patients || response?.patients || []);
+      const response = await apiClient.getDentistPatientsForReport(targetId, {
+        startDate: startStr,
+        endDate: endStr,
+      });
+      setDentistPatients(response?.patients || []);
     } catch {
       setPatientsError("Failed to load records.");
     } finally {
@@ -286,18 +284,18 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
   return (
     <div className="reports-page">
       <div className="reports-header">
-        <div style={{display: 'flex', flexDirection: 'column'}}>
+        <div className="reports-header-left">
             <h2 className="reports-title">{pageTitle}</h2>
-            <p style={{ margin: '2px 0 0 0', color: '#64748b', fontSize: '0.9rem' }}>{pageSubtitle}</p>
-            <div className="range-selector" style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                <button onClick={() => handleRangeChange('daily')} className={`export-btn ${rangeType === 'daily' ? 'pdf' : ''}`} style={{padding: '5px 10px', fontSize: '0.85rem'}}>Today</button>
-                <button onClick={() => handleRangeChange('weekly')} className={`export-btn ${rangeType === 'weekly' ? 'pdf' : ''}`} style={{padding: '5px 10px', fontSize: '0.85rem'}}>Past Week</button>
-                <button onClick={() => handleRangeChange('monthly')} className={`export-btn ${rangeType === 'monthly' ? 'pdf' : ''}`} style={{padding: '5px 10px', fontSize: '0.85rem'}}>Past Month</button>
-                <button onClick={() => handleRangeChange('yearly')} className={`export-btn ${rangeType === 'yearly' ? 'pdf' : ''}`} style={{padding: '5px 10px', fontSize: '0.85rem'}}>Past Year</button>
+            <p className="reports-subtitle">{pageSubtitle}</p>
+            <div className="range-selector">
+                <button onClick={() => handleRangeChange('daily')} className={`range-btn ${rangeType === 'daily' ? 'active' : ''}`}>Today</button>
+                <button onClick={() => handleRangeChange('weekly')} className={`range-btn ${rangeType === 'weekly' ? 'active' : ''}`}>Past Week</button>
+                <button onClick={() => handleRangeChange('monthly')} className={`range-btn ${rangeType === 'monthly' ? 'active' : ''}`}>Past Month</button>
+                <button onClick={() => handleRangeChange('yearly')} className={`range-btn ${rangeType === 'yearly' ? 'active' : ''}`}>Past Year</button>
             </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'flex-end', marginTop: '10px' }}>
+        <div className="reports-controls">
           <div className="date-picker-container">
             <span className="small-label">Start Date</span>
             <DatePicker
@@ -337,31 +335,31 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
       {api.loading && <p className="loading-state">Loading reports...</p>}
 
       {api.error && (
-        <div className="error-message" style={{ color: 'red', padding: '1rem', background: '#ffe3e3', borderRadius: '8px', margin: '1rem 0' }}>
+        <div className="error-message reports-error-message">
           <h3>Error loading reports</h3>
-          <p>Please check your connection or database schema.</p>
+          <p>{api.error?.message || "Please check your connection or database schema."}</p>
         </div>
       )}
 
       {!api.loading && hasData && (
         <>
           {showSummaryCards ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-                <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Patients Seen</p>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.patientsSeen}</p>
+            <div className="reports-summary-cards">
+              <div className="reports-summary-card">
+                <p className="reports-summary-label">Patients Seen</p>
+                <p className="reports-summary-value">{summary.patientsSeen}</p>
               </div>
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-                <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Procedures Done</p>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.proceduresDone}</p>
+              <div className="reports-summary-card">
+                <p className="reports-summary-label">Procedures Done</p>
+                <p className="reports-summary-value">{summary.proceduresDone}</p>
               </div>
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-                <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>New Patients</p>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.newPatients}</p>
+              <div className="reports-summary-card">
+                <p className="reports-summary-label">New Patients</p>
+                <p className="reports-summary-value">{summary.newPatients}</p>
               </div>
-              <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '0.65rem 0.8rem', background: '#fff' }}>
-                <p style={{ margin: 0, color: '#64748b', fontSize: '0.8rem' }}>Avg Treatment Time</p>
-                <p style={{ margin: '0.25rem 0 0 0', fontSize: '1.35rem', fontWeight: 700 }}>{summary.avgTreatmentDuration}</p>
+              <div className="reports-summary-card">
+                <p className="reports-summary-label">Avg Treatment Time</p>
+                <p className="reports-summary-value">{summary.avgTreatmentDuration}</p>
               </div>
             </div>
           ) : null}
@@ -384,10 +382,10 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
           <div className="report-section">
             <h3 className="report-subtitle">Dentist Performance</h3>
             {rankedDentists.length === 0 ? (
-              <p style={{ margin: 0, color: '#64748b' }}>No performance data for this date range.</p>
+              <p className="reports-empty-text">No performance data for this date range.</p>
             ) : (
               <>
-                <div style={{ minHeight: '320px' }}>
+                <div className="reports-chart-wrap">
                   <WeeklyBarChart chartData={dentistPerformanceChartData} />
                 </div>
 
@@ -415,8 +413,8 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
       )}
 
       {!api.loading && !api.error && !hasData && (
-        <div className="report-section" style={{ marginTop: '1rem' }}>
-          <p style={{ margin: 0, color: '#64748b' }}>
+        <div className="report-section reports-empty-section">
+          <p className="reports-empty-text">
             No report data available for the selected date range.
           </p>
         </div>
@@ -431,10 +429,9 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
                 <h3>Patients handled by {getDentistName(selectedDentist)}</h3>
                 <p>{getTitleDateRangeStr()}</p>
               </div>
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <div className="modal-header-actions">
                 <button 
-                  className="export-btn pdf" 
-                  style={{ fontSize: '0.85rem', padding: '6px 12px' }}
+                  className="export-btn pdf modal-export-btn"
                   onClick={(e) => {
                     e.stopPropagation(); 
                     exportDentistPatientsToPDF();
@@ -467,7 +464,7 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
                     <tbody>
                       {dentistPatients.map((p, i) => (
                         <tr key={i}>
-                          <td style={{ fontWeight: '500' }}>{p.full_name || p.name || "Unknown"}</td>
+                          <td className="patient-name-cell">{p.full_name || p.name || "Unknown"}</td>
                           <td>{new Date(p.appointment_datetime || p.timeStart).toLocaleDateString()} {formatApptTime(p.appointment_datetime || p.timeStart)}</td>
                           <td>{p.reason || p.procedure || "Check-up"}</td>
                         </tr>

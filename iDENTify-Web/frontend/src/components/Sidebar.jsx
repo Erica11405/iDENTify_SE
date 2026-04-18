@@ -182,6 +182,7 @@ import LogoutIcon from "../assets/logout.svg";
 
 function roleLabel(role) {
     if (role === 'superadmin') return 'Super Admin';
+    if (role === 'globaladmin') return 'Global Admin';
     if (role === 'dentist') return 'Dentist';
     return 'Dental Aide';
 }
@@ -249,7 +250,7 @@ function Sidebar({ role }) {
                 )}
 
                 <nav>
-                    {role === 'superadmin' ? (
+                    {(role === 'superadmin' || role === 'globaladmin') ? (
                         <>
                             <NavLink to="/admin/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
                                 <img src={DashboardIcon} alt="Dashboard" />

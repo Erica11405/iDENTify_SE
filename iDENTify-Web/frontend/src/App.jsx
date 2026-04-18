@@ -6,6 +6,7 @@ import AppLayout from './layout/AppLayout';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import Landing from './pages/Landing';
+import ChangePasswordRequired from './pages/ChangePasswordRequired';
 
 // --- Aide Pages ---
 import Dashboard from './pages/aide/Dashboard';
@@ -32,8 +33,22 @@ import SuperAdminReports from './pages/superadmin/SuperAdminReports';
 import SuperAdminSettings from './pages/superadmin/SuperAdminSettings';
 import SuperAdminArchive from './pages/superadmin/SuperAdminArchive';
 
+function requiresPasswordChange(user) {
+    if (!user || typeof user !== 'object') {
+        return false;
+    }
+
+    const rawValue = user.require_password_change ?? user.requirePasswordChange;
+    if (rawValue === true || rawValue === 1) return true;
+    if (rawValue === false || rawValue === 0 || rawValue === null || rawValue === undefined) return false;
+
+    const normalized = String(rawValue).trim().toLowerCase();
+    return normalized === 'true' || normalized === '1';
+}
+
 function App() {
     const { user } = useAppStore();
+    const mustChangePassword = requiresPasswordChange(user);
 
     // 1. If not logged in, force them to Login or Signup
     if (!user) {
@@ -43,6 +58,16 @@ function App() {
                 <Route path="/" element={<Login />} />
                 <Route path="/signup" element={<SignUp />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+        );
+    }
+
+    if (mustChangePassword) {
+        return (
+            <Routes>
+                <Route path="/download" element={<Landing />} />
+                <Route path="/change-password" element={<ChangePasswordRequired />} />
+                <Route path="*" element={<Navigate to="/change-password" replace />} />
             </Routes>
         );
     }
@@ -65,7 +90,7 @@ function App() {
                     </>
                 )}
 
-                {user.role === 'superadmin' && (
+                {(user.role === 'superadmin' || user.role === 'globaladmin') && (
                     <>
                         <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
                         <Route path="/admin/dashboard" element={<SuperAdminDashboard />} />
@@ -77,7 +102,7 @@ function App() {
                     </>
                 )}
 
-                {user.role !== 'dentist' && user.role !== 'superadmin' && (
+                {user.role !== 'dentist' && user.role !== 'superadmin' && user.role !== 'globaladmin' && (
                     <>
                         <Route path="/" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/dashboard" element={<Dashboard />} />

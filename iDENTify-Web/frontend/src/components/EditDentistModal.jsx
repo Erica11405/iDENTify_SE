@@ -20,6 +20,23 @@ const FALLBACK_DENTIST_TYPES = [
 const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [leaveDraft, setLeaveDraft] = useState('');
+
+  const actorContext = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('identify-auth-storage');
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed?.state?.user || null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const canEditSchedule = useMemo(() => {
+    const role = String(actorContext?.role || '').trim().toLowerCase();
+    const actorDentistId = Number(actorContext?.dentist_id || 0);
+    const targetDentistId = Number(dentist?.id || 0);
+    return role === 'dentist' && actorDentistId > 0 && actorDentistId === targetDentistId;
+  }, [actorContext, dentist?.id]);
   
   // Pre-fill the form with the dentist's existing data
   const [formData, setFormData] = useState({
@@ -166,6 +183,7 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
                     type="button"
                     className={`day-toggle ${formData.days.includes(day.value) ? 'active' : ''}`}
                     onClick={() => toggleWorkingDay(day.value)}
+                    disabled={!canEditSchedule}
                   >
                     {day.label}
                   </button>
@@ -177,17 +195,17 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
               <div className="form-group">
                 <label>Operating Hours</label>
                 <div className="time-range">
-                  <input type="time" value={formData.operatingHours.start} onChange={(e) => handleTimeChange('operatingHours', 'start', e.target.value)} />
+                  <input type="time" value={formData.operatingHours.start} onChange={(e) => handleTimeChange('operatingHours', 'start', e.target.value)} disabled={!canEditSchedule} />
                   <span>to</span>
-                  <input type="time" value={formData.operatingHours.end} onChange={(e) => handleTimeChange('operatingHours', 'end', e.target.value)} />
+                  <input type="time" value={formData.operatingHours.end} onChange={(e) => handleTimeChange('operatingHours', 'end', e.target.value)} disabled={!canEditSchedule} />
                 </div>
               </div>
               <div className="form-group">
                 <label>Lunch Break</label>
                 <div className="time-range">
-                  <input type="time" value={formData.lunch.start} onChange={(e) => handleTimeChange('lunch', 'start', e.target.value)} />
+                  <input type="time" value={formData.lunch.start} onChange={(e) => handleTimeChange('lunch', 'start', e.target.value)} disabled={!canEditSchedule} />
                   <span>to</span>
-                  <input type="time" value={formData.lunch.end} onChange={(e) => handleTimeChange('lunch', 'end', e.target.value)} />
+                  <input type="time" value={formData.lunch.end} onChange={(e) => handleTimeChange('lunch', 'end', e.target.value)} disabled={!canEditSchedule} />
                 </div>
               </div>
             </div>
@@ -199,13 +217,13 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
                   {(formData.leaveDays || []).map((dateValue) => (
                     <div className="chip red-chip" key={dateValue}>
                       {dateValue}
-                      <button type="button" onClick={() => removeLeaveDay(dateValue)}>&times;</button>
+                      <button type="button" onClick={() => removeLeaveDay(dateValue)} disabled={!canEditSchedule}>&times;</button>
                     </div>
                   ))}
                 </div>
                 <div className="add-row">
-                  <input type="date" value={leaveDraft} onChange={(e) => setLeaveDraft(e.target.value)} />
-                  <button type="button" className="btn-small-add" onClick={addLeaveDay}>Add</button>
+                  <input type="date" value={leaveDraft} onChange={(e) => setLeaveDraft(e.target.value)} disabled={!canEditSchedule} />
+                  <button type="button" className="btn-small-add" onClick={addLeaveDay} disabled={!canEditSchedule}>Add</button>
                 </div>
               </div>
             </div>

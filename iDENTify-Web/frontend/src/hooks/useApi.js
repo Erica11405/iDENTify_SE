@@ -137,6 +137,22 @@ export default function useApi() {
     return updated;
   }, []);
 
+  const loadReports = useCallback(async (params) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.getReports(params);
+      setReports(data || {});
+      return data || {};
+    } catch (err) {
+      setReports({});
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [setReports]);
+
   return useMemo(() => ({
     loading,
     error,
@@ -150,11 +166,7 @@ export default function useApi() {
       setDentists(list);
       return list;
     },
-    loadReports: async (date) => {
-      const data = await api.getReports(date);
-      setReports(data);
-      return data;
-    },
+    loadReports,
     updateDentist: async (id, updates) => {
       const updated = await api.updateDentist(id, updates);
       if (updated) updateDentistStore(updated);
@@ -188,8 +200,8 @@ export default function useApi() {
     saveAnnualRecord: async (p) => api.saveAnnualRecord(p)
   }), [
     loading, error, loadPatients, loadAppointments, loadQueue, loadQueueHistory, 
-    deleteQueue, setDentists, setReports, updateDentistStore, removeDentistStore, 
-    getPatientById, createPatient, updatePatient, createAppointment, updateAppointment, 
-    removeAppointment, addQueue, updateQueueItem
+    deleteQueue, setDentists, updateDentistStore, removeDentistStore,
+    getPatientById, createPatient, updatePatient, createAppointment, updateAppointment,
+    removeAppointment, addQueue, updateQueueItem, loadReports
   ]);
 }

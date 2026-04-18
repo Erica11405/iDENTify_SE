@@ -3,8 +3,15 @@ const router = express.Router();
 const db = require("../db");
 
 const DEFAULT_DURATION_MINUTES = 30;
-const CANCELLATION_LOCK_MINUTES = 24 * 60;
+const CANCELLATION_LOCK_MINUTES = 30;
 const SQL_PH_NOW = "DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR)";
+
+let hasAppointmentClinicColumnCache = null;
+let hasAppointmentBranchColumnCache = null;
+let hasQueueClinicColumnCache = null;
+let hasQueueBranchColumnCache = null;
+let hasUsersClinicColumnCache = null;
+let hasUsersBranchColumnCache = null;
 
 function parseTime(dateTimeStr) {
   if (!dateTimeStr) return null;
@@ -23,6 +30,301 @@ function toPositiveInt(value) {
   const parsed = Number.parseInt(String(value || ""), 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return parsed;
+}
+
+function normalizeActorRole(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "super_admin") return "superadmin";
+  if (normalized === "global_admin") return "globaladmin";
+  return normalized;
+}
+
+function actorUserId(req) {
+  return toPositiveInt(req.headers["x-user-id"]);
+}
+
+async function hasAppointmentClinicColumn() {
+  if (hasAppointmentClinicColumnCache !== null) {
+    return hasAppointmentClinicColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM appointments LIKE 'clinic_id'");
+    hasAppointmentClinicColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasAppointmentClinicColumnCache = false;
+  }
+
+  return hasAppointmentClinicColumnCache;
+}
+
+async function hasAppointmentBranchColumn() {
+  if (hasAppointmentBranchColumnCache !== null) {
+    return hasAppointmentBranchColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM appointments LIKE 'branch_id'");
+    hasAppointmentBranchColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasAppointmentBranchColumnCache = false;
+  }
+
+  return hasAppointmentBranchColumnCache;
+}
+
+async function hasQueueClinicColumn() {
+  if (hasQueueClinicColumnCache !== null) {
+    return hasQueueClinicColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM walk_in_queue LIKE 'clinic_id'");
+    hasQueueClinicColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasQueueClinicColumnCache = false;
+  }
+
+  return hasQueueClinicColumnCache;
+}
+
+async function hasQueueBranchColumn() {
+  if (hasQueueBranchColumnCache !== null) {
+    return hasQueueBranchColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM walk_in_queue LIKE 'branch_id'");
+    hasQueueBranchColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasQueueBranchColumnCache = false;
+  }
+
+  return hasQueueBranchColumnCache;
+}
+
+async function hasUsersClinicColumn() {
+  if (hasUsersClinicColumnCache !== null) {
+    return hasUsersClinicColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'clinic_id'");
+    hasUsersClinicColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasUsersClinicColumnCache = false;
+  }
+
+  return hasUsersClinicColumnCache;
+}
+
+async function hasUsersBranchColumn() {
+  if (hasUsersBranchColumnCache !== null) {
+    return hasUsersBranchColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'branch_id'");
+    hasUsersBranchColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasUsersBranchColumnCache = false;
+  }
+
+  return hasUsersBranchColumnCache;
+}
+
+async function getActorTenantScope(req) {
+  const role = normalizeActorRole(req.headers["x-user-role"]);
+  const userId = actorUserId(req);
+
+  if (!userId) {
+    return {
+      role,
+      userId: null,
+      clinicId: null,
+      branchId: null,
+      scoped: false,
+    };
+  }
+
+  const supportsUsersClinic = await hasUsersClinicColumn();
+  const supportsUsersBranch = await hasUsersBranchColumn();
+  if (!supportsUsersClinic && !supportsUsersBranch) {
+    return {
+      role,
+      userId,
+      clinicId: null,
+      branchId: null,
+      scoped: false,
+    };
+  }
+
+  const selectColumns = [];
+  if (supportsUsersClinic) selectColumns.push("clinic_id");
+  if (supportsUsersBranch) selectColumns.push("branch_id");
+
+  try {
+    const [rows] = await db.query(
+      `SELECT ${selectColumns.join(", ")} FROM users WHERE id = ? LIMIT 1`,
+      [userId]
+    );
+
+    const row = rows[0] || {};
+    const clinicId = supportsUsersClinic ? toPositiveInt(row.clinic_id) : null;
+    const branchId = supportsUsersBranch ? toPositiveInt(row.branch_id) : null;
+
+    if (role === "globaladmin") {
+      return {
+        role,
+        userId,
+        clinicId,
+        branchId,
+        scoped: false,
+      };
+    }
+
+    const scopedRoles = new Set(["superadmin", "dentist", "aide"]);
+    const scoped = scopedRoles.has(role) && Boolean(clinicId || branchId);
+
+    return {
+      role,
+      userId,
+      clinicId,
+      branchId,
+      scoped,
+    };
+  } catch (_err) {
+    return {
+      role,
+      userId,
+      clinicId: null,
+      branchId: null,
+      scoped: false,
+    };
+  }
+}
+
+function hasTenantScopeViolation(scope, clinicId, branchId) {
+  if (!scope?.scoped) return null;
+
+  if (scope.clinicId && clinicId && Number(scope.clinicId) !== Number(clinicId)) {
+    return "You can only manage appointments within your assigned clinic.";
+  }
+
+  if (scope.branchId && branchId && Number(scope.branchId) !== Number(branchId)) {
+    return "You can only manage appointments within your assigned branch.";
+  }
+
+  return null;
+}
+
+function appendTenantWhereClauses({ whereClauses, params, scope, clinicExpression, branchExpression }) {
+  if (!scope?.scoped) return;
+
+  if (scope.clinicId && clinicExpression) {
+    whereClauses.push(`${clinicExpression} = ?`);
+    params.push(scope.clinicId);
+  }
+
+  if (scope.branchId && branchExpression) {
+    whereClauses.push(`${branchExpression} = ?`);
+    params.push(scope.branchId);
+  }
+}
+
+async function resolveClinicIdFromBranch(branchId) {
+  const parsedBranchId = toPositiveInt(branchId);
+  if (!parsedBranchId) return null;
+
+  try {
+    const [rows] = await db.query(
+      `SELECT clinic_id FROM clinic_branches WHERE id = ? LIMIT 1`,
+      [parsedBranchId]
+    );
+    if (!rows.length) return null;
+    return toPositiveInt(rows[0]?.clinic_id);
+  } catch (_err) {
+    return null;
+  }
+}
+
+async function inferTenantFromDentist(dentistId) {
+  const parsedDentistId = toPositiveInt(dentistId);
+  if (!parsedDentistId) {
+    return { clinicId: null, branchId: null };
+  }
+
+  const supportsUsersClinic = await hasUsersClinicColumn();
+  const supportsUsersBranch = await hasUsersBranchColumn();
+  if (!supportsUsersClinic && !supportsUsersBranch) {
+    return { clinicId: null, branchId: null };
+  }
+
+  const selectColumns = [];
+  if (supportsUsersClinic) selectColumns.push("clinic_id");
+  if (supportsUsersBranch) selectColumns.push("branch_id");
+
+  try {
+    const [rows] = await db.query(
+      `SELECT ${selectColumns.join(", ")}
+       FROM users
+       WHERE dentist_id = ?
+         AND role IN ('dentist', 'aide', 'superadmin', 'globaladmin')
+       ORDER BY CASE
+         WHEN role = 'dentist' THEN 0
+         WHEN role = 'aide' THEN 1
+         WHEN role = 'superadmin' THEN 2
+         ELSE 3
+       END,
+       id ASC
+       LIMIT 1`,
+      [parsedDentistId]
+    );
+
+    const row = rows[0] || {};
+    return {
+      clinicId: supportsUsersClinic ? toPositiveInt(row.clinic_id) : null,
+      branchId: supportsUsersBranch ? toPositiveInt(row.branch_id) : null,
+    };
+  } catch (_err) {
+    return { clinicId: null, branchId: null };
+  }
+}
+
+async function resolveAppointmentTenant({ clinicId, branchId, dentistId, actorScope }) {
+  let resolvedClinicId = toPositiveInt(clinicId);
+  let resolvedBranchId = toPositiveInt(branchId);
+
+  if (actorScope?.scoped) {
+    if (!resolvedClinicId && actorScope.clinicId) {
+      resolvedClinicId = actorScope.clinicId;
+    }
+    if (!resolvedBranchId && actorScope.branchId) {
+      resolvedBranchId = actorScope.branchId;
+    }
+  }
+
+  if (!resolvedClinicId && resolvedBranchId) {
+    resolvedClinicId = await resolveClinicIdFromBranch(resolvedBranchId);
+  }
+
+  if ((!resolvedClinicId || !resolvedBranchId) && dentistId) {
+    const inferredTenant = await inferTenantFromDentist(dentistId);
+    if (!resolvedClinicId) {
+      resolvedClinicId = inferredTenant.clinicId;
+    }
+    if (!resolvedBranchId) {
+      resolvedBranchId = inferredTenant.branchId;
+    }
+  }
+
+  const scopeViolation = hasTenantScopeViolation(actorScope, resolvedClinicId, resolvedBranchId);
+
+  return {
+    clinicId: resolvedClinicId,
+    branchId: resolvedBranchId,
+    scopeViolation,
+  };
 }
 
 function toDate(value) {
@@ -148,10 +450,30 @@ router.get("/check-limit", async (req, res) => {
   if (!dentist_id || !date) return res.status(400).json({ message: "Missing data" });
 
   try {
+    const actorScope = await getActorTenantScope(req);
+    const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+    const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+
+    const whereClauses = [
+      "a.dentist_id = ?",
+      "DATE(a.appointment_datetime) = ?",
+      "a.status != 'Cancelled'",
+    ];
+    const params = [dentist_id, date];
+
+    appendTenantWhereClauses({
+      whereClauses,
+      params,
+      scope: actorScope,
+      clinicExpression: supportsAppointmentClinic ? "a.clinic_id" : null,
+      branchExpression: supportsAppointmentBranch ? "a.branch_id" : null,
+    });
+
     const [countResult] = await db.query(
-      `SELECT COUNT(*) as count FROM appointments WHERE dentist_id = ? AND DATE(appointment_datetime) = ? AND status != 'Cancelled'`,
-      [dentist_id, date]
+      `SELECT COUNT(*) as count FROM appointments a WHERE ${whereClauses.join(" AND ")}`,
+      params
     );
+
     res.json({ count: countResult[0].count, limit: 5 });
   } catch (err) {
     res.status(500).json({ message: "Error checking limit" });
@@ -161,33 +483,62 @@ router.get("/check-limit", async (req, res) => {
 // --- GET ALL APPOINTMENTS ---
 router.get("/", async (req, res) => {
   const { date, patient_id } = req.query; 
-  // ADDED: LEFT JOIN to fetch the dentist's name
-  let query = `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name 
-               FROM appointments a 
-               JOIN patients p ON a.patient_id = p.id 
-               LEFT JOIN dentists d ON a.dentist_id = d.id`;
-  
-  const params = [];
-  const whereClauses = [];
-
-  if (date) { 
-    whereClauses.push("DATE(a.appointment_datetime) = ?"); 
-    params.push(date); 
-  }
-  
-  if (patient_id) { 
-    whereClauses.push("a.patient_id = ?"); 
-    params.push(patient_id); 
-  }
-
-  if (whereClauses.length > 0) {
-    query += " WHERE " + whereClauses.join(" AND ");
-  }
-
-  query += " ORDER BY a.appointment_datetime ASC";
 
   try {
     await syncOverdueAppointmentsToMissed();
+
+    const actorScope = await getActorTenantScope(req);
+    const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+    const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+    const supportsUsersClinic = await hasUsersClinicColumn();
+    const supportsUsersBranch = await hasUsersBranchColumn();
+
+    const needsOwnerJoin = actorScope.scoped && (
+      (actorScope.clinicId && !supportsAppointmentClinic && supportsUsersClinic) ||
+      (actorScope.branchId && !supportsAppointmentBranch && supportsUsersBranch)
+    );
+
+    let query = `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name 
+               FROM appointments a 
+               JOIN patients p ON a.patient_id = p.id 
+               LEFT JOIN dentists d ON a.dentist_id = d.id`;
+
+    if (needsOwnerJoin) {
+      query += `
+               LEFT JOIN (
+                 SELECT dentist_id, MAX(clinic_id) AS clinic_id, MAX(branch_id) AS branch_id
+                 FROM users
+                 GROUP BY dentist_id
+               ) owner ON owner.dentist_id = a.dentist_id`;
+    }
+
+    const params = [];
+    const whereClauses = [];
+
+    if (date) {
+      whereClauses.push("DATE(a.appointment_datetime) = ?");
+      params.push(date);
+    }
+
+    if (patient_id) {
+      whereClauses.push("a.patient_id = ?");
+      params.push(patient_id);
+    }
+
+    appendTenantWhereClauses({
+      whereClauses,
+      params,
+      scope: actorScope,
+      clinicExpression: supportsAppointmentClinic ? "a.clinic_id" : (needsOwnerJoin ? "owner.clinic_id" : null),
+      branchExpression: supportsAppointmentBranch ? "a.branch_id" : (needsOwnerJoin ? "owner.branch_id" : null),
+    });
+
+    if (whereClauses.length > 0) {
+      query += " WHERE " + whereClauses.join(" AND ");
+    }
+
+    query += " ORDER BY a.appointment_datetime ASC";
+
     const [rows] = await db.query(query, params);
     res.json(rows);
   } catch (err) {
@@ -199,15 +550,46 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     await syncOverdueAppointmentsToMissed();
-    // ADDED: LEFT JOIN to fetch the dentist's name
-    const [rows] = await db.query(
-      `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name 
+
+    const actorScope = await getActorTenantScope(req);
+    const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+    const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+    const supportsUsersClinic = await hasUsersClinicColumn();
+    const supportsUsersBranch = await hasUsersBranchColumn();
+
+    const needsOwnerJoin = actorScope.scoped && (
+      (actorScope.clinicId && !supportsAppointmentClinic && supportsUsersClinic) ||
+      (actorScope.branchId && !supportsAppointmentBranch && supportsUsersBranch)
+    );
+
+    let query = `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name 
        FROM appointments a 
        JOIN patients p ON a.patient_id = p.id 
-       LEFT JOIN dentists d ON a.dentist_id = d.id
-       WHERE a.id = ?`,
-      [req.params.id]
-    );
+       LEFT JOIN dentists d ON a.dentist_id = d.id`;
+
+    if (needsOwnerJoin) {
+      query += `
+       LEFT JOIN (
+         SELECT dentist_id, MAX(clinic_id) AS clinic_id, MAX(branch_id) AS branch_id
+         FROM users
+         GROUP BY dentist_id
+       ) owner ON owner.dentist_id = a.dentist_id`;
+    }
+
+    const whereClauses = ["a.id = ?"];
+    const params = [req.params.id];
+
+    appendTenantWhereClauses({
+      whereClauses,
+      params,
+      scope: actorScope,
+      clinicExpression: supportsAppointmentClinic ? "a.clinic_id" : (needsOwnerJoin ? "owner.clinic_id" : null),
+      branchExpression: supportsAppointmentBranch ? "a.branch_id" : (needsOwnerJoin ? "owner.branch_id" : null),
+    });
+
+    query += ` WHERE ${whereClauses.join(" AND ")}`;
+
+    const [rows] = await db.query(query, params);
     
     if (rows.length === 0) {
       return res.status(404).json({ message: "Appointment not found" });
@@ -221,13 +603,48 @@ router.get("/:id", async (req, res) => {
 
 // --- ADD APPOINTMENT ---
 router.post("/", async (req, res) => {
-  const { patient_id, dentist_id, timeStart, procedure, services, notes, status, estimated_duration_minutes } = req.body;
+  const {
+    patient_id,
+    dentist_id,
+    timeStart,
+    procedure,
+    services,
+    notes,
+    status,
+    estimated_duration_minutes,
+    clinic_id,
+    branch_id,
+  } = req.body;
+
+  const patientId = toPositiveInt(patient_id);
+  const dentistId = toPositiveInt(dentist_id);
   const appointment_datetime = parseTime(timeStart);
+
+  if (!patientId || !dentistId) {
+    return res.status(400).json({ message: "patient_id and dentist_id are required." });
+  }
 
   if (!appointment_datetime) return res.status(400).json({ message: "Invalid time format" });
 
   let connection;
   try {
+    const actorScope = await getActorTenantScope(req);
+    const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+    const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+    const supportsQueueClinic = await hasQueueClinicColumn();
+    const supportsQueueBranch = await hasQueueBranchColumn();
+
+    const resolvedTenant = await resolveAppointmentTenant({
+      clinicId: clinic_id,
+      branchId: branch_id,
+      dentistId,
+      actorScope,
+    });
+
+    if (resolvedTenant.scopeViolation) {
+      return res.status(403).json({ message: resolvedTenant.scopeViolation });
+    }
+
     connection = await db.getConnection();
     await connection.beginTransaction();
 
@@ -249,7 +666,7 @@ router.post("/", async (req, res) => {
        AND status NOT IN ('Cancelled', 'Declined')
        AND appointment_datetime < ?
        AND COALESCE(end_datetime, DATE_ADD(appointment_datetime, INTERVAL 30 MINUTE)) > ?`,
-      [dentist_id, endDateTime, appointment_datetime]
+      [dentistId, endDateTime, appointment_datetime]
     );
 
     if (existingConflict.length > 0) {
@@ -257,10 +674,39 @@ router.post("/", async (req, res) => {
       return res.status(409).json({ message: "This time slot is already booked for this dentist. Please select another time." });
     }
 
+    const appointmentColumns = [
+      "patient_id",
+      "dentist_id",
+      "appointment_datetime",
+      "end_datetime",
+      "reason",
+      "notes",
+      "status",
+    ];
+    const appointmentValues = [
+      patientId,
+      dentistId,
+      appointment_datetime,
+      endDateTime,
+      finalReason,
+      notes || "",
+      status || "Scheduled",
+    ];
+
+    if (supportsAppointmentClinic) {
+      appointmentColumns.push("clinic_id");
+      appointmentValues.push(resolvedTenant.clinicId || null);
+    }
+
+    if (supportsAppointmentBranch) {
+      appointmentColumns.push("branch_id");
+      appointmentValues.push(resolvedTenant.branchId || null);
+    }
+
     const [result] = await connection.query(
-      `INSERT INTO appointments (patient_id, dentist_id, appointment_datetime, end_datetime, reason, notes, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [patient_id, dentist_id, appointment_datetime, endDateTime, finalReason, notes || "", status || 'Scheduled']
+      `INSERT INTO appointments (${appointmentColumns.join(", ")})
+       VALUES (${appointmentColumns.map(() => "?").join(", ")})`,
+      appointmentValues
     );
 
     const [existingQueueRows] = await connection.query(
@@ -269,18 +715,39 @@ router.post("/", async (req, res) => {
     );
 
     if (existingQueueRows.length === 0) {
+      const queueColumns = [
+        "patient_id",
+        "dentist_id",
+        "appointment_id",
+        "source",
+        "status",
+        "notes",
+        "time_added",
+      ];
+      const queueValues = [
+        patientId,
+        dentistId,
+        result.insertId,
+        "appointment",
+        status || "Scheduled",
+        finalReason || notes || "",
+        appointment_datetime,
+      ];
+
+      if (supportsQueueClinic) {
+        queueColumns.push("clinic_id");
+        queueValues.push(resolvedTenant.clinicId || null);
+      }
+
+      if (supportsQueueBranch) {
+        queueColumns.push("branch_id");
+        queueValues.push(resolvedTenant.branchId || null);
+      }
+
       await connection.query(
-        `INSERT INTO walk_in_queue (patient_id, dentist_id, appointment_id, source, status, notes, time_added)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          patient_id,
-          dentist_id,
-          result.insertId,
-          "appointment",
-          status || "Scheduled",
-          finalReason || notes || "",
-          appointment_datetime,
-        ]
+        `INSERT INTO walk_in_queue (${queueColumns.join(", ")})
+         VALUES (${queueColumns.map(() => "?").join(", ")})`,
+        queueValues
       );
     }
     
@@ -318,8 +785,15 @@ router.put("/:id", async (req, res) => {
   try {
     await syncOverdueAppointmentsToMissed();
 
+    const actorScope = await getActorTenantScope(req);
+    const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+    const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+
     const [currentRows] = await db.query(
-      `SELECT id, dentist_id, appointment_datetime, reason, end_datetime FROM appointments WHERE id = ? LIMIT 1`,
+      `SELECT id, dentist_id, appointment_datetime, reason, end_datetime${supportsAppointmentClinic ? ", clinic_id" : ""}${supportsAppointmentBranch ? ", branch_id" : ""}
+       FROM appointments
+       WHERE id = ?
+       LIMIT 1`,
       [id]
     );
 
@@ -328,6 +802,25 @@ router.put("/:id", async (req, res) => {
     }
 
     const currentAppt = currentRows[0];
+    const currentClinicId = supportsAppointmentClinic ? toPositiveInt(currentAppt.clinic_id) : null;
+    const currentBranchId = supportsAppointmentBranch ? toPositiveInt(currentAppt.branch_id) : null;
+
+    if (actorScope.scoped) {
+      let scopedClinicId = currentClinicId;
+      let scopedBranchId = currentBranchId;
+
+      if (!supportsAppointmentClinic || !supportsAppointmentBranch) {
+        const inferredTenant = await inferTenantFromDentist(currentAppt.dentist_id);
+        if (!scopedClinicId) scopedClinicId = inferredTenant.clinicId;
+        if (!scopedBranchId) scopedBranchId = inferredTenant.branchId;
+      }
+
+      const currentScopeViolation = hasTenantScopeViolation(actorScope, scopedClinicId, scopedBranchId);
+      if (currentScopeViolation) {
+        return res.status(403).json({ message: currentScopeViolation });
+      }
+    }
+
     const requestedStatus = String(fields.status || "").trim().toLowerCase();
     const isCancelling = requestedStatus === "cancelled";
 
@@ -340,12 +833,20 @@ router.put("/:id", async (req, res) => {
 
       if (minutesUntil <= CANCELLATION_LOCK_MINUTES) {
         return res.status(400).json({
-          message: "Appointments can only be cancelled at least 24 hours before the appointment time.",
+          message: "Appointments can only be cancelled at least 30 minutes before the appointment time.",
         });
       }
     }
 
-    const nextDentistId = fields.dentist_id || currentAppt.dentist_id;
+    const requestedDentistId = Object.prototype.hasOwnProperty.call(fields, "dentist_id")
+      ? toPositiveInt(fields.dentist_id)
+      : null;
+
+    if (Object.prototype.hasOwnProperty.call(fields, "dentist_id") && !requestedDentistId) {
+      return res.status(400).json({ message: "Invalid dentist_id." });
+    }
+
+    const nextDentistId = requestedDentistId || currentAppt.dentist_id;
 
     const parsedStart = fields.timeStart ? parseTime(fields.timeStart) : null;
     if (fields.timeStart && !parsedStart) {
@@ -364,6 +865,17 @@ router.put("/:id", async (req, res) => {
       procedure: nextReason,
       durationHint: fields.estimated_duration_minutes,
     });
+
+    const resolvedTenant = await resolveAppointmentTenant({
+      clinicId: Object.prototype.hasOwnProperty.call(fields, "clinic_id") ? fields.clinic_id : currentClinicId,
+      branchId: Object.prototype.hasOwnProperty.call(fields, "branch_id") ? fields.branch_id : currentBranchId,
+      dentistId: nextDentistId,
+      actorScope,
+    });
+
+    if (resolvedTenant.scopeViolation) {
+      return res.status(403).json({ message: resolvedTenant.scopeViolation });
+    }
 
     const nextEnd = addMinutes(nextStart, durationMinutes);
     if (!nextEnd) {
@@ -390,7 +902,10 @@ router.put("/:id", async (req, res) => {
       setClauses.push("appointment_datetime = ?");
       values.push(nextStart);
     }
-    if (fields.dentist_id) { setClauses.push("dentist_id = ?"); values.push(fields.dentist_id); }
+    if (requestedDentistId) {
+      setClauses.push("dentist_id = ?");
+      values.push(requestedDentistId);
+    }
     if (fields.procedure || fields.services) {
       setClauses.push("reason = ?"); 
       values.push(nextReason);
@@ -406,6 +921,16 @@ router.put("/:id", async (req, res) => {
     if (Object.prototype.hasOwnProperty.call(fields, "status")) {
       setClauses.push("status = ?");
       values.push(fields.status);
+    }
+
+    if (supportsAppointmentClinic && resolvedTenant.clinicId !== currentClinicId) {
+      setClauses.push("clinic_id = ?");
+      values.push(resolvedTenant.clinicId || null);
+    }
+
+    if (supportsAppointmentBranch && resolvedTenant.branchId !== currentBranchId) {
+      setClauses.push("branch_id = ?");
+      values.push(resolvedTenant.branchId || null);
     }
 
     if (setClauses.length === 0) return res.status(400).json({ message: "No valid updates provided." });
@@ -432,6 +957,37 @@ router.put("/:id", async (req, res) => {
 // --- DELETE APPOINTMENT ---
 router.delete("/:id", async (req, res) => {
   try {
+    const actorScope = await getActorTenantScope(req);
+    const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+    const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+
+    const [rows] = await db.query(
+      `SELECT dentist_id${supportsAppointmentClinic ? ", clinic_id" : ""}${supportsAppointmentBranch ? ", branch_id" : ""}
+       FROM appointments
+       WHERE id = ?
+       LIMIT 1`,
+      [req.params.id]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    const row = rows[0];
+    let scopedClinicId = supportsAppointmentClinic ? toPositiveInt(row.clinic_id) : null;
+    let scopedBranchId = supportsAppointmentBranch ? toPositiveInt(row.branch_id) : null;
+
+    if (!supportsAppointmentClinic || !supportsAppointmentBranch) {
+      const inferredTenant = await inferTenantFromDentist(row.dentist_id);
+      if (!scopedClinicId) scopedClinicId = inferredTenant.clinicId;
+      if (!scopedBranchId) scopedBranchId = inferredTenant.branchId;
+    }
+
+    const scopeViolation = hasTenantScopeViolation(actorScope, scopedClinicId, scopedBranchId);
+    if (scopeViolation) {
+      return res.status(403).json({ message: scopeViolation });
+    }
+
     await db.query("DELETE FROM appointments WHERE id = ?", [req.params.id]);
     res.json({ message: "Appointment deleted" });
   } catch (err) {

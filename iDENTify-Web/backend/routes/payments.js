@@ -86,6 +86,298 @@ function sanitizeText(value, max = 255) {
   return str.slice(0, max);
 }
 
+let hasQueueClinicColumnCache = null;
+let hasQueueBranchColumnCache = null;
+let hasAppointmentClinicColumnCache = null;
+let hasAppointmentBranchColumnCache = null;
+let hasUsersClinicColumnCache = null;
+let hasUsersBranchColumnCache = null;
+
+function normalizeActorRole(req) {
+  const normalized = String(req.headers['x-user-role'] || '').trim().toLowerCase();
+  if (normalized === 'super_admin') return 'superadmin';
+  if (normalized === 'global_admin') return 'globaladmin';
+  return normalized;
+}
+
+function actorUserId(req) {
+  return toOptionalInt(req.headers['x-user-id']);
+}
+
+async function hasQueueClinicColumn() {
+  if (hasQueueClinicColumnCache !== null) {
+    return hasQueueClinicColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM walk_in_queue LIKE 'clinic_id'");
+    hasQueueClinicColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasQueueClinicColumnCache = false;
+  }
+
+  return hasQueueClinicColumnCache;
+}
+
+async function hasQueueBranchColumn() {
+  if (hasQueueBranchColumnCache !== null) {
+    return hasQueueBranchColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM walk_in_queue LIKE 'branch_id'");
+    hasQueueBranchColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasQueueBranchColumnCache = false;
+  }
+
+  return hasQueueBranchColumnCache;
+}
+
+async function hasAppointmentClinicColumn() {
+  if (hasAppointmentClinicColumnCache !== null) {
+    return hasAppointmentClinicColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM appointments LIKE 'clinic_id'");
+    hasAppointmentClinicColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasAppointmentClinicColumnCache = false;
+  }
+
+  return hasAppointmentClinicColumnCache;
+}
+
+async function hasAppointmentBranchColumn() {
+  if (hasAppointmentBranchColumnCache !== null) {
+    return hasAppointmentBranchColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM appointments LIKE 'branch_id'");
+    hasAppointmentBranchColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasAppointmentBranchColumnCache = false;
+  }
+
+  return hasAppointmentBranchColumnCache;
+}
+
+async function hasUsersClinicColumn() {
+  if (hasUsersClinicColumnCache !== null) {
+    return hasUsersClinicColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'clinic_id'");
+    hasUsersClinicColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasUsersClinicColumnCache = false;
+  }
+
+  return hasUsersClinicColumnCache;
+}
+
+async function hasUsersBranchColumn() {
+  if (hasUsersBranchColumnCache !== null) {
+    return hasUsersBranchColumnCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'branch_id'");
+    hasUsersBranchColumnCache = rows.length > 0;
+  } catch (_err) {
+    hasUsersBranchColumnCache = false;
+  }
+
+  return hasUsersBranchColumnCache;
+}
+
+async function getActorTenantScope(req) {
+  const role = normalizeActorRole(req);
+  const userId = actorUserId(req);
+
+  if (!userId) {
+    return {
+      role,
+      userId: null,
+      clinicId: null,
+      branchId: null,
+      scoped: false,
+    };
+  }
+
+  const supportsUsersClinic = await hasUsersClinicColumn();
+  const supportsUsersBranch = await hasUsersBranchColumn();
+  if (!supportsUsersClinic && !supportsUsersBranch) {
+    return {
+      role,
+      userId,
+      clinicId: null,
+      branchId: null,
+      scoped: false,
+    };
+  }
+
+  const selectColumns = [];
+  if (supportsUsersClinic) selectColumns.push('clinic_id');
+  if (supportsUsersBranch) selectColumns.push('branch_id');
+
+  try {
+    const [rows] = await db.query(
+      `SELECT ${selectColumns.join(', ')} FROM users WHERE id = ? LIMIT 1`,
+      [userId]
+    );
+
+    const row = rows[0] || {};
+    const clinicId = supportsUsersClinic ? toOptionalInt(row.clinic_id) : null;
+    const branchId = supportsUsersBranch ? toOptionalInt(row.branch_id) : null;
+
+    if (role === 'globaladmin') {
+      return {
+        role,
+        userId,
+        clinicId,
+        branchId,
+        scoped: false,
+      };
+    }
+
+    const scopedRoles = new Set(['superadmin', 'dentist', 'aide']);
+    const scoped = scopedRoles.has(role) && Boolean(clinicId || branchId);
+
+    return {
+      role,
+      userId,
+      clinicId,
+      branchId,
+      scoped,
+    };
+  } catch (_err) {
+    return {
+      role,
+      userId,
+      clinicId: null,
+      branchId: null,
+      scoped: false,
+    };
+  }
+}
+
+function hasTenantScopeViolation(scope, clinicId, branchId) {
+  if (!scope?.scoped) return null;
+
+  if (scope.clinicId && clinicId && Number(scope.clinicId) !== Number(clinicId)) {
+    return 'You can only access payments within your assigned clinic.';
+  }
+
+  if (scope.branchId && branchId && Number(scope.branchId) !== Number(branchId)) {
+    return 'You can only access payments within your assigned branch.';
+  }
+
+  return null;
+}
+
+function appendTenantWhereClauses({ whereClauses, params, scope, clinicExpression, branchExpression }) {
+  if (!scope?.scoped) return;
+
+  if (scope.clinicId && clinicExpression) {
+    whereClauses.push(`${clinicExpression} = ?`);
+    params.push(scope.clinicId);
+  }
+
+  if (scope.branchId && branchExpression) {
+    whereClauses.push(`${branchExpression} = ?`);
+    params.push(scope.branchId);
+  }
+}
+
+async function resolveClinicIdFromBranch(branchId) {
+  const parsedBranchId = toOptionalInt(branchId);
+  if (!parsedBranchId) return null;
+
+  try {
+    const [rows] = await db.query(
+      `SELECT clinic_id FROM clinic_branches WHERE id = ? LIMIT 1`,
+      [parsedBranchId]
+    );
+
+    if (!rows.length) return null;
+    return toOptionalInt(rows[0]?.clinic_id);
+  } catch (_err) {
+    return null;
+  }
+}
+
+async function inferTenantFromDentist(dentistId) {
+  const parsedDentistId = toOptionalInt(dentistId);
+  if (!parsedDentistId) {
+    return { clinicId: null, branchId: null };
+  }
+
+  const supportsUsersClinic = await hasUsersClinicColumn();
+  const supportsUsersBranch = await hasUsersBranchColumn();
+  if (!supportsUsersClinic && !supportsUsersBranch) {
+    return { clinicId: null, branchId: null };
+  }
+
+  const selectColumns = [];
+  if (supportsUsersClinic) selectColumns.push('clinic_id');
+  if (supportsUsersBranch) selectColumns.push('branch_id');
+
+  try {
+    const [rows] = await db.query(
+      `SELECT ${selectColumns.join(', ')}
+       FROM users
+       WHERE dentist_id = ?
+         AND role IN ('dentist', 'aide', 'superadmin', 'globaladmin')
+       ORDER BY CASE
+         WHEN role = 'dentist' THEN 0
+         WHEN role = 'aide' THEN 1
+         WHEN role = 'superadmin' THEN 2
+         ELSE 3
+       END,
+       id ASC
+       LIMIT 1`,
+      [parsedDentistId]
+    );
+
+    const row = rows[0] || {};
+    return {
+      clinicId: supportsUsersClinic ? toOptionalInt(row.clinic_id) : null,
+      branchId: supportsUsersBranch ? toOptionalInt(row.branch_id) : null,
+    };
+  } catch (_err) {
+    return { clinicId: null, branchId: null };
+  }
+}
+
+function canMutatePayments(req) {
+  const actorRole = normalizeActorRole(req);
+
+  // Backward compatibility for legacy clients that do not yet send actor context.
+  if (!actorRole) {
+    return { allowed: true };
+  }
+
+  if (actorRole === 'dentist') {
+    return {
+      allowed: false,
+      message: 'Dentists have read-only access to payments. Only dental aides can edit payment records.',
+    };
+  }
+
+  if (actorRole !== 'aide') {
+    return {
+      allowed: false,
+      message: 'Only dental aides can create or update payment records.',
+    };
+  }
+
+  return { allowed: true };
+}
+
 function normalizeServices(value) {
   if (Array.isArray(value)) {
     return value
@@ -305,6 +597,183 @@ async function syncQueueAndAppointmentStatus(connection, { queueId, appointmentI
   }
 }
 
+function buildPaymentTenantJoinConfig({
+  actorScope,
+  supportsQueueClinic,
+  supportsQueueBranch,
+  supportsAppointmentClinic,
+  supportsAppointmentBranch,
+  supportsUsersClinic,
+  supportsUsersBranch,
+}) {
+  const needsOwnerJoin = Boolean(actorScope?.scoped) && (
+    (actorScope?.clinicId && !supportsQueueClinic && !supportsAppointmentClinic && supportsUsersClinic) ||
+    (actorScope?.branchId && !supportsQueueBranch && !supportsAppointmentBranch && supportsUsersBranch)
+  );
+
+  const joinSql = [
+    'LEFT JOIN walk_in_queue q ON q.id = pr.queue_id',
+    'LEFT JOIN appointments a ON a.id = pr.appointment_id',
+  ];
+
+  if (needsOwnerJoin) {
+    joinSql.push(`LEFT JOIN (
+      SELECT dentist_id, MAX(clinic_id) AS clinic_id, MAX(branch_id) AS branch_id
+      FROM users
+      GROUP BY dentist_id
+    ) owner ON owner.dentist_id = COALESCE(pr.dentist_id, q.dentist_id, a.dentist_id)`);
+  }
+
+  const clinicExpressions = [];
+  const branchExpressions = [];
+
+  if (supportsQueueClinic) clinicExpressions.push('q.clinic_id');
+  if (supportsAppointmentClinic) clinicExpressions.push('a.clinic_id');
+  if (needsOwnerJoin) clinicExpressions.push('owner.clinic_id');
+
+  if (supportsQueueBranch) branchExpressions.push('q.branch_id');
+  if (supportsAppointmentBranch) branchExpressions.push('a.branch_id');
+  if (needsOwnerJoin) branchExpressions.push('owner.branch_id');
+
+  return {
+    joinSql: joinSql.join('\n'),
+    clinicExpression: clinicExpressions.length > 0 ? `COALESCE(${clinicExpressions.join(', ')})` : null,
+    branchExpression: branchExpressions.length > 0 ? `COALESCE(${branchExpressions.join(', ')})` : null,
+  };
+}
+
+async function resolveTenantFromQueue(connection, queueId) {
+  const parsedQueueId = toOptionalInt(queueId);
+  if (!parsedQueueId) {
+    return { clinicId: null, branchId: null, dentistId: null };
+  }
+
+  const supportsQueueClinic = await hasQueueClinicColumn();
+  const supportsQueueBranch = await hasQueueBranchColumn();
+
+  const selectColumns = ['dentist_id'];
+  if (supportsQueueClinic) selectColumns.push('clinic_id');
+  if (supportsQueueBranch) selectColumns.push('branch_id');
+
+  try {
+    const [rows] = await connection.query(
+      `SELECT ${selectColumns.join(', ')} FROM walk_in_queue WHERE id = ? LIMIT 1`,
+      [parsedQueueId]
+    );
+
+    if (!rows.length) {
+      return { clinicId: null, branchId: null, dentistId: null };
+    }
+
+    const row = rows[0] || {};
+    let clinicId = supportsQueueClinic ? toOptionalInt(row.clinic_id) : null;
+    const branchId = supportsQueueBranch ? toOptionalInt(row.branch_id) : null;
+    const dentistId = toOptionalInt(row.dentist_id);
+
+    if (!clinicId && branchId) {
+      clinicId = await resolveClinicIdFromBranch(branchId);
+    }
+
+    return { clinicId, branchId, dentistId };
+  } catch (_err) {
+    return { clinicId: null, branchId: null, dentistId: null };
+  }
+}
+
+async function resolveTenantFromAppointment(connection, appointmentId) {
+  const parsedAppointmentId = toOptionalInt(appointmentId);
+  if (!parsedAppointmentId) {
+    return { clinicId: null, branchId: null, dentistId: null };
+  }
+
+  const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+  const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+
+  const selectColumns = ['dentist_id'];
+  if (supportsAppointmentClinic) selectColumns.push('clinic_id');
+  if (supportsAppointmentBranch) selectColumns.push('branch_id');
+
+  try {
+    const [rows] = await connection.query(
+      `SELECT ${selectColumns.join(', ')} FROM appointments WHERE id = ? LIMIT 1`,
+      [parsedAppointmentId]
+    );
+
+    if (!rows.length) {
+      return { clinicId: null, branchId: null, dentistId: null };
+    }
+
+    const row = rows[0] || {};
+    let clinicId = supportsAppointmentClinic ? toOptionalInt(row.clinic_id) : null;
+    const branchId = supportsAppointmentBranch ? toOptionalInt(row.branch_id) : null;
+    const dentistId = toOptionalInt(row.dentist_id);
+
+    if (!clinicId && branchId) {
+      clinicId = await resolveClinicIdFromBranch(branchId);
+    }
+
+    return { clinicId, branchId, dentistId };
+  } catch (_err) {
+    return { clinicId: null, branchId: null, dentistId: null };
+  }
+}
+
+async function resolvePaymentTenant(connection, { queueId, appointmentId, dentistId, actorScope }) {
+  let resolvedClinicId = null;
+  let resolvedBranchId = null;
+  let resolvedDentistId = toOptionalInt(dentistId);
+
+  if (queueId) {
+    const queueTenant = await resolveTenantFromQueue(connection, queueId);
+    if (queueTenant.clinicId) resolvedClinicId = queueTenant.clinicId;
+    if (queueTenant.branchId) resolvedBranchId = queueTenant.branchId;
+    if (!resolvedDentistId && queueTenant.dentistId) {
+      resolvedDentistId = queueTenant.dentistId;
+    }
+  }
+
+  if ((!resolvedClinicId || !resolvedBranchId) && appointmentId) {
+    const appointmentTenant = await resolveTenantFromAppointment(connection, appointmentId);
+    if (!resolvedClinicId && appointmentTenant.clinicId) resolvedClinicId = appointmentTenant.clinicId;
+    if (!resolvedBranchId && appointmentTenant.branchId) resolvedBranchId = appointmentTenant.branchId;
+    if (!resolvedDentistId && appointmentTenant.dentistId) {
+      resolvedDentistId = appointmentTenant.dentistId;
+    }
+  }
+
+  if ((!resolvedClinicId || !resolvedBranchId) && resolvedDentistId) {
+    const inferredTenant = await inferTenantFromDentist(resolvedDentistId);
+    if (!resolvedClinicId) resolvedClinicId = inferredTenant.clinicId;
+    if (!resolvedBranchId) resolvedBranchId = inferredTenant.branchId;
+  }
+
+  if (!resolvedClinicId && resolvedBranchId) {
+    resolvedClinicId = await resolveClinicIdFromBranch(resolvedBranchId);
+  }
+
+  const scopeViolation = hasTenantScopeViolation(actorScope, resolvedClinicId, resolvedBranchId);
+  return {
+    clinicId: resolvedClinicId,
+    branchId: resolvedBranchId,
+    scopeViolation,
+  };
+}
+
+async function ensurePaymentRecordScope(connection, paymentRow, actorScope) {
+  if (!paymentRow) {
+    return null;
+  }
+
+  const tenant = await resolvePaymentTenant(connection, {
+    queueId: paymentRow.queue_id,
+    appointmentId: paymentRow.appointment_id,
+    dentistId: paymentRow.dentist_id,
+    actorScope,
+  });
+
+  return tenant.scopeViolation;
+}
+
 async function fetchPaymentRecord(connection, paymentId) {
   const [rows] = await connection.query(
     `SELECT
@@ -361,23 +830,51 @@ router.get("/", async (req, res) => {
   const keyword = sanitizeText(search, 120);
 
   try {
+    const actorScope = await getActorTenantScope(req);
+    const supportsQueueClinic = await hasQueueClinicColumn();
+    const supportsQueueBranch = await hasQueueBranchColumn();
+    const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+    const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+    const supportsUsersClinic = await hasUsersClinicColumn();
+    const supportsUsersBranch = await hasUsersBranchColumn();
+
+    const tenantJoinConfig = buildPaymentTenantJoinConfig({
+      actorScope,
+      supportsQueueClinic,
+      supportsQueueBranch,
+      supportsAppointmentClinic,
+      supportsAppointmentBranch,
+      supportsUsersClinic,
+      supportsUsersBranch,
+    });
+
     const params = [start, end];
-    let whereSql = `
-      WHERE (
+    const whereClauses = [
+      `(
         DATE(COALESCE(latest_tx.created_at, pr.updated_at, pr.created_at)) BETWEEN ? AND ?
         OR pr.balance_due > 0
-      )`;
+      )`,
+    ];
 
     if (keyword) {
       const term = `%${keyword}%`;
       params.push(term, term, term);
-      whereSql += `
-        AND (
-          COALESCE(p.full_name, pr.patient_name) LIKE ?
-          OR COALESCE(d.name, pr.dentist_name) LIKE ?
-          OR COALESCE(pr.services_text, '') LIKE ?
-        )`;
+      whereClauses.push(`(
+        COALESCE(p.full_name, pr.patient_name) LIKE ?
+        OR COALESCE(d.name, pr.dentist_name) LIKE ?
+        OR COALESCE(pr.services_text, '') LIKE ?
+      )`);
     }
+
+    appendTenantWhereClauses({
+      whereClauses,
+      params,
+      scope: actorScope,
+      clinicExpression: tenantJoinConfig.clinicExpression,
+      branchExpression: tenantJoinConfig.branchExpression,
+    });
+
+    const whereSql = `WHERE ${whereClauses.join(" AND ")}`;
 
     const [rows] = await db.query(
       `SELECT
@@ -389,6 +886,7 @@ router.get("/", async (req, res) => {
         CASE WHEN COALESCE(latest_tx.proof_data, '') = '' THEN 0 ELSE 1 END AS has_proof,
         (SELECT COUNT(*) FROM payment_transactions tx WHERE tx.payment_record_id = pr.id) AS transaction_count
       FROM payment_records pr
+      ${tenantJoinConfig.joinSql}
       LEFT JOIN patients p ON p.id = pr.patient_id
       LEFT JOIN dentists d ON d.id = pr.dentist_id
       LEFT JOIN payment_transactions latest_tx
@@ -417,9 +915,12 @@ router.get("/by-queue/:queueId", async (req, res) => {
     return res.status(400).json({ message: "Invalid queue id." });
   }
 
+  const connection = await db.getConnection();
   try {
-    const [rows] = await db.query(
-      `SELECT id
+    const actorScope = await getActorTenantScope(req);
+
+    const [rows] = await connection.query(
+      `SELECT id, queue_id, appointment_id, dentist_id
        FROM payment_records
        WHERE queue_id = ?
        ORDER BY updated_at DESC, id DESC
@@ -431,17 +932,19 @@ router.get("/by-queue/:queueId", async (req, res) => {
       return res.json(null);
     }
 
-    const connection = await db.getConnection();
-    try {
-      const record = await fetchPaymentRecord(connection, rows[0].id);
-      const transactions = await fetchPaymentTransactions(connection, rows[0].id);
-      return res.json({ ...record, transactions });
-    } finally {
-      connection.release();
+    const scopeViolation = await ensurePaymentRecordScope(connection, rows[0], actorScope);
+    if (scopeViolation) {
+      return res.status(403).json({ message: scopeViolation });
     }
+
+    const record = await fetchPaymentRecord(connection, rows[0].id);
+    const transactions = await fetchPaymentTransactions(connection, rows[0].id);
+    return res.json({ ...record, transactions });
   } catch (error) {
     console.error("Error fetching payment by queue:", error);
     res.status(500).json({ message: "Failed to load payment record." });
+  } finally {
+    connection.release();
   }
 });
 
@@ -458,6 +961,38 @@ router.post("/unpaid-matches", async (req, res) => {
   }
 
   try {
+    const actorScope = await getActorTenantScope(req);
+    const supportsQueueClinic = await hasQueueClinicColumn();
+    const supportsQueueBranch = await hasQueueBranchColumn();
+    const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+    const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+    const supportsUsersClinic = await hasUsersClinicColumn();
+    const supportsUsersBranch = await hasUsersBranchColumn();
+
+    const tenantJoinConfig = buildPaymentTenantJoinConfig({
+      actorScope,
+      supportsQueueClinic,
+      supportsQueueBranch,
+      supportsAppointmentClinic,
+      supportsAppointmentBranch,
+      supportsUsersClinic,
+      supportsUsersBranch,
+    });
+
+    const whereClauses = [
+      'pr.patient_id = ?',
+      'pr.balance_due > 0',
+    ];
+    const params = [patientId];
+
+    appendTenantWhereClauses({
+      whereClauses,
+      params,
+      scope: actorScope,
+      clinicExpression: tenantJoinConfig.clinicExpression,
+      branchExpression: tenantJoinConfig.branchExpression,
+    });
+
     const [rows] = await db.query(
       `SELECT
         pr.*,
@@ -467,6 +1002,7 @@ router.post("/unpaid-matches", async (req, res) => {
         CASE WHEN COALESCE(latest_tx.proof_data, '') = '' THEN 0 ELSE 1 END AS has_proof,
         (SELECT COUNT(*) FROM payment_transactions tx WHERE tx.payment_record_id = pr.id) AS transaction_count
       FROM payment_records pr
+      ${tenantJoinConfig.joinSql}
       LEFT JOIN patients p ON p.id = pr.patient_id
       LEFT JOIN dentists d ON d.id = pr.dentist_id
       LEFT JOIN payment_transactions latest_tx
@@ -477,10 +1013,9 @@ router.post("/unpaid-matches", async (req, res) => {
           ORDER BY tx2.created_at DESC, tx2.id DESC
           LIMIT 1
         )
-      WHERE pr.patient_id = ?
-        AND pr.balance_due > 0
+      WHERE ${whereClauses.join(' AND ')}
       ORDER BY COALESCE(pr.updated_at, pr.created_at) DESC, pr.id DESC`,
-      [patientId]
+      params
     );
 
     const matches = rows
@@ -527,6 +1062,25 @@ router.get("/:id", async (req, res) => {
 
   const connection = await db.getConnection();
   try {
+    const actorScope = await getActorTenantScope(req);
+
+    const [scopeRows] = await connection.query(
+      `SELECT id, queue_id, appointment_id, dentist_id
+       FROM payment_records
+       WHERE id = ?
+       LIMIT 1`,
+      [paymentId]
+    );
+
+    if (!scopeRows.length) {
+      return res.status(404).json({ message: "Payment record not found." });
+    }
+
+    const scopeViolation = await ensurePaymentRecordScope(connection, scopeRows[0], actorScope);
+    if (scopeViolation) {
+      return res.status(403).json({ message: scopeViolation });
+    }
+
     const record = await fetchPaymentRecord(connection, paymentId);
     if (!record) {
       return res.status(404).json({ message: "Payment record not found." });
@@ -543,6 +1097,11 @@ router.get("/:id", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  const paymentMutationGuard = canMutatePayments(req);
+  if (!paymentMutationGuard.allowed) {
+    return res.status(403).json({ message: paymentMutationGuard.message });
+  }
+
   const patientId = toOptionalInt(req.body.patient_id);
   const dentistId = toOptionalInt(req.body.dentist_id);
   const appointmentId = toOptionalInt(req.body.appointment_id);
@@ -598,9 +1157,22 @@ router.post("/", async (req, res) => {
   const changeAmount = paymentMethod === "cash" ? roundMoney(cashReceived - amountPaidNow) : null;
   const balanceDue = roundMoney(Math.max(totalDue - amountPaidNow, 0));
   const paymentStatus = getPaymentStatus(balanceDue);
+  const actorScope = await getActorTenantScope(req);
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
+
+    const resolvedTenant = await resolvePaymentTenant(connection, {
+      queueId,
+      appointmentId,
+      dentistId,
+      actorScope,
+    });
+
+    if (resolvedTenant.scopeViolation) {
+      await connection.rollback();
+      return res.status(403).json({ message: resolvedTenant.scopeViolation });
+    }
 
     if (queueId && !allowSplitRecord) {
       const [queueExisting] = await connection.query(
@@ -723,6 +1295,11 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
+  const paymentMutationGuard = canMutatePayments(req);
+  if (!paymentMutationGuard.allowed) {
+    return res.status(403).json({ message: paymentMutationGuard.message });
+  }
+
   const paymentId = toOptionalInt(req.params.id);
   if (!paymentId) {
     return res.status(400).json({ message: "Invalid payment record id." });
@@ -740,6 +1317,7 @@ router.put("/:id", async (req, res) => {
 
   const connection = await db.getConnection();
   try {
+    const actorScope = await getActorTenantScope(req);
     await connection.beginTransaction();
 
     const [rows] = await connection.query(
@@ -753,6 +1331,12 @@ router.put("/:id", async (req, res) => {
     }
 
     const current = rows[0];
+    const scopeViolation = await ensurePaymentRecordScope(connection, current, actorScope);
+    if (scopeViolation) {
+      await connection.rollback();
+      return res.status(403).json({ message: scopeViolation });
+    }
+
     const currentAmountPaid = roundMoney(current.amount_paid);
     const currentIsDeposit = Boolean(Number(current.is_deposit || 0));
 
@@ -849,6 +1433,11 @@ router.put("/:id", async (req, res) => {
 });
 
 router.post("/:id/installments", async (req, res) => {
+  const paymentMutationGuard = canMutatePayments(req);
+  if (!paymentMutationGuard.allowed) {
+    return res.status(403).json({ message: paymentMutationGuard.message });
+  }
+
   const paymentId = toOptionalInt(req.params.id);
   if (!paymentId) {
     return res.status(400).json({ message: "Invalid payment record id." });
@@ -889,6 +1478,7 @@ router.post("/:id/installments", async (req, res) => {
 
   const connection = await db.getConnection();
   try {
+    const actorScope = await getActorTenantScope(req);
     await connection.beginTransaction();
 
     const [rows] = await connection.query(
@@ -902,6 +1492,12 @@ router.post("/:id/installments", async (req, res) => {
     }
 
     const current = rows[0];
+    const scopeViolation = await ensurePaymentRecordScope(connection, current, actorScope);
+    if (scopeViolation) {
+      await connection.rollback();
+      return res.status(403).json({ message: scopeViolation });
+    }
+
     const currentAmountPaid = roundMoney(current.amount_paid);
     const currentTotalDue = roundMoney(current.total_due);
     const currentIsDeposit = Boolean(Number(current.is_deposit || 0));

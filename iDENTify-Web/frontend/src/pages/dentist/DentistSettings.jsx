@@ -110,10 +110,6 @@ function DentistSettings({ showAideManagement = true }) {
       return toast.error("First Name, Last Name, Phone, and Email are required.");
     }
     
-    if (!editingAideId && !newAide.password) {
-        return toast.error("Password is required for new accounts.");
-    }
-
     try {
       const fullNameDisplay = `${newAide.firstName} ${newAide.middleName ? newAide.middleName + " " : ""}${newAide.lastName}`.trim();
       const payload = {
@@ -135,7 +131,11 @@ function DentistSettings({ showAideManagement = true }) {
         payload.password = newAide.password;
         const newStaff = await api.createDentist(payload);
         setAides([...aides, { id: newStaff.id, name: fullNameDisplay, email: newAide.email, phone: newAide.phone, first_name: newAide.firstName, last_name: newAide.lastName, middle_name: newAide.middleName }]);
-        toast.success("Dental Aide account created successfully!");
+                if (newStaff?.generated_password) {
+                    toast.success(`Dental Aide account created. Temporary password: ${newStaff.generated_password}`);
+                } else {
+                    toast.success("Dental Aide account created successfully!");
+                }
       }
       
       cancelAideEdit();

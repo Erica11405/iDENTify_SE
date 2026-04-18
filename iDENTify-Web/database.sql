@@ -181,12 +181,8 @@ CREATE TABLE IF NOT EXISTS `medications` (
   `dosage` VARCHAR(255),
   `frequency` VARCHAR(255),
   `notes` TEXT,
+  INDEX `idx_medications_treatment_id` (`treatment_id`),
   FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`treatment_id`) REFERENCES `treatment_timeline`(`id`) ON DELETE SET NULL
 );
 
--- INITIAL DATA SEEDING
-INSERT INTO `dentists` (`name`, `specialty`, `status`, `schedule`) VALUES
-('Dr. Paul Zaragoza', 'General Dentist', 'Available', '{\"days\": [1,3,5], "operatingHours\": {\"start\": \"09:00\", \"end\": \"17:30\"}, \"lunch\": {\"start\": \"12:30\", \"end\": \"13:15\"}, \"breaks\": [], \"leaveDays\": []}'),
-('Dr. Erica Aquino', 'Orthodontist', 'Available', '{\"days\": [2,4], "operatingHours\": {\"start\": \"10:00\", \"end\": \"18:00\"}, \"lunch\": {\"start\": \"13:00\", \"end\": \"14:00\"}, \"breaks\": [], \"leaveDays\": []}'),
-('Dr. Hernane Benedicto', 'Prosthodontist', 'Available', '{\"days\": [1,2,3,4,5], "operatingHours\": {\"start\": \"08:30\", \"end\": \"17:00\"}, \"lunch\": {\"start\": \"12:00\", \"end\": \"12:45\"}, \"breaks\": [], \"leaveDays\": []}');

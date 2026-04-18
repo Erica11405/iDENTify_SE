@@ -31,6 +31,7 @@ export const API = {
   dentists: `${API_BASE_URL}/api/dentists`,
   medications: `${API_BASE_URL}/api/medications`,
   services: `${API_BASE_URL}/api/services`,
+  clinicsDiscover: `${API_BASE_URL}/api/clinics/discover`,
 };
 
 export const fetchPatientByEmail = async (email) => {
@@ -41,5 +42,18 @@ export const fetchPatientByEmail = async (email) => {
   } catch (error) {
     console.error("Error fetching patient by email:", error);
     return null;
+  }
+};
+
+export const fetchClinicDiscovery = async () => {
+  try {
+    const response = await fetch(API.clinicsDiscover);
+    if (!response.ok) {
+      throw new Error(`Clinic discovery failed (${response.status})`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching clinic discovery:", error);
+    return [];
   }
 };

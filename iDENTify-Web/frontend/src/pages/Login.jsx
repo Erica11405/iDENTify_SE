@@ -7,8 +7,20 @@ import toothLogo from "../assets/toothlogo.svg";
 import "../styles/pages/LoginPage.css";
 
 function getHomeRoute(role) {
-    if (role === "superadmin") return "/admin/dashboard";
+    if (role === "superadmin" || role === "globaladmin") return "/admin/dashboard";
     return "/dashboard";
+}
+
+function shouldRequirePasswordChange(user, responseFlag) {
+    if (responseFlag === true) return true;
+
+    if (!user || typeof user !== "object") {
+        return false;
+    }
+
+    const rawValue = user.require_password_change ?? user.requirePasswordChange;
+    if (rawValue === true || rawValue === 1) return true;
+    return String(rawValue || "").trim().toLowerCase() === "true" || String(rawValue || "").trim() === "1";
 }
 
 function Login() {
@@ -52,9 +64,25 @@ function Login() {
                 toast.success(response.message || "OTP sent to your email!");
                 setIsOtpStep(true); 
             } else {
-                setUser(response.user); 
-                toast.success(response.message || "Welcome back!");
-                navigate(getHomeRoute(response.user?.role));
+                const nextUser = response.user;
+                const requirePasswordChange = shouldRequirePasswordChange(nextUser, response.requirePasswordChange);
+
+                if (!nextUser) {
+                    throw new Error("Login succeeded but no user profile was returned.");
+                }
+
+                setUser({
+                    ...nextUser,
+                    require_password_change: requirePasswordChange,
+                });
+
+                if (requirePasswordChange) {
+                    toast.success("Please change your temporary password before continuing.");
+                    navigate("/change-password");
+                } else {
+                    toast.success(response.message || "Welcome back!");
+                    navigate(getHomeRoute(nextUser.role));
+                }
             }
         } catch (error) {
             setErrors({ form: error.message || "Invalid credentials." });
@@ -72,9 +100,25 @@ function Login() {
 
         try {
             const response = await api.verifyOtp({ email, otp: otpCode });
-            setUser(response.user); 
-            toast.success(response.message || "Welcome back!");
-            navigate(getHomeRoute(response.user?.role));
+            const nextUser = response.user;
+            const requirePasswordChange = shouldRequirePasswordChange(nextUser, response.requirePasswordChange);
+
+            if (!nextUser) {
+                throw new Error("Verification succeeded but no user profile was returned.");
+            }
+
+            setUser({
+                ...nextUser,
+                require_password_change: requirePasswordChange,
+            });
+
+            if (requirePasswordChange) {
+                toast.success("Please change your temporary password before continuing.");
+                navigate("/change-password");
+            } else {
+                toast.success(response.message || "Welcome back!");
+                navigate(getHomeRoute(nextUser.role));
+            }
         } catch (error) {
             setErrors({ form: error.message || "Invalid verification code." });
             toast.error(error.message || "Invalid verification code.");

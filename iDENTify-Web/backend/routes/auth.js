@@ -20,6 +20,7 @@ const transporter = nodemailer.createTransport({
 const signupOtpStore = new Map();
 let signupOtpTableReady = false;
 let signupOtpTableUnavailable = false;
+let hasPasswordChangeRequiredColumnCache = null;
 
 function normalizeRole(role) {
     const normalized = String(role || '').trim().toLowerCase();
@@ -57,7 +58,25 @@ function toPublicUser(userRecord) {
         email: userRecord.email,
         role: normalizeRole(userRecord.role),
         dentist_id: userRecord.dentist_id || null,
+        clinic_id: userRecord.clinic_id || null,
+        branch_id: userRecord.branch_id || null,
+        require_password_change: Boolean(Number(userRecord.password_change_required || 0)),
     };
+}
+
+async function hasPasswordChangeRequiredColumn() {
+    if (hasPasswordChangeRequiredColumnCache !== null) {
+        return hasPasswordChangeRequiredColumnCache;
+    }
+
+    try {
+        const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'password_change_required'");
+        hasPasswordChangeRequiredColumnCache = rows.length > 0;
+    } catch (_err) {
+        hasPasswordChangeRequiredColumnCache = false;
+    }
+
+    return hasPasswordChangeRequiredColumnCache;
 }
 
 async function sendOtpEmail({ email, name, otpCode, subject, introText }) {
@@ -342,6 +361,7 @@ router.post('/login', async (req, res) => {
 
         const userRecord = users[0];
         const role = normalizeRole(userRecord.role);
+        const requirePasswordChange = Boolean(Number(userRecord.password_change_required || 0));
 
         if (Number(userRecord.is_archived) === 1) {
             return res.status(403).json({ error: 'This account has been archived. Please contact the super admin.' });
@@ -354,6 +374,7 @@ router.post('/login', async (req, res) => {
             return res.status(200).json({ 
                 message: "Login successful", 
                 requireOtp: false, 
+                requirePasswordChange,
                 user: toPublicUser(userRecord),
             });
         }
@@ -402,6 +423,7 @@ router.post('/verify-otp', async (req, res) => {
 
         const userRecord = users[0];
         const role = normalizeRole(userRecord.role);
+        const requirePasswordChange = Boolean(Number(userRecord.password_change_required || 0));
 
         if (Number(userRecord.is_archived) === 1) {
             return res.status(403).json({ error: 'This account has been archived. Please contact the super admin.' });
@@ -427,12 +449,81 @@ router.post('/verify-otp', async (req, res) => {
 
         res.status(200).json({ 
             message: "Login successful", 
+            requirePasswordChange,
             user: toPublicUser(userRecord),
         });
 
     } catch (err) {
         console.error("OTP Verification Error:", err);
         res.status(500).json({ error: "Server crash during OTP verification." });
+    }
+});
+
+router.post('/change-password', async (req, res) => {
+    const email = toEmail(req.body?.email);
+    const currentPassword = String(req.body?.currentPassword || '');
+    const newPassword = String(req.body?.newPassword || '');
+    const confirmPassword = String(req.body?.confirmPassword || '');
+
+    if (!email || !currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Email, current password, and new password are required.' });
+    }
+
+    if (newPassword.length < 8) {
+        return res.status(400).json({ error: 'New password must be at least 8 characters long.' });
+    }
+
+    if (confirmPassword && confirmPassword !== newPassword) {
+        return res.status(400).json({ error: 'New password and confirm password do not match.' });
+    }
+
+    try {
+        const [users] = await db.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
+        if (users.length === 0) {
+            return res.status(404).json({ error: 'Account not found.' });
+        }
+
+        const userRecord = users[0];
+        if (Number(userRecord.is_archived) === 1) {
+            return res.status(403).json({ error: 'This account has been archived. Please contact the super admin.' });
+        }
+
+        const passwordMatches = await bcrypt.compare(currentPassword, userRecord.password_hash);
+        if (!passwordMatches) {
+            return res.status(401).json({ error: 'Current password is incorrect.' });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const supportsPasswordChangeRequired = await hasPasswordChangeRequiredColumn();
+
+        if (supportsPasswordChangeRequired) {
+            await db.query(
+                `UPDATE users
+                 SET password_hash = ?,
+                     password_change_required = 0,
+                     otp_code = NULL,
+                     otp_expires_at = NULL
+                 WHERE id = ?`,
+                [hashedPassword, userRecord.id]
+            );
+        } else {
+            await db.query(
+                `UPDATE users
+                 SET password_hash = ?,
+                     otp_code = NULL,
+                     otp_expires_at = NULL
+                 WHERE id = ?`,
+                [hashedPassword, userRecord.id]
+            );
+        }
+
+        return res.status(200).json({
+            message: 'Password updated successfully.',
+            user: toPublicUser({ ...userRecord, password_change_required: 0 }),
+        });
+    } catch (err) {
+        console.error('Change Password Error:', err);
+        return res.status(500).json({ error: 'Failed to change password.' });
     }
 });
 

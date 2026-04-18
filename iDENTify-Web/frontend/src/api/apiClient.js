@@ -2,6 +2,39 @@ const API_BASE = import.meta.env.DEV
     ? "/api"
     : (import.meta.env.VITE_API_BASE || "/api");
 
+function getStoredUserContext() {
+    try {
+        const raw = localStorage.getItem('identify-auth-storage');
+        if (!raw) return null;
+
+        const parsed = JSON.parse(raw);
+        const stateUser = parsed?.state?.user;
+        if (!stateUser || typeof stateUser !== 'object') return null;
+        return stateUser;
+    } catch {
+        return null;
+    }
+}
+
+function actorHeaders() {
+    const user = getStoredUserContext();
+    if (!user) return {};
+
+    const headers = {};
+    if (user.role) headers['x-user-role'] = String(user.role);
+    if (user.id) headers['x-user-id'] = String(user.id);
+    if (user.dentist_id) headers['x-user-dentist-id'] = String(user.dentist_id);
+    return headers;
+}
+
+function jsonHeaders(extra = {}) {
+    return {
+        'Content-Type': 'application/json',
+        ...actorHeaders(),
+        ...extra,
+    };
+}
+
 function assertSuperadminEndpointAvailable(res) {
     if (res.status !== 404) return;
 
@@ -45,6 +78,15 @@ export const login = async (payload) => {
 
 export const verifyOtp = async (payload) => {
     const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const changePassword = async (payload) => {
+    const res = await fetch(`${API_BASE}/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -126,7 +168,7 @@ export const getDentists = async () => {
 export const createDentist = async (payload) => {
     const res = await fetch(`${API_BASE}/dentists`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
     return handleResponse(res);
@@ -135,7 +177,7 @@ export const createDentist = async (payload) => {
 export const updateDentist = async (id, payload) => {
     const res = await fetch(`${API_BASE}/dentists/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
     return handleResponse(res);
@@ -183,14 +225,16 @@ export const searchPatients = async (query) => {
 /* --- Queue & Appointment Functions --- */
 export const getQueue = async (isHistory = false) => {
     const url = isHistory ? `${API_BASE}/queue?history=true` : `${API_BASE}/queue`;
-    const res = await fetch(url);
+    const res = await fetch(url, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
 export const addQueueItem = async (payload) => {
     const res = await fetch(`${API_BASE}/queue`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
     return handleResponse(res);
@@ -199,26 +243,31 @@ export const addQueueItem = async (payload) => {
 export const updateQueueItem = async (id, payload) => {
     const res = await fetch(`${API_BASE}/queue/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
     return handleResponse(res);
 };
 
 export const deleteQueueItem = async (id) => {
-    const res = await fetch(`${API_BASE}/queue/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}/queue/${id}`, {
+        method: 'DELETE',
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
 export const getAppointments = async () => {
-    const res = await fetch(`${API_BASE}/appointments`);
+    const res = await fetch(`${API_BASE}/appointments`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
 export const createAppointment = async (payload) => {
     const res = await fetch(`${API_BASE}/appointments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
     return handleResponse(res);
@@ -230,14 +279,16 @@ export const checkAppointmentLimit = async (dentistId, date) => {
         date: String(date || ''),
     });
 
-    const res = await fetch(`${API_BASE}/appointments/check-limit?${params.toString()}`);
+    const res = await fetch(`${API_BASE}/appointments/check-limit?${params.toString()}`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
 export const updateAppointment = async (id, payload) => {
     const res = await fetch(`${API_BASE}/appointments/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
     return handleResponse(res);
@@ -251,24 +302,30 @@ export const getPayments = async ({ startDate, endDate, search } = {}) => {
     if (search) params.set('search', search);
 
     const query = params.toString();
-    const res = await fetch(`${API_BASE}/payments${query ? `?${query}` : ''}`);
+    const res = await fetch(`${API_BASE}/payments${query ? `?${query}` : ''}`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
 export const getPaymentById = async (id) => {
-    const res = await fetch(`${API_BASE}/payments/${id}`);
+    const res = await fetch(`${API_BASE}/payments/${id}`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
 export const getPaymentByQueueId = async (queueId) => {
-    const res = await fetch(`${API_BASE}/payments/by-queue/${queueId}`);
+    const res = await fetch(`${API_BASE}/payments/by-queue/${queueId}`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
 export const getUnpaidPaymentMatches = async ({ patient_id, services }) => {
     const res = await fetch(`${API_BASE}/payments/unpaid-matches`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify({ patient_id, services }),
     });
     return handleResponse(res);
@@ -277,7 +334,7 @@ export const getUnpaidPaymentMatches = async ({ patient_id, services }) => {
 export const createPaymentRecord = async (payload) => {
     const res = await fetch(`${API_BASE}/payments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
     return handleResponse(res);
@@ -286,7 +343,7 @@ export const createPaymentRecord = async (payload) => {
 export const updatePaymentRecord = async (id, payload) => {
     const res = await fetch(`${API_BASE}/payments/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
     return handleResponse(res);
@@ -295,16 +352,29 @@ export const updatePaymentRecord = async (id, payload) => {
 export const addPaymentInstallment = async (id, payload) => {
     const res = await fetch(`${API_BASE}/payments/${id}/installments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
     return handleResponse(res);
 };
 
 /* --- Reports Functions --- */
-export const getReports = async (date) => {
-    const url = date ? `${API_BASE}/reports?date=${date}` : `${API_BASE}/reports`;
-    const res = await fetch(url);
+export const getReports = async (dateOrOptions) => {
+    const params = new URLSearchParams();
+
+    if (typeof dateOrOptions === 'string') {
+        if (dateOrOptions) params.set('date', dateOrOptions);
+    } else if (dateOrOptions && typeof dateOrOptions === 'object') {
+        const { startDate, endDate, date } = dateOrOptions;
+        if (startDate) params.set('startDate', startDate);
+        if (endDate) params.set('endDate', endDate);
+        if (date) params.set('date', date);
+    }
+
+    const query = params.toString();
+    const res = await fetch(`${API_BASE}/reports${query ? `?${query}` : ''}`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
@@ -316,7 +386,9 @@ export const getServicePopularityReport = async ({ startDate, endDate, date, den
     if (dentistId) params.set('dentistId', String(dentistId));
     const query = params.toString();
 
-    const res = await fetch(`${API_BASE}/reports/services/popularity${query ? `?${query}` : ''}`);
+    const res = await fetch(`${API_BASE}/reports/services/popularity${query ? `?${query}` : ''}`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
@@ -327,7 +399,9 @@ export const getDentistPatientsForReport = async (dentistId, { startDate, endDat
     if (date) params.set('date', date);
     const query = params.toString();
 
-    const res = await fetch(`${API_BASE}/reports/dentist/${dentistId}/patients${query ? `?${query}` : ''}`);
+    const res = await fetch(`${API_BASE}/reports/dentist/${dentistId}/patients${query ? `?${query}` : ''}`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
@@ -337,7 +411,9 @@ export const getDentistReportSummary = async (dentistId, { startDate, endDate } 
     if (endDate) params.set('endDate', endDate);
     const query = params.toString();
 
-    const res = await fetch(`${API_BASE}/reports/dentist/${dentistId}/summary${query ? `?${query}` : ''}`);
+    const res = await fetch(`${API_BASE}/reports/dentist/${dentistId}/summary${query ? `?${query}` : ''}`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
@@ -402,6 +478,55 @@ export const deleteClinicMedication = async (id) => {
 /* --- Dentist Types Master List --- */
 export const getDentistTypes = async () => {
     const res = await fetch(`${API_BASE}/dentist-types`);
+    return handleResponse(res);
+};
+
+/* --- Clinics & Branches --- */
+export const getClinics = async ({ includeInactive = false } = {}) => {
+    const params = new URLSearchParams();
+    if (includeInactive) params.set('includeInactive', 'true');
+    const query = params.toString();
+
+    const res = await fetch(`${API_BASE}/clinics${query ? `?${query}` : ''}`);
+    return handleResponse(res);
+};
+
+export const getClinicSummary = async () => {
+    const res = await fetch(`${API_BASE}/clinics/summary`, {
+        headers: { ...actorHeaders() },
+    });
+    return handleResponse(res);
+};
+
+export const createClinic = async (payload) => {
+    const res = await fetch(`${API_BASE}/clinics`, {
+        method: 'POST',
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const getClinicBranches = async (clinicId, { includeInactive = false } = {}) => {
+    const params = new URLSearchParams();
+    if (includeInactive) params.set('includeInactive', 'true');
+    const query = params.toString();
+
+    const res = await fetch(`${API_BASE}/clinics/${clinicId}/branches${query ? `?${query}` : ''}`);
+    return handleResponse(res);
+};
+
+export const createClinicBranch = async (clinicId, payload) => {
+    const res = await fetch(`${API_BASE}/clinics/${clinicId}/branches`, {
+        method: 'POST',
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const getClinicDiscovery = async () => {
+    const res = await fetch(`${API_BASE}/clinics/discover`);
     return handleResponse(res);
 };
 
@@ -491,12 +616,14 @@ export const deleteMedication = async (id) => {
 };
 
 export const get = async (url) => {
-    const res = await fetch(`${API_BASE}${url}`);
+    const res = await fetch(`${API_BASE}${url}`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
 const api = {
-    login, verifyOtp, sendSuperadminSignupOtp, signupSuperadmin, sendSignupOtp, signupDentist,
+    login, verifyOtp, changePassword, sendSuperadminSignupOtp, signupSuperadmin, sendSignupOtp, signupDentist,
     getAdminUsers, archiveAdminUser, restoreAdminUser,
     getDentists, createDentist, updateDentist, deleteDentist,
     getPatients, getPatientById, createPatient, updatePatient, searchPatients,
@@ -507,6 +634,7 @@ const api = {
     getServices, createService, updateService, deleteService,
     getClinicMedications, createClinicMedication, updateClinicMedication, deleteClinicMedication,
     getDentistTypes, createDentistType, updateDentistType, deleteDentistType,
+    getClinics, getClinicSummary, createClinic, getClinicBranches, createClinicBranch, getClinicDiscovery,
     getAnnualRecord, saveAnnualRecord, getToothConditions, upsertToothCondition,
     getTreatmentTimeline, addTreatmentTimelineEntry, getMedications, addMedication, deleteMedication
 };

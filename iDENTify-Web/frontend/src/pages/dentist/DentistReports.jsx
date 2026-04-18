@@ -80,6 +80,16 @@ function DentistReports() {
       if (!dentistId) {
         setLoading(false);
         setError("Unable to resolve your dentist account for reports.");
+        setReportData(null);
+        setPatientRows([]);
+        return;
+      }
+
+      if (startDate > endDate) {
+        setLoading(false);
+        setError("Start date cannot be later than end date.");
+        setReportData(null);
+        setPatientRows([]);
         return;
       }
 
@@ -104,6 +114,7 @@ function DentistReports() {
         setPatientRows(patientsResponse?.patients || []);
       } catch (err) {
         setError(err.message || "Failed to load your report data.");
+        setReportData(null);
         setPatientRows([]);
       } finally {
         setLoading(false);
@@ -124,6 +135,12 @@ function DentistReports() {
 
   const serviceDistribution = reportData?.serviceDistribution || [];
   const topService = serviceDistribution.length > 0 ? serviceDistribution[0].service : "N/A";
+  const summaryCards = [
+    { label: "Patients Handled", value: summary.patientsHandled },
+    { label: "Procedures Done", value: summary.proceduresDone },
+    { label: "Avg Treatment Time", value: summary.avgTreatmentDuration },
+    { label: "Top Service", value: topService },
+  ];
 
   const exportToPDF = async () => {
     if (!hasData) return;
@@ -274,10 +291,10 @@ function DentistReports() {
           </p>
 
           <div className="dentist-reports-range-buttons">
-            <button type="button" onClick={() => applyRange("daily")} className={`export-btn ${rangeType === "daily" ? "pdf" : ""}`}>Today</button>
-            <button type="button" onClick={() => applyRange("weekly")} className={`export-btn ${rangeType === "weekly" ? "pdf" : ""}`}>Past Week</button>
-            <button type="button" onClick={() => applyRange("monthly")} className={`export-btn ${rangeType === "monthly" ? "pdf" : ""}`}>Past Month</button>
-            <button type="button" onClick={() => applyRange("yearly")} className={`export-btn ${rangeType === "yearly" ? "pdf" : ""}`}>Past Year</button>
+            <button type="button" onClick={() => applyRange("daily")} className={`dentist-range-btn ${rangeType === "daily" ? "active" : ""}`}>Today</button>
+            <button type="button" onClick={() => applyRange("weekly")} className={`dentist-range-btn ${rangeType === "weekly" ? "active" : ""}`}>Past Week</button>
+            <button type="button" onClick={() => applyRange("monthly")} className={`dentist-range-btn ${rangeType === "monthly" ? "active" : ""}`}>Past Month</button>
+            <button type="button" onClick={() => applyRange("yearly")} className={`dentist-range-btn ${rangeType === "yearly" ? "active" : ""}`}>Past Year</button>
           </div>
         </div>
 
@@ -323,6 +340,17 @@ function DentistReports() {
       <p className="dentist-reports-range-label">
         Range: {rangeLabel(startDate, endDate)}
       </p>
+
+      {!loading && !error ? (
+        <div className="dentist-reports-summary-cards">
+          {summaryCards.map((item) => (
+            <article className="dentist-reports-summary-card" key={item.label}>
+              <p className="dentist-reports-summary-label">{item.label}</p>
+              <p className="dentist-reports-summary-value">{item.value}</p>
+            </article>
+          ))}
+        </div>
+      ) : null}
 
       {loading ? <p className="dentist-reports-loading">Loading your report...</p> : null}
       {!loading && error ? <p className="dentist-reports-error">{error}</p> : null}

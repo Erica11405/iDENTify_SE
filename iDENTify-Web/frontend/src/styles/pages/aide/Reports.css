@@ -9,6 +9,54 @@
   margin-bottom: 2rem;
 }
 
+.reports-header-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.reports-subtitle {
+  margin: 2px 0 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.range-selector {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.range-btn {
+  padding: 5px 10px;
+  font-size: 0.85rem;
+  border: 1px solid #dbe7f0;
+  background: #f8fbfe;
+  color: #1f4d6b;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.range-btn:hover {
+  background: #eaf3fb;
+  border-color: #c3d8ea;
+}
+
+.range-btn.active {
+  background: #1b93d5;
+  border-color: #1b93d5;
+  color: #ffffff;
+}
+
+.reports-controls {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-end;
+  margin-top: 10px;
+}
+
 .reports-title {
   font-size: 2rem;
   font-weight: bold;
@@ -53,6 +101,54 @@
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   margin-bottom: 2rem;
+}
+
+.reports-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.reports-summary-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.65rem 0.8rem;
+  background: #ffffff;
+}
+
+.reports-summary-label {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.reports-summary-value {
+  margin: 0.25rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.reports-chart-wrap {
+  min-height: 320px;
+}
+
+.reports-empty-section {
+  margin-top: 1rem;
+}
+
+.reports-empty-text {
+  margin: 0;
+  color: #64748b;
+}
+
+.reports-error-message {
+  color: #b91c1c;
+  padding: 1rem;
+  background: #ffe3e3;
+  border-radius: 8px;
+  margin: 1rem 0;
 }
 
 .report-subtitle {
@@ -150,6 +246,17 @@ tbody tr:hover {
   color: #495057;
 }
 
+.modal-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.modal-export-btn {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+}
+
 /* Modal Body */
 .modal-body {
   padding: 24px;
@@ -194,6 +301,10 @@ tbody tr:hover {
 
 .grid-row:hover {
   background-color: #f8f9fa;
+}
+
+.patient-name-cell {
+  font-weight: 500;
 }
 
 /* Modal Footer */
@@ -262,4 +373,18 @@ tbody tr:hover {
 
 .dentist-performance-link:hover {
   background: #eaf3fb;
+}
+
+@media (max-width: 1080px) {
+  .reports-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .reports-controls {
+    flex-wrap: wrap;
+    gap: 0.85rem;
+    align-items: flex-start;
+  }
 }

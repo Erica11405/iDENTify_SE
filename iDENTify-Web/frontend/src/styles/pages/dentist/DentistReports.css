@@ -41,6 +41,29 @@
   margin-top: 0.75rem;
 }
 
+.dentist-range-btn {
+  padding: 0.42rem 0.78rem;
+  border: 1px solid #dbe7f0;
+  background: #f8fbfe;
+  color: #1f4d6b;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.dentist-range-btn:hover {
+  background: #eaf3fb;
+  border-color: #c3d8ea;
+}
+
+.dentist-range-btn.active {
+  background: #1b93d5;
+  border-color: #1b93d5;
+  color: #ffffff;
+}
+
 .dentist-reports-controls {
   display: flex;
   gap: 1rem;
@@ -112,6 +135,33 @@
   margin: 0.4rem 0 1rem;
   color: #475569;
   font-size: 0.9rem;
+}
+
+.dentist-reports-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.dentist-reports-summary-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.65rem 0.8rem;
+  background: #ffffff;
+}
+
+.dentist-reports-summary-label {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.dentist-reports-summary-value {
+  margin: 0.25rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .dentist-reports-loading {

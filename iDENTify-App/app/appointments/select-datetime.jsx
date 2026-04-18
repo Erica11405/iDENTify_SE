@@ -10,7 +10,21 @@ const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export default function ConfirmAppointment() {
   const router = useRouter();
   const { user } = useUser();
-  const { doctor, docId, service, serviceName, serviceId, serviceIds, servicesJson, serviceDuration, servicePrice } = useLocalSearchParams();
+  const {
+    doctor,
+    docId,
+    service,
+    serviceName,
+    serviceId,
+    serviceIds,
+    servicesJson,
+    serviceDuration,
+    servicePrice,
+    clinicId,
+    clinicName,
+    branchId,
+    branchName,
+  } = useLocalSearchParams();
 
   const parsedServices = useMemo(() => {
     if (!servicesJson) return [];
@@ -76,6 +90,14 @@ export default function ConfirmAppointment() {
       return total + (Number.isFinite(duration) && duration > 0 ? duration : 30);
     }, 0);
   }, [serviceDuration, parsedServices]);
+
+  const locationLabel = useMemo(() => {
+    const clinic = String(clinicName || '').trim();
+    const branch = String(branchName || '').trim();
+    if (clinic && branch) return `${clinic} / ${branch}`;
+    if (clinic) return clinic;
+    return '';
+  }, [clinicName, branchName]);
 
   const [loading, setLoading] = useState(false);
   const [dentist, setDentist] = useState(null);
@@ -347,6 +369,16 @@ export default function ConfirmAppointment() {
       const parsedSingleServiceId = selectedServiceIds.length === 1
         ? Number.parseInt(selectedServiceIds[0], 10)
         : null;
+      const parsedClinicId = Number.parseInt(String(clinicId || ''), 10);
+      const parsedBranchId = Number.parseInt(String(branchId || ''), 10);
+
+      const locationNotes = [];
+      if (String(clinicName || '').trim()) {
+        locationNotes.push(`Clinic: ${String(clinicName).trim()}`);
+      }
+      if (String(branchName || '').trim()) {
+        locationNotes.push(`Branch: ${String(branchName).trim()}`);
+      }
 
       const payload = {
         patient_id: selectedPatient.id,
@@ -357,7 +389,11 @@ export default function ConfirmAppointment() {
         service_id: Number.isFinite(parsedSingleServiceId) ? parsedSingleServiceId : undefined,
         estimated_duration_minutes: selectedDurationMinutes,
         status: "Scheduled",
-        notes: "Booked via App"
+        clinic_id: Number.isFinite(parsedClinicId) ? parsedClinicId : undefined,
+        branch_id: Number.isFinite(parsedBranchId) ? parsedBranchId : undefined,
+        notes: locationNotes.length > 0
+          ? `Booked via App | ${locationNotes.join(' | ')}`
+          : "Booked via App"
       };
 
       const res = await fetch(API.appointments, {
@@ -470,6 +506,12 @@ export default function ConfirmAppointment() {
             <Text style={styles.summaryValue}>{selectedServiceName || "Checkup"}</Text>
             <Text style={styles.summaryLabel}>Duration</Text>
             <Text style={styles.summaryValue}>{selectedDurationMinutes} mins</Text>
+            {locationLabel ? (
+              <>
+                <Text style={styles.summaryLabel}>Location</Text>
+                <Text style={styles.summaryValue}>{locationLabel}</Text>
+              </>
+            ) : null}
             {servicePrice ? <Text style={styles.summaryValue}>{String(servicePrice)}</Text> : null}
           </View>
         </View>
@@ -601,6 +643,12 @@ export default function ConfirmAppointment() {
               <Text style={styles.confirmDetailLabel}>Time</Text>
               <Text style={styles.confirmDetailValue}>{pendingSlot?.label || "-"}</Text>
             </View>
+            {locationLabel ? (
+              <View style={styles.confirmDetailRow}>
+                <Text style={styles.confirmDetailLabel}>Location</Text>
+                <Text style={styles.confirmDetailValue}>{locationLabel}</Text>
+              </View>
+            ) : null}
             <View style={styles.confirmDetailRow}>
               <Text style={styles.confirmDetailLabel}>Patient</Text>
               <Text style={styles.confirmDetailValue}>{selectedPatientName}</Text>

@@ -158,6 +158,7 @@ const servicesRoutes = require("./routes/services");
 const clinicMedicationsRoutes = require("./routes/clinic_medications"); 
 const dentistTypesRoutes = require("./routes/dentist_types");
 const paymentsRoutes = require("./routes/payments");
+const clinicsRoutes = require("./routes/clinics");
 
 const app = express();
 
@@ -176,7 +177,7 @@ if (process.env.NODE_ENV !== "production") {
 app.use(cors({
     origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    allowedHeaders: ["Content-Type", "Authorization", "x-user-role", "x-user-id", "x-user-dentist-id"]
 }));
 
 app.use(express.json({ limit: "50mb" })); 
@@ -205,6 +206,7 @@ apiRouter.use("/treatments", treatmentsRoutes);
 apiRouter.use("/reports", reportsRoutes);
 apiRouter.use("/admin/users", adminUsersRoutes);
 apiRouter.use("/payments", paymentsRoutes);
+apiRouter.use("/clinics", clinicsRoutes);
 
 // Apply the unified router to the app
 app.use("/api", apiRouter); 

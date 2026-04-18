@@ -5,7 +5,19 @@ import { useEffect, useMemo, useState } from "react";
 import { API } from "../../constants/Api";
 
 export default function SelectDoctor() {
-  const { service, serviceName, serviceId, serviceIds, servicesJson, serviceDuration, servicePrice } = useLocalSearchParams();
+  const {
+    service,
+    serviceName,
+    serviceId,
+    serviceIds,
+    servicesJson,
+    serviceDuration,
+    servicePrice,
+    clinicId,
+    clinicName,
+    branchId,
+    branchName,
+  } = useLocalSearchParams();
 
   const parsedServices = useMemo(() => {
     if (!servicesJson) return [];
@@ -81,6 +93,14 @@ export default function SelectDoctor() {
     ? `${selectedServiceNames.length} services`
     : (selectedServiceName || "Appointment");
 
+  const locationLabel = useMemo(() => {
+    const clinic = String(clinicName || '').trim();
+    const branch = String(branchName || '').trim();
+    if (clinic && branch) return `${clinic} / ${branch}`;
+    if (clinic) return clinic;
+    return '';
+  }, [clinicName, branchName]);
+
   const servicesParam = parsedServices.length > 0 ? JSON.stringify(parsedServices) : String(servicesJson || "");
   const router = useRouter();
   const [doctors, setDoctors] = useState([]);
@@ -138,6 +158,8 @@ export default function SelectDoctor() {
 
         <Text style={styles.title}>Choose a Specialist</Text>
         <Text style={styles.subtitle}>for {subtitleText}</Text>
+
+        {locationLabel ? <Text style={styles.locationText}>Location: {locationLabel}</Text> : null}
       </View>
 
       {loading ? (
@@ -168,6 +190,10 @@ export default function SelectDoctor() {
                     servicesJson: servicesParam,
                     serviceDuration: String(selectedDurationMinutes),
                     servicePrice: String(servicePrice || ""),
+                    clinicId: String(clinicId || ''),
+                    clinicName: String(clinicName || ''),
+                    branchId: String(branchId || ''),
+                    branchName: String(branchName || ''),
                   },
                 })
               }
@@ -241,6 +267,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#64748B",
     fontWeight: "500"
+  },
+  locationText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: "#0369A1",
+    fontWeight: "600"
   },
   loadingContainer: {
     flex: 1,

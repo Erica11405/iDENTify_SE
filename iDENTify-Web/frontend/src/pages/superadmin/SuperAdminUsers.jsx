@@ -259,8 +259,8 @@ function SuperAdminUsers() {
     const handleCreateDentist = async (event) => {
         event.preventDefault();
 
-        if (!dentistForm.firstName || !dentistForm.lastName || !dentistForm.email || !dentistForm.password || !dentistForm.specialization) {
-            toast.error('First name, last name, email, password, and dentist type are required.');
+        if (!dentistForm.firstName || !dentistForm.lastName || !dentistForm.email || !dentistForm.specialization) {
+            toast.error('First name, last name, email, and dentist type are required.');
             return;
         }
 
@@ -271,7 +271,7 @@ function SuperAdminUsers() {
 
         setSavingDentist(true);
         try {
-            await api.createDentist({
+            const createdDentist = await api.createDentist({
                 first_name: normalizeText(dentistForm.firstName),
                 middle_name: normalizeText(dentistForm.middleName),
                 last_name: normalizeText(dentistForm.lastName),
@@ -288,7 +288,11 @@ function SuperAdminUsers() {
                 leaveDays: dentistForm.leaveDays,
             });
 
-            toast.success('Dentist added successfully.');
+            if (createdDentist?.generated_password) {
+                toast.success(`Dentist added. Temporary password: ${createdDentist.generated_password}`);
+            } else {
+                toast.success('Dentist added successfully.');
+            }
             setDentistForm(initialDentistForm(dentistTypeOptions[0] || 'General Dentist'));
             setLeaveDraft('');
             await loadData();
@@ -325,11 +329,6 @@ function SuperAdminUsers() {
             return;
         }
 
-        if (!editingAideId && !aideForm.password) {
-            toast.error('Password is required for new dental aide accounts.');
-            return;
-        }
-
         setSavingAide(true);
         try {
             const selectedAide = aides.find((item) => item.id === editingAideId);
@@ -354,8 +353,12 @@ function SuperAdminUsers() {
                 await api.updateDentist(editingAideId, payload);
                 toast.success('Dental aide updated successfully.');
             } else {
-                await api.createDentist({ ...payload, password: aideForm.password });
-                toast.success('Dental aide added successfully.');
+                const createdAide = await api.createDentist({ ...payload, password: aideForm.password });
+                if (createdAide?.generated_password) {
+                    toast.success(`Dental aide added. Temporary password: ${createdAide.generated_password}`);
+                } else {
+                    toast.success('Dental aide added successfully.');
+                }
             }
 
             resetAideForm();

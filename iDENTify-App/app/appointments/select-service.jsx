@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { API } from '../../constants/Api'; 
 import { Ionicons } from '@expo/vector-icons';
 
@@ -51,6 +51,7 @@ function formatPriceRange(min, max) {
 
 export default function SelectServiceScreen() {
   const router = useRouter();
+  const { clinicId, clinicName, branchId, branchName } = useLocalSearchParams();
   
   const [services, setServices] = useState([]);
   const [selectedServices, setSelectedServices] = useState([]);
@@ -147,9 +148,21 @@ export default function SelectServiceScreen() {
         servicesJson: JSON.stringify(normalizedServices),
         serviceDuration: String(totalDurationMinutes || 30),
         servicePrice: combinedPriceText,
+        clinicId: String(clinicId || ''),
+        clinicName: String(clinicName || ''),
+        branchId: String(branchId || ''),
+        branchName: String(branchName || ''),
       },
     });
   };
+
+  const locationLabel = useMemo(() => {
+    const clinic = String(clinicName || '').trim();
+    const branch = String(branchName || '').trim();
+    if (clinic && branch) return `${clinic} / ${branch}`;
+    if (clinic) return clinic;
+    return '';
+  }, [clinicName, branchName]);
 
   if (loading) {
     return (
@@ -182,6 +195,16 @@ export default function SelectServiceScreen() {
             </TouchableOpacity>
             <Text style={styles.title}>Book Appointment</Text>
             <Text style={styles.subtitle}>Select one or more services</Text>
+
+            {locationLabel ? (
+              <View style={styles.locationCard}>
+                <Ionicons name="business-outline" size={18} color="#0369A1" />
+                <View style={{ marginLeft: 10, flex: 1 }}>
+                  <Text style={styles.locationLabel}>Booking Location</Text>
+                  <Text style={styles.locationValue}>{locationLabel}</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
         }
         renderItem={({ item }) => {
@@ -272,6 +295,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#64748B',
     marginBottom: 8,
+  },
+  locationCard: {
+    marginTop: 8,
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationLabel: {
+    fontSize: 11,
+    color: '#0C4A6E',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  locationValue: {
+    fontSize: 14,
+    color: '#0F172A',
+    fontWeight: '700',
+    marginTop: 2,
   },
   serviceCard: {
     backgroundColor: '#FFFFFF',

@@ -288,6 +288,77 @@
     color: #0f172a;
 }
 
+.superadmin-stat-card-label {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.85rem;
+}
+
+.superadmin-stat-card-value {
+    margin: 0.25rem 0 0 0;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.dashboard-top-spacing-sm {
+    margin-top: 0.75rem;
+}
+
+.dashboard-top-spacing-md {
+    margin-top: 1rem;
+}
+
+.dashboard-management-card {
+    border-top: 3px solid #dbeafe;
+}
+
+.dashboard-muted-text {
+    margin: 0 0 0.75rem 0;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.dashboard-form-helper {
+    margin: 0.75rem 0 0;
+    color: #64748b;
+    font-size: 0.84rem;
+}
+
+.dashboard-notice {
+    margin-top: 0.75rem;
+    color: #0f766e;
+    font-size: 0.9rem;
+}
+
+.dashboard-error-text {
+    color: #dc2626;
+}
+
+.dashboard-action-notice {
+    margin-top: -0.5rem;
+}
+
+.dashboard-action-notice.error {
+    color: #dc2626;
+}
+
+.dashboard-action-notice.success {
+    color: #166534;
+}
+
+.dashboard-inline-loading {
+    margin: 0;
+}
+
+.dashboard-clickable-row {
+    cursor: pointer;
+}
+
+.dashboard-clickable-row td {
+    transition: background-color 0.2s ease;
+}
+
 .status-pill {
     display: inline-flex;
     align-items: center;

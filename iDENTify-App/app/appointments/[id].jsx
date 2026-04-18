@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { API } from "../../constants/Api";
 import { Ionicons } from "@expo/vector-icons";
 
-const CANCELLATION_LOCK_MINUTES = 24 * 60;
+const CANCELLATION_LOCK_MINUTES = 30;
 
 function parseDateTime(value) {
   if (!value) return null;
@@ -89,12 +89,12 @@ export default function AppointmentDetails() {
     : (!Number.isFinite(minutesUntilAppointment)
       ? "Cancellation window unavailable."
       : (minutesUntilAppointment <= CANCELLATION_LOCK_MINUTES
-        ? "Cancellation is locked within 24 hours of the appointment time."
+        ? "Cancellation is locked within 30 minutes of the appointment time."
         : "You can cancel this appointment now."));
 
   const performCancellation = async () => {
     if (!canCancel || cancelling) {
-      Alert.alert("Cancellation Locked", "You can only cancel at least 24 hours before the appointment time.");
+      Alert.alert("Cancellation Locked", "You can only cancel at least 30 minutes before the appointment time.");
       return;
     }
 
