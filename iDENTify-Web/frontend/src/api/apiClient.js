@@ -116,6 +116,58 @@ export const signupSuperadmin = async (payload) => {
     return handleResponse(res);
 };
 
+export const getMySuperadminRequest = async () => {
+    const res = await fetch(`${API_BASE}/superadmin-requests/me`, {
+        headers: { ...actorHeaders() },
+    });
+    return handleResponse(res);
+};
+
+export const submitSuperadminRequest = async (payload) => {
+    const res = await fetch(`${API_BASE}/superadmin-requests/me/submit`, {
+        method: 'POST',
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const getSuperadminRequestsForReview = async ({ status = 'pending_review' } = {}) => {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    const query = params.toString();
+
+    const res = await fetch(`${API_BASE}/superadmin-requests/review${query ? `?${query}` : ''}`, {
+        headers: { ...actorHeaders() },
+    });
+    return handleResponse(res);
+};
+
+export const getSuperadminRequestDetail = async (requestId) => {
+    const res = await fetch(`${API_BASE}/superadmin-requests/review/${requestId}`, {
+        headers: { ...actorHeaders() },
+    });
+    return handleResponse(res);
+};
+
+export const approveSuperadminRequest = async (requestId, payload = {}) => {
+    const res = await fetch(`${API_BASE}/superadmin-requests/review/${requestId}/approve`, {
+        method: 'PATCH',
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const declineSuperadminRequest = async (requestId, payload) => {
+    const res = await fetch(`${API_BASE}/superadmin-requests/review/${requestId}/decline`, {
+        method: 'PATCH',
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
 export const sendSignupOtp = async (payload) => {
     const res = await fetch(`${API_BASE}/auth/signup/dentist/send-otp`, {
         method: 'POST',
@@ -624,6 +676,8 @@ export const get = async (url) => {
 
 const api = {
     login, verifyOtp, changePassword, sendSuperadminSignupOtp, signupSuperadmin, sendSignupOtp, signupDentist,
+    getMySuperadminRequest, submitSuperadminRequest,
+    getSuperadminRequestsForReview, getSuperadminRequestDetail, approveSuperadminRequest, declineSuperadminRequest,
     getAdminUsers, archiveAdminUser, restoreAdminUser,
     getDentists, createDentist, updateDentist, deleteDentist,
     getPatients, getPatientById, createPatient, updatePatient, searchPatients,

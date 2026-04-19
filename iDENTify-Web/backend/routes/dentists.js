@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db'); 
 const bcrypt = require('bcrypt');
+const { enforceAdminAccess } = require('../utils/accessControl');
 
 // Helper to convert undefined to null to prevent MySQL crashes
 const safeVal = (val) => val === undefined ? null : val;
@@ -332,6 +333,13 @@ router.post('/', async (req, res) => {
   } = req.body;
   
   try {
+    const access = await enforceAdminAccess(req, res, {
+      allowGlobalAdmin: true,
+      allowSuperAdmin: true,
+      requireApprovedSuperAdmin: true,
+    });
+    if (!access.ok) return;
+
     const actorScope = await getActorTenantScope(req);
     const supportsUsersClinic = await hasUsersClinicColumn();
     const supportsUsersBranch = await hasUsersBranchColumn();
@@ -478,6 +486,19 @@ router.put('/:id', async (req, res) => {
     const actorDentist = actorDentistId(req);
     const supportsMiddleName = await hasMiddleNameColumn();
 
+    if (actorRole !== 'dentist' && actorRole !== 'superadmin' && actorRole !== 'globaladmin') {
+      return res.status(403).json({ error: 'You are not allowed to update staff records.' });
+    }
+
+    if (actorRole === 'superadmin' || actorRole === 'globaladmin') {
+      const access = await enforceAdminAccess(req, res, {
+        allowGlobalAdmin: true,
+        allowSuperAdmin: true,
+        requireApprovedSuperAdmin: true,
+      });
+      if (!access.ok) return;
+    }
+
     const [existingRows] = await db.query('SELECT * FROM dentists WHERE id = ? LIMIT 1', [id]);
     if (existingRows.length === 0) return res.status(404).json({ message: 'Staff member not found' });
 
@@ -533,6 +554,13 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   try {
+    const access = await enforceAdminAccess(req, res, {
+      allowGlobalAdmin: true,
+      allowSuperAdmin: true,
+      requireApprovedSuperAdmin: true,
+    });
+    if (!access.ok) return;
+
     const [result] = await db.query('DELETE FROM dentists WHERE id = ?', [id]);
     if (result.affectedRows === 0) return res.status(404).json({ message: 'Staff member not found' });
     await db.query('DELETE FROM users WHERE dentist_id = ?', [id]);

@@ -1,0 +1,151 @@
+.request-gate-page {
+  min-height: 100vh;
+  padding: 2rem 1rem;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background: radial-gradient(circle at 15% 20%, #e7f2ff, #f9fbff),
+    linear-gradient(135deg, #0d3b66 0%, #1a7cc1 45%, #93c6ff 100%);
+}
+
+.request-gate-card {
+  width: min(980px, 100%);
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #dbe7f4;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+  padding: 1.5rem;
+}
+
+.request-gate-header h2 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.request-gate-header p {
+  margin: 0.35rem 0 1rem;
+  color: #475569;
+}
+
+.request-state {
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.request-state h3 {
+  margin: 0 0 0.4rem;
+}
+
+.request-state.waiting {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0c4a6e;
+}
+
+.request-state.declined {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #9f1239;
+}
+
+.request-meta {
+  margin-top: 0.4rem;
+  font-size: 0.92rem;
+}
+
+.request-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.request-grid {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.request-grid.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.request-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.request-field label {
+  font-weight: 600;
+  color: #334155;
+}
+
+.request-field input,
+.request-field textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.request-field input:focus,
+.request-field textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.request-section-title {
+  margin-top: 0.2rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.file-name {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.request-gate-actions {
+  margin-top: 0.4rem;
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.request-gate-primary,
+.request-gate-secondary {
+  border-radius: 10px;
+  padding: 0.62rem 0.95rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.request-gate-primary {
+  background: linear-gradient(120deg, #0ea5e9, #2563eb);
+  color: #fff;
+}
+
+.request-gate-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.request-gate-secondary {
+  background: #f8fafc;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
+@media (max-width: 760px) {
+  .request-grid.two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .request-gate-card {
+    padding: 1rem;
+  }
+}

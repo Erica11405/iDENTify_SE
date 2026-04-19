@@ -1,0 +1,259 @@
+.approvals-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.approvals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.approvals-header h2 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.approvals-header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.approvals-header-actions select,
+.approvals-header-actions button {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.45rem 0.7rem;
+  background: #fff;
+}
+
+.approvals-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.approvals-list-panel,
+.approvals-detail-panel {
+  border: 1px solid #dbe7f4;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  padding: 0.9rem;
+}
+
+.approvals-list-panel h3,
+.approvals-detail-panel h3 {
+  margin: 0 0 0.7rem;
+  color: #0f172a;
+}
+
+.approvals-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.approvals-list-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 0.6rem;
+  cursor: pointer;
+}
+
+.approvals-list-item.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.16);
+  background: #eff6ff;
+}
+
+.approvals-list-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.45rem;
+  margin-bottom: 0.25rem;
+}
+
+.approvals-list-top .name {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.meta {
+  color: #475569;
+  font-size: 0.86rem;
+}
+
+.status {
+  border-radius: 999px;
+  padding: 0.2rem 0.58rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.status.pending_review {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.status.approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status.declined {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.approvals-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.85rem;
+}
+
+.approvals-grid {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 0.7rem;
+}
+
+.approvals-grid.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.field label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.field span {
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.field textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  font-family: inherit;
+  font-size: 0.92rem;
+}
+
+.approvals-documents-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin: 0.9rem 0;
+}
+
+.approval-document-card {
+  border: 1px solid #dbe7f4;
+  border-radius: 12px;
+  padding: 0.6rem;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.approval-document-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.approval-document-name {
+  font-size: 0.82rem;
+  color: #64748b;
+  word-break: break-word;
+}
+
+.approval-document-image {
+  width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+}
+
+.approval-document-note {
+  font-size: 0.82rem;
+  color: #475569;
+  margin: 0;
+}
+
+.approval-document-link {
+  color: #1d4ed8;
+  font-weight: 700;
+  text-decoration: none;
+  font-size: 0.86rem;
+}
+
+.approvals-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.button-row {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.approve-btn,
+.decline-btn {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0.55rem 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.approve-btn {
+  background: #16a34a;
+  color: #fff;
+}
+
+.decline-btn {
+  background: #b91c1c;
+  color: #fff;
+}
+
+.approve-btn:disabled,
+.decline-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1100px) {
+  .approvals-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .approvals-documents-grid,
+  .approvals-grid.two-col {
+    grid-template-columns: 1fr;
+  }
+}

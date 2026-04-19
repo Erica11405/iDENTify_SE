@@ -7,6 +7,13 @@ SET SESSION time_zone = '+08:00';
 -- 2) Resolve DB name
 SET @db_name = DATABASE();
 
+SET @payment_records_table_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.tables
+  WHERE table_schema = @db_name
+    AND table_name = 'payment_records'
+);
+
 -- 3) Drop child-side FK constraints first (required before dropping indexes used by FK checks)
 SET @fk_appointment = (
   SELECT kcu.CONSTRAINT_NAME
@@ -85,6 +92,9 @@ DEALLOCATE PREPARE stmt_drop_uq_appointment;
 -- 5) Ensure non-unique indexes exist for lookup performance
 SET @create_idx_queue_sql = (
   SELECT IF(
+    @payment_records_table_exists = 0,
+    'SELECT ''skip create idx_payment_queue (table missing)''',
+    IF(
     EXISTS(
       SELECT 1
       FROM information_schema.statistics
@@ -94,6 +104,7 @@ SET @create_idx_queue_sql = (
     ),
     'SELECT ''skip create idx_payment_queue''',
     'CREATE INDEX idx_payment_queue ON payment_records(queue_id)'
+    )
   )
 );
 PREPARE stmt_create_idx_queue FROM @create_idx_queue_sql;
@@ -102,6 +113,9 @@ DEALLOCATE PREPARE stmt_create_idx_queue;
 
 SET @create_idx_appointment_sql = (
   SELECT IF(
+    @payment_records_table_exists = 0,
+    'SELECT ''skip create idx_payment_appointment (table missing)''',
+    IF(
     EXISTS(
       SELECT 1
       FROM information_schema.statistics
@@ -111,6 +125,7 @@ SET @create_idx_appointment_sql = (
     ),
     'SELECT ''skip create idx_payment_appointment''',
     'CREATE INDEX idx_payment_appointment ON payment_records(appointment_id)'
+    )
   )
 );
 PREPARE stmt_create_idx_appointment FROM @create_idx_appointment_sql;
@@ -128,7 +143,7 @@ SET @has_fk_appointment = (
 );
 
 SET @create_fk_appointment_sql = IF(
-  @has_fk_appointment > 0,
+  @payment_records_table_exists = 0 OR @has_fk_appointment > 0,
   'SELECT ''skip create fk_payment_records_appointment''',
   'ALTER TABLE payment_records ADD CONSTRAINT fk_payment_records_appointment FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE SET NULL'
 );
@@ -146,7 +161,7 @@ SET @has_fk_queue = (
 );
 
 SET @create_fk_queue_sql = IF(
-  @has_fk_queue > 0,
+  @payment_records_table_exists = 0 OR @has_fk_queue > 0,
   'SELECT ''skip create fk_payment_records_queue''',
   'ALTER TABLE payment_records ADD CONSTRAINT fk_payment_records_queue FOREIGN KEY (queue_id) REFERENCES walk_in_queue(id) ON DELETE SET NULL'
 );

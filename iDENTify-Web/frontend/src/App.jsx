@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import Landing from './pages/Landing';
 import ChangePasswordRequired from './pages/ChangePasswordRequired';
+import SuperAdminRequestGate from './pages/SuperAdminRequestGate';
 
 // --- Aide Pages ---
 import Dashboard from './pages/aide/Dashboard';
@@ -32,6 +33,7 @@ import SuperAdminUsers from './pages/superadmin/SuperAdminUsers';
 import SuperAdminReports from './pages/superadmin/SuperAdminReports';
 import SuperAdminSettings from './pages/superadmin/SuperAdminSettings';
 import SuperAdminArchive from './pages/superadmin/SuperAdminArchive';
+import SuperAdminApprovals from './pages/superadmin/SuperAdminApprovals';
 
 function requiresPasswordChange(user) {
     if (!user || typeof user !== 'object') {
@@ -46,9 +48,24 @@ function requiresPasswordChange(user) {
     return normalized === 'true' || normalized === '1';
 }
 
+function normalizeApprovalStatus(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'pendingrequirements') return 'pending_requirements';
+    if (normalized === 'pendingreview') return 'pending_review';
+
+    if (normalized === 'pending_requirements' || normalized === 'pending_review' || normalized === 'approved' || normalized === 'declined') {
+        return normalized;
+    }
+
+    return 'approved';
+}
+
 function App() {
     const { user } = useAppStore();
     const mustChangePassword = requiresPasswordChange(user);
+    const superadminApprovalStatus = user?.role === 'superadmin'
+        ? normalizeApprovalStatus(user?.approval_status)
+        : 'approved';
 
     // 1. If not logged in, force them to Login or Signup
     if (!user) {
@@ -68,6 +85,16 @@ function App() {
                 <Route path="/download" element={<Landing />} />
                 <Route path="/change-password" element={<ChangePasswordRequired />} />
                 <Route path="*" element={<Navigate to="/change-password" replace />} />
+            </Routes>
+        );
+    }
+
+    if (user?.role === 'superadmin' && superadminApprovalStatus !== 'approved') {
+        return (
+            <Routes>
+                <Route path="/download" element={<Landing />} />
+                <Route path="/superadmin/request" element={<SuperAdminRequestGate />} />
+                <Route path="*" element={<Navigate to="/superadmin/request" replace />} />
             </Routes>
         );
     }
@@ -95,6 +122,10 @@ function App() {
                         <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
                         <Route path="/admin/dashboard" element={<SuperAdminDashboard />} />
                         <Route path="/admin/users" element={<SuperAdminUsers />} />
+                        <Route
+                            path="/admin/approvals"
+                            element={user.role === 'globaladmin' ? <SuperAdminApprovals /> : <Navigate to="/admin/dashboard" replace />}
+                        />
                         <Route path="/admin/reports" element={<SuperAdminReports />} />
                         <Route path="/admin/settings" element={<SuperAdminSettings />} />
                         <Route path="/admin/archive" element={<SuperAdminArchive />} />

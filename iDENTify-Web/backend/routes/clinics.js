@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { enforceAdminAccess } = require('../utils/accessControl');
 
 function normalizeRole(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -31,13 +32,17 @@ function cleanText(value, max = 255) {
   return text ? text.slice(0, max) : '';
 }
 
-function requireGlobalAdmin(req, res) {
-  const role = actorRole(req);
-  // Transitional compatibility: existing deployments use `superadmin` as the top-level role.
-  if (role !== 'globaladmin' && role !== 'superadmin') {
-    res.status(403).json({ message: 'Only global admins can manage clinics and branches.' });
+async function requireGlobalAdmin(req, res) {
+  const access = await enforceAdminAccess(req, res, {
+    allowGlobalAdmin: true,
+    allowSuperAdmin: true,
+    requireApprovedSuperAdmin: true,
+  });
+
+  if (!access.ok) {
     return false;
   }
+
   return true;
 }
 
@@ -83,7 +88,7 @@ router.get('/discover', async (_req, res) => {
 });
 
 router.get('/summary', async (req, res) => {
-  if (!requireGlobalAdmin(req, res)) return;
+  if (!(await requireGlobalAdmin(req, res))) return;
 
   try {
     const [clinicCountRows] = await db.query(
@@ -163,7 +168,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  if (!requireGlobalAdmin(req, res)) return;
+  if (!(await requireGlobalAdmin(req, res))) return;
 
   const name = cleanText(req.body?.name);
   const code = cleanText(req.body?.code, 64);
@@ -244,7 +249,7 @@ router.get('/:clinicId/branches', async (req, res) => {
 });
 
 router.post('/:clinicId/branches', async (req, res) => {
-  if (!requireGlobalAdmin(req, res)) return;
+  if (!(await requireGlobalAdmin(req, res))) return;
 
   const clinicId = toOptionalPositiveInt(req.params.clinicId);
   const name = cleanText(req.body?.name);

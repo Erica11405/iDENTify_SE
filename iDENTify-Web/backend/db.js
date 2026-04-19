@@ -18,9 +18,25 @@ const hasDbEnvConfig = Boolean(
   process.env.DB_NAME
 );
 
-if (!forceIndividualDbConfig && process.env.DATABASE_URL) {
+function normalizeDatabaseUrl(rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) return '';
+
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1).trim();
+  }
+
+  return value;
+}
+
+const normalizedDatabaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
+
+if (!forceIndividualDbConfig && normalizedDatabaseUrl) {
   console.log("-> Connecting using DATABASE_URL...");
-  const dbUrl = new URL(process.env.DATABASE_URL);
+  const dbUrl = new URL(normalizedDatabaseUrl);
   poolConfig = {
     host: dbUrl.hostname,
     port: Number(dbUrl.port || 25060),

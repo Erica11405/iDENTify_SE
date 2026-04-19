@@ -23,12 +23,29 @@ To get the application running, you will need to run both the frontend and backe
     npm install
     ```
 
-3.  **Set up the database:**
+3.  **Configure environment:**
+    -   Copy `backend/.env.example` to `backend/.env`.
+    -   Set DB credentials (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`) or `DATABASE_URL`.
+    -   If `DATABASE_URL` is present but you want local DB config instead, set `DB_FORCE_INDIVIDUAL=1`.
+    -   Set mailer values (`MAILER_USER`, `MAILER_PASS`, `MAILER_FROM`) so OTP and approval decision emails can be sent.
+
+4.  **Set up and migrate the database:**
     -   Make sure you have a MySQL server running.
     -   Create a database named `identify_app`.
-    -   Update the database credentials in `backend/.env` if they are different from the defaults.
+    -   Run migrations:
+      ```bash
+      npm run migrate
+      ```
+    -   Optional: view migration state:
+      ```bash
+      npm run migrate:status
+      ```
 
-4.  **Run the backend server:**
+    The superadmin approval workflow migration seeds a globaladmin account:
+    -   Email: `ericaaquino01145@gmail.com`
+    -   Password: `erica0114`
+
+5.  **Run the backend server:**
     ```bash
     npm start
     ```

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "migrate": "node scripts/run-migrations.js",
+    "migrate:status": "node scripts/run-migrations.js --status",
     "reports:access-check": "node scripts/reports-access-check.js",
     "reports:access-check:positive": "node scripts/reports-access-check.js --include-positive",
     "reports:access-check:positive:auto": "node scripts/reports-access-check-positive-auto.js"

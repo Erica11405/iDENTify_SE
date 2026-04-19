@@ -1,7 +1,25 @@
 require("dotenv").config();
 const mysql = require("mysql2/promise");
 
+function normalizeDatabaseUrl(rawValue) {
+  const value = String(rawValue || "").trim();
+  if (!value) return "";
+
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1).trim();
+  }
+
+  return value;
+}
+
 function resolveConnectionConfig() {
+  const forceIndividualDbConfig =
+    process.env.DB_FORCE_INDIVIDUAL === "1" ||
+    process.env.DB_USE_LOCAL_DB === "1";
+
   const hasDbEnvConfig = Boolean(
     process.env.DB_HOST ||
     process.env.DB_PORT ||
@@ -11,8 +29,10 @@ function resolveConnectionConfig() {
     process.env.DB_NAME
   );
 
-  if (process.env.DATABASE_URL) {
-    const dbUrl = new URL(process.env.DATABASE_URL);
+  const normalizedDatabaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
+
+  if (!forceIndividualDbConfig && normalizedDatabaseUrl) {
+    const dbUrl = new URL(normalizedDatabaseUrl);
     return {
       host: dbUrl.hostname,
       port: Number(dbUrl.port || 25060),

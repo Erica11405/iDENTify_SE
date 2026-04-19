@@ -3,6 +3,20 @@
 
 SET @db_name = DATABASE();
 
+SET @medications_table_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.tables
+  WHERE table_schema = @db_name
+    AND table_name = 'medications'
+);
+
+SET @treatment_timeline_table_exists = (
+  SELECT COUNT(*)
+  FROM information_schema.tables
+  WHERE table_schema = @db_name
+    AND table_name = 'treatment_timeline'
+);
+
 -- 1) Add medications.treatment_id if missing
 SET @has_treatment_column = (
   SELECT COUNT(*)
@@ -13,13 +27,21 @@ SET @has_treatment_column = (
 );
 
 SET @add_column_sql = IF(
-  @has_treatment_column > 0,
+  @medications_table_exists = 0 OR @has_treatment_column > 0,
   'SELECT ''skip add medications.treatment_id''',
   'ALTER TABLE medications ADD COLUMN treatment_id INT NULL AFTER patient_id'
 );
 PREPARE stmt_add_column FROM @add_column_sql;
 EXECUTE stmt_add_column;
 DEALLOCATE PREPARE stmt_add_column;
+
+SET @has_treatment_column = (
+  SELECT COUNT(*)
+  FROM information_schema.columns
+  WHERE table_schema = @db_name
+    AND table_name = 'medications'
+    AND column_name = 'treatment_id'
+);
 
 -- 2) Add lookup index for treatment_id if missing
 SET @has_index_treatment = (
@@ -31,7 +53,7 @@ SET @has_index_treatment = (
 );
 
 SET @add_index_sql = IF(
-  @has_index_treatment > 0,
+  @medications_table_exists = 0 OR @has_treatment_column = 0 OR @has_index_treatment > 0,
   'SELECT ''skip create idx_medications_treatment_id''',
   'CREATE INDEX idx_medications_treatment_id ON medications(treatment_id)'
 );
@@ -50,7 +72,7 @@ SET @has_fk_treatment = (
 );
 
 SET @add_fk_sql = IF(
-  @has_fk_treatment > 0,
+  @medications_table_exists = 0 OR @treatment_timeline_table_exists = 0 OR @has_treatment_column = 0 OR @has_fk_treatment > 0,
   'SELECT ''skip create fk_medications_treatment''',
   'ALTER TABLE medications ADD CONSTRAINT fk_medications_treatment FOREIGN KEY (treatment_id) REFERENCES treatment_timeline(id) ON DELETE SET NULL'
 );

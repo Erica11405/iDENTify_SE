@@ -36,6 +36,12 @@ function fullName(firstName, middleName, lastName) {
         .join(' ');
 }
 
+function toPositiveInt(value) {
+    const parsed = Number.parseInt(String(value || ''), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return parsed;
+}
+
 function initialDentistForm(defaultSpecialization = 'General Dentist') {
     return {
         firstName: '',
@@ -130,6 +136,10 @@ function SuperAdminUsers() {
     const [editingAideId, setEditingAideId] = useState(null);
     const [dentistTypeOptions, setDentistTypeOptions] = useState(['General Dentist']);
     const [archiveDialog, setArchiveDialog] = useState(initialArchiveDialog);
+    const [clinicOptions, setClinicOptions] = useState([]);
+    const [selectedClinicId, setSelectedClinicId] = useState('');
+    const [branchOptions, setBranchOptions] = useState([]);
+    const [selectedBranchId, setSelectedBranchId] = useState('');
 
     const [dentistForm, setDentistForm] = useState(initialDentistForm);
     const [aideForm, setAideForm] = useState(initialAideForm);
@@ -138,10 +148,11 @@ function SuperAdminUsers() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [staffList, usersList, typeList] = await Promise.all([
+            const [staffList, usersList, typeList, clinicsList] = await Promise.all([
                 api.getDentists(),
                 api.getAdminUsers({ role: 'all', archived: 'all' }),
                 api.getDentistTypes().catch(() => []),
+                api.getClinics().catch(() => []),
             ]);
 
             const activeDentistIds = new Set(
@@ -162,6 +173,16 @@ function SuperAdminUsers() {
             setAides(aidesOnly);
             setUsers(usersList || []);
             setDentistTypeOptions(nextTypeOptions);
+
+            const normalizedClinics = (clinicsList || []).filter((clinic) => toPositiveInt(clinic?.id));
+            setClinicOptions(normalizedClinics);
+            setSelectedClinicId((prev) => {
+                if (prev && normalizedClinics.some((clinic) => String(clinic.id) === String(prev))) {
+                    return prev;
+                }
+
+                return normalizedClinics.length ? String(normalizedClinics[0].id) : '';
+            });
         } catch (error) {
             toast.error(error.message || 'Failed to load users.');
         } finally {
@@ -172,6 +193,45 @@ function SuperAdminUsers() {
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    useEffect(() => {
+        const clinicId = toPositiveInt(selectedClinicId);
+        if (!clinicId) {
+            setBranchOptions([]);
+            setSelectedBranchId('');
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadBranches = async () => {
+            try {
+                const branches = await api.getClinicBranches(clinicId);
+                if (cancelled) return;
+
+                const normalizedBranches = (branches || []).filter((branch) => toPositiveInt(branch?.id));
+                setBranchOptions(normalizedBranches);
+                setSelectedBranchId((prev) => {
+                    if (prev && normalizedBranches.some((branch) => String(branch.id) === String(prev))) {
+                        return prev;
+                    }
+
+                    return normalizedBranches.length ? String(normalizedBranches[0].id) : '';
+                });
+            } catch (error) {
+                if (cancelled) return;
+                setBranchOptions([]);
+                setSelectedBranchId('');
+                toast.error(error.message || 'Failed to load clinic branches.');
+            }
+        };
+
+        loadBranches();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedClinicId]);
 
     const userByDentistId = useMemo(() => {
         const lookup = new Map();
@@ -264,6 +324,13 @@ function SuperAdminUsers() {
             return;
         }
 
+        const clinicId = toPositiveInt(selectedClinicId);
+        const branchId = toPositiveInt(selectedBranchId);
+        if (!clinicId || !branchId) {
+            toast.error('Please select both clinic and branch before creating a dentist account.');
+            return;
+        }
+
         if (!Array.isArray(dentistForm.days) || dentistForm.days.length === 0) {
             toast.error('Please select at least one working day.');
             return;
@@ -282,6 +349,8 @@ function SuperAdminUsers() {
                 phone: normalizeText(dentistForm.phone),
                 role: 'dentist',
                 status: 'Available',
+                clinic_id: clinicId,
+                branch_id: branchId,
                 days: dentistForm.days,
                 operatingHours: dentistForm.operatingHours,
                 lunch: dentistForm.lunch,
@@ -329,6 +398,13 @@ function SuperAdminUsers() {
             return;
         }
 
+        const clinicId = toPositiveInt(selectedClinicId);
+        const branchId = toPositiveInt(selectedBranchId);
+        if (!editingAideId && (!clinicId || !branchId)) {
+            toast.error('Please select both clinic and branch before creating a dental aide account.');
+            return;
+        }
+
         setSavingAide(true);
         try {
             const selectedAide = aides.find((item) => item.id === editingAideId);
@@ -353,7 +429,12 @@ function SuperAdminUsers() {
                 await api.updateDentist(editingAideId, payload);
                 toast.success('Dental aide updated successfully.');
             } else {
-                const createdAide = await api.createDentist({ ...payload, password: aideForm.password });
+                const createdAide = await api.createDentist({
+                    ...payload,
+                    password: aideForm.password,
+                    clinic_id: clinicId,
+                    branch_id: branchId,
+                });
                 if (createdAide?.generated_password) {
                     toast.success(`Dental aide added. Temporary password: ${createdAide.generated_password}`);
                 } else {
@@ -483,6 +564,32 @@ function SuperAdminUsers() {
                                     <div className="form-group">
                                         <label>Password *</label>
                                         <input type="password" value={dentistForm.password} onChange={(e) => setDentistForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="At least 8 characters" />
+                                    </div>
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Clinic *</label>
+                                        <select value={selectedClinicId} onChange={(e) => setSelectedClinicId(e.target.value)}>
+                                            {clinicOptions.length === 0 ? <option value="">No clinics available</option> : null}
+                                            {clinicOptions.map((clinic) => (
+                                                <option key={clinic.id} value={clinic.id}>{clinic.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Branch *</label>
+                                        <select
+                                            value={selectedBranchId}
+                                            onChange={(e) => setSelectedBranchId(e.target.value)}
+                                            disabled={!selectedClinicId || branchOptions.length === 0}
+                                        >
+                                            {!selectedClinicId ? <option value="">Select a clinic first</option> : null}
+                                            {selectedClinicId && branchOptions.length === 0 ? <option value="">No branches available</option> : null}
+                                            {branchOptions.map((branch) => (
+                                                <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
 
@@ -654,6 +761,32 @@ function SuperAdminUsers() {
                                             <input type="password" value={aideForm.password} onChange={(e) => setAideForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="At least 8 characters" />
                                         </div>
                                     ) : null}
+                                </div>
+
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Clinic *</label>
+                                        <select value={selectedClinicId} onChange={(e) => setSelectedClinicId(e.target.value)}>
+                                            {clinicOptions.length === 0 ? <option value="">No clinics available</option> : null}
+                                            {clinicOptions.map((clinic) => (
+                                                <option key={clinic.id} value={clinic.id}>{clinic.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Branch *</label>
+                                        <select
+                                            value={selectedBranchId}
+                                            onChange={(e) => setSelectedBranchId(e.target.value)}
+                                            disabled={!selectedClinicId || branchOptions.length === 0}
+                                        >
+                                            {!selectedClinicId ? <option value="">Select a clinic first</option> : null}
+                                            {selectedClinicId && branchOptions.length === 0 ? <option value="">No branches available</option> : null}
+                                            {branchOptions.map((branch) => (
+                                                <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <div className="settings-inline-actions">

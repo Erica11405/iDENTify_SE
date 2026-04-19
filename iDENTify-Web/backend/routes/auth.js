@@ -2,25 +2,18 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db'); 
 const bcrypt = require('bcrypt');
-const nodemailer = require('nodemailer');
+const { sendEmail } = require('../utils/mailer');
+const { normalizeApprovalStatus } = require('../utils/accessControl');
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
 const LOGIN_OTP_ROLES = new Set(['dentist', 'aide']);
-
-// Configure your email transporter
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: 'ericaaquino0114@gmail.com', 
-        pass: 'seumvvibmpgzzseg'
-    }
-});
 
 // Temporary in-memory store for Sign-Up OTPs
 const signupOtpStore = new Map();
 let signupOtpTableReady = false;
 let signupOtpTableUnavailable = false;
 let hasPasswordChangeRequiredColumnCache = null;
+let hasApprovalStatusColumnCache = null;
 
 function normalizeRole(role) {
     const normalized = String(role || '').trim().toLowerCase();
@@ -61,6 +54,7 @@ function toPublicUser(userRecord) {
         clinic_id: userRecord.clinic_id || null,
         branch_id: userRecord.branch_id || null,
         require_password_change: Boolean(Number(userRecord.password_change_required || 0)),
+        approval_status: normalizeApprovalStatus(userRecord.approval_status),
     };
 }
 
@@ -79,15 +73,27 @@ async function hasPasswordChangeRequiredColumn() {
     return hasPasswordChangeRequiredColumnCache;
 }
 
+async function hasApprovalStatusColumn() {
+    if (hasApprovalStatusColumnCache !== null) {
+        return hasApprovalStatusColumnCache;
+    }
+
+    try {
+        const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'approval_status'");
+        hasApprovalStatusColumnCache = rows.length > 0;
+    } catch (_err) {
+        hasApprovalStatusColumnCache = false;
+    }
+
+    return hasApprovalStatusColumnCache;
+}
+
 async function sendOtpEmail({ email, name, otpCode, subject, introText }) {
-    const mailOptions = {
-        from: 'iDENTify Clinic <your_email@gmail.com>',
+    await sendEmail({
         to: email,
         subject,
         text: `Hello ${name || 'there'},\n\n${introText}: ${otpCode}\n\nThis code will expire in 10 minutes.`,
-    };
-
-    await transporter.sendMail(mailOptions);
+    });
 }
 
 async function ensureEmailNotRegistered(email) {
@@ -251,16 +257,41 @@ router.post('/signup/superadmin', async (req, res) => {
 
         const fullName = composeFullName(firstName, middleName, surname);
         const hashedPassword = await bcrypt.hash(password, 10);
+        const supportsApprovalStatus = await hasApprovalStatusColumn();
 
-        await db.query(
-            `INSERT INTO users (email, password_hash, full_name, last_name, role, is_verified, is_archived)
-             VALUES (?, ?, ?, ?, 'superadmin', 1, 0)`,
-            [email, hashedPassword, fullName, String(surname).trim()]
-        );
+        if (supportsApprovalStatus) {
+            await db.query(
+                `INSERT INTO users (
+                    email,
+                    password_hash,
+                    full_name,
+                    last_name,
+                    role,
+                    is_verified,
+                    is_archived,
+                    approval_status,
+                    approved_at,
+                    approved_by_user_id,
+                    declined_at,
+                    decline_reason
+                )
+                VALUES (?, ?, ?, ?, 'superadmin', 1, 0, 'pending_requirements', NULL, NULL, NULL, NULL)`,
+                [email, hashedPassword, fullName, String(surname).trim()]
+            );
+        } else {
+            await db.query(
+                `INSERT INTO users (email, password_hash, full_name, last_name, role, is_verified, is_archived)
+                 VALUES (?, ?, ?, ?, 'superadmin', 1, 0)`,
+                [email, hashedPassword, fullName, String(surname).trim()]
+            );
+        }
 
         await clearSignupOtp('superadmin', email);
 
-        res.status(201).json({ message: 'Super admin account created successfully.' });
+        res.status(201).json({
+            message: 'Super admin account created. Please submit your requirements for approval.',
+            approval_status: supportsApprovalStatus ? 'pending_requirements' : 'approved',
+        });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ error: 'This email is already taken.' });
@@ -370,9 +401,12 @@ router.post('/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, userRecord.password_hash);
         if (!isMatch) return res.status(401).json({ error: "Invalid password." });
 
-        if (role === 'superadmin') {
+        if (role === 'superadmin' || role === 'globaladmin') {
+            const approvalStatus = normalizeApprovalStatus(userRecord.approval_status);
             return res.status(200).json({ 
-                message: "Login successful", 
+                message: role === 'globaladmin' || approvalStatus === 'approved'
+                    ? 'Login successful'
+                    : 'Login successful. Complete your approval process to continue.',
                 requireOtp: false, 
                 requirePasswordChange,
                 user: toPublicUser(userRecord),
@@ -429,8 +463,8 @@ router.post('/verify-otp', async (req, res) => {
             return res.status(403).json({ error: 'This account has been archived. Please contact the super admin.' });
         }
 
-        if (role === 'superadmin') {
-            return res.status(400).json({ error: 'Super admin accounts do not require OTP during login.' });
+        if (role === 'superadmin' || role === 'globaladmin') {
+            return res.status(400).json({ error: 'Admin accounts do not require OTP during login.' });
         }
 
         if (!LOGIN_OTP_ROLES.has(role)) {

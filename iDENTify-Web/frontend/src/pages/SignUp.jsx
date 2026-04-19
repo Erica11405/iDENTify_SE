@@ -2,8 +2,17 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../api/apiClient";
+import useAppStore from "../store/useAppStore";
 import toothLogo from "../assets/toothlogo.svg";
 import "../styles/pages/Signup.css"; 
+
+function shouldRequirePasswordChange(user, responseFlag) {
+    if (responseFlag === true) return true;
+
+    const rawValue = user?.require_password_change ?? user?.requirePasswordChange;
+    if (rawValue === true || rawValue === 1) return true;
+    return String(rawValue || "").trim().toLowerCase() === "true" || String(rawValue || "").trim() === "1";
+}
 
 function SignUp() {
 	const [firstName, setFirstName] = useState("");
@@ -20,6 +29,7 @@ function SignUp() {
 
 	const [errors, setErrors] = useState({});
 	const navigate = useNavigate();
+    const { setUser } = useAppStore();
 
 	const handleInputChange = (field, value) => {
 		setErrors((prev) => ({ ...prev, [field]: null }));
@@ -71,8 +81,30 @@ function SignUp() {
 
         try {
 			await api.signupSuperadmin({ firstName, middleName, surname, email, password, confirmPassword, otp: normalizedOtp });
-			toast.success("Super admin account verified and created! You can now log in.");
-			navigate("/");
+
+            const loginResponse = await api.login({ email, password });
+            const nextUser = loginResponse?.user;
+
+            if (!nextUser) {
+                toast.success("Super admin account created. Please log in to submit requirements.");
+                navigate("/");
+                return;
+            }
+
+            const requirePasswordChange = shouldRequirePasswordChange(nextUser, loginResponse?.requirePasswordChange);
+            setUser({
+                ...nextUser,
+                require_password_change: requirePasswordChange,
+            });
+
+            if (requirePasswordChange) {
+                toast.success("Account created. Please update your password before continuing.");
+                navigate("/change-password");
+                return;
+            }
+
+            toast.success("Account created. Submit your requirements for approval.");
+			navigate("/superadmin/request");
 		} catch (error) {
 			toast.error(error.message || "Signup failed.");
             setErrors({ form: error.message });

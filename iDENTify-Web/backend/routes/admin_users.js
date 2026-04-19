@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { enforceAdminAccess, hasUsersApprovalStatusColumn } = require('../utils/accessControl');
 
 const ALLOWED_ROLES = new Set(['dentist', 'aide']);
 let hasDentistArchivedAtColumnCache = null;
@@ -51,7 +52,19 @@ async function syncAideArchiveFlag(userId, isArchived) {
   }
 }
 
+async function requireApprovedAdmin(req, res) {
+  const access = await enforceAdminAccess(req, res, {
+    allowGlobalAdmin: true,
+    allowSuperAdmin: true,
+    requireApprovedSuperAdmin: true,
+  });
+
+  return access.ok;
+}
+
 router.get('/', async (req, res) => {
+  if (!(await requireApprovedAdmin(req, res))) return;
+
   const roleFilter = normalizeRole(req.query?.role);
   const archivedFilter = String(req.query?.archived || 'false').trim().toLowerCase();
 
@@ -75,6 +88,11 @@ router.get('/', async (req, res) => {
   }
 
   try {
+    const supportsApprovalStatus = await hasUsersApprovalStatusColumn();
+    const approvalStatusSelect = supportsApprovalStatus
+      ? 'u.approval_status,'
+      : "'approved' AS approval_status,";
+
     const [rows] = await db.query(
       `SELECT
         u.id,
@@ -84,6 +102,7 @@ router.get('/', async (req, res) => {
         LOWER(u.role) AS role,
         u.is_archived,
         u.is_verified,
+        ${approvalStatusSelect}
         u.dentist_id,
         d.specialization AS dentist_specialization,
         d.status AS dentist_status,
@@ -100,6 +119,7 @@ router.get('/', async (req, res) => {
       role: normalizeRole(row.role),
       is_archived: Number(row.is_archived || 0),
       is_verified: Number(row.is_verified || 0),
+      approval_status: String(row.approval_status || 'approved').trim().toLowerCase(),
     }));
 
     res.json(users);
@@ -110,6 +130,8 @@ router.get('/', async (req, res) => {
 });
 
 router.patch('/:id/archive', async (req, res) => {
+  if (!(await requireApprovedAdmin(req, res))) return;
+
   const id = Number(req.params.id);
   if (!Number.isFinite(id) || id <= 0) {
     return res.status(400).json({ error: 'Invalid user id.' });
@@ -145,6 +167,8 @@ router.patch('/:id/archive', async (req, res) => {
 });
 
 router.patch('/:id/restore', async (req, res) => {
+  if (!(await requireApprovedAdmin(req, res))) return;
+
   const id = Number(req.params.id);
   if (!Number.isFinite(id) || id <= 0) {
     return res.status(400).json({ error: 'Invalid user id.' });
