@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../api/apiClient';
 import EditDentistModal from '../../components/EditDentistModal';
@@ -40,6 +41,19 @@ function toPositiveInt(value) {
     const parsed = Number.parseInt(String(value || ''), 10);
     if (!Number.isFinite(parsed) || parsed <= 0) return null;
     return parsed;
+}
+
+function resolveAdminMessage(error, fallback = 'Failed to load users.') {
+    const code = String(error?.body?.code || '').trim().toUpperCase();
+    if (code === 'SUPERADMIN_NOT_APPROVED') {
+        return 'Your superadmin access is not approved yet. Complete your request and wait for approval.';
+    }
+
+    if (error?.status === 403 && error?.message) {
+        return error.message;
+    }
+
+    return error?.message || fallback;
 }
 
 function initialDentistForm(defaultSpecialization = 'General Dentist') {
@@ -116,6 +130,7 @@ function formatScheduleSummary(staff) {
 }
 
 function SuperAdminUsers() {
+    const navigate = useNavigate();
     const initialArchiveDialog = {
         isOpen: false,
         staff: null,
@@ -140,6 +155,8 @@ function SuperAdminUsers() {
     const [selectedClinicId, setSelectedClinicId] = useState('');
     const [branchOptions, setBranchOptions] = useState([]);
     const [selectedBranchId, setSelectedBranchId] = useState('');
+    const [pageNotice, setPageNotice] = useState('');
+    const [clinicNotice, setClinicNotice] = useState('');
 
     const [dentistForm, setDentistForm] = useState(initialDentistForm);
     const [aideForm, setAideForm] = useState(initialAideForm);
@@ -147,13 +164,35 @@ function SuperAdminUsers() {
 
     const loadData = useCallback(async () => {
         setLoading(true);
+        setPageNotice('');
+        setClinicNotice('');
+
         try {
-            const [staffList, usersList, typeList, clinicsList] = await Promise.all([
+            const [staffResult, usersResult, typeResult, clinicsResult] = await Promise.allSettled([
                 api.getDentists(),
                 api.getAdminUsers({ role: 'all', archived: 'all' }),
                 api.getDentistTypes().catch(() => []),
-                api.getClinics().catch(() => []),
+                api.getClinics(),
             ]);
+
+            if (staffResult.status === 'rejected') {
+                throw staffResult.reason;
+            }
+
+            if (usersResult.status === 'rejected') {
+                throw usersResult.reason;
+            }
+
+            const staffList = staffResult.value;
+            const usersList = usersResult.value;
+            const typeList = typeResult.status === 'fulfilled' ? typeResult.value : [];
+            const clinicsList = clinicsResult.status === 'fulfilled' ? clinicsResult.value : [];
+
+            if (clinicsResult.status === 'rejected') {
+                const clinicMessage = resolveAdminMessage(clinicsResult.reason, 'Failed to load clinics.');
+                setClinicNotice(clinicMessage);
+                toast.error(clinicMessage);
+            }
 
             const activeDentistIds = new Set(
                 (usersList || [])
@@ -184,7 +223,12 @@ function SuperAdminUsers() {
                 return normalizedClinics.length ? String(normalizedClinics[0].id) : '';
             });
         } catch (error) {
-            toast.error(error.message || 'Failed to load users.');
+            const message = resolveAdminMessage(error, 'Failed to load users.');
+            setPageNotice(message);
+            setDentists([]);
+            setAides([]);
+            setUsers([]);
+            toast.error(message);
         } finally {
             setLoading(false);
         }
@@ -508,6 +552,27 @@ function SuperAdminUsers() {
             <div className="settings-header-section">
                 <h2>User Management</h2>
             </div>
+
+            {!loading && pageNotice ? (
+                <div className="dashboard-action-notice error" style={{ marginBottom: '1rem' }}>
+                    {pageNotice}
+                </div>
+            ) : null}
+
+            {!loading && !pageNotice && clinicNotice ? (
+                <p className="dashboard-notice">{clinicNotice}</p>
+            ) : null}
+
+            {!loading && !pageNotice && clinicOptions.length === 0 ? (
+                <div className="dashboard-action-notice error" style={{ marginBottom: '1rem' }}>
+                    No clinics are available yet. Create a clinic and branch on Dashboard before adding dentists or aides.
+                    <div className="settings-inline-actions" style={{ marginTop: '0.75rem' }}>
+                        <button type="button" className="btn-secondary-action" onClick={() => navigate('/admin/dashboard')}>
+                            Go To Dashboard
+                        </button>
+                    </div>
+                </div>
+            ) : null}
 
             <div className="superadmin-stats-grid" style={{ marginBottom: '1.25rem' }}>
                 <div className="superadmin-stat-card compact">

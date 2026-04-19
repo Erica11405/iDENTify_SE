@@ -38,6 +38,7 @@ function assertReportActorContext(req, {
       allowed: false,
       status: 401,
       message: "User role context is required.",
+      code: 'REPORT_ROLE_CONTEXT_REQUIRED',
       role,
       userId,
       dentistId,
@@ -49,6 +50,7 @@ function assertReportActorContext(req, {
       allowed: false,
       status: 403,
       message: "User context is missing. Please sign in again.",
+      code: 'REPORT_USER_CONTEXT_MISSING',
       role,
       userId,
       dentistId,
@@ -60,6 +62,7 @@ function assertReportActorContext(req, {
       allowed: false,
       status: 403,
       message: "Dentists can only access dentist-specific report endpoints.",
+      code: 'REPORT_DENTIST_ROUTE_FORBIDDEN',
       role,
       userId,
       dentistId,
@@ -71,6 +74,7 @@ function assertReportActorContext(req, {
       allowed: false,
       status: 403,
       message: "Dentist context is missing. Please sign in again.",
+      code: 'REPORT_DENTIST_CONTEXT_MISSING',
       role,
       userId,
       dentistId,
@@ -81,6 +85,7 @@ function assertReportActorContext(req, {
     allowed: true,
     status: 200,
     message: "",
+    code: '',
     role,
     userId,
     dentistId,
@@ -267,6 +272,7 @@ function assertResolvedTenantScope(actorScope) {
       allowed: false,
       status: 403,
       message: "Unable to resolve user tenant scope.",
+      code: 'REPORT_SCOPE_RESOLUTION_FAILED',
     };
   }
 
@@ -275,6 +281,7 @@ function assertResolvedTenantScope(actorScope) {
       allowed: true,
       status: 200,
       message: "",
+      code: '',
     };
   }
 
@@ -283,6 +290,7 @@ function assertResolvedTenantScope(actorScope) {
       allowed: false,
       status: 403,
       message: "Tenant assignment is required to access reports.",
+      code: 'TENANT_ASSIGNMENT_REQUIRED',
     };
   }
 
@@ -290,6 +298,7 @@ function assertResolvedTenantScope(actorScope) {
     allowed: true,
     status: 200,
     message: "",
+    code: '',
   };
 }
 
@@ -455,6 +464,7 @@ async function assertDentistReportAccess(req, dentistId) {
       allowed: false,
       status: actorContext.status,
       message: actorContext.message,
+      code: actorContext.code || 'REPORT_CONTEXT_FORBIDDEN',
       actorScope: null,
     };
   }
@@ -467,6 +477,7 @@ async function assertDentistReportAccess(req, dentistId) {
       allowed: false,
       status: 403,
       message: "Dentist context is missing. Please sign in again.",
+      code: 'REPORT_DENTIST_CONTEXT_MISSING',
       actorScope: null,
     };
   }
@@ -476,6 +487,7 @@ async function assertDentistReportAccess(req, dentistId) {
       allowed: false,
       status: 403,
       message: "Dentists can only access their own report data.",
+      code: 'REPORT_DENTIST_SELF_ONLY',
       actorScope: null,
     };
   }
@@ -487,6 +499,7 @@ async function assertDentistReportAccess(req, dentistId) {
       allowed: false,
       status: tenantScopeAccess.status,
       message: tenantScopeAccess.message,
+      code: tenantScopeAccess.code || 'REPORT_SCOPE_FORBIDDEN',
       actorScope,
     };
   }
@@ -499,6 +512,7 @@ async function assertDentistReportAccess(req, dentistId) {
       allowed: false,
       status: 403,
       message: scopeViolation,
+      code: 'REPORT_TENANT_SCOPE_VIOLATION',
       actorScope,
     };
   }
@@ -508,6 +522,7 @@ async function assertDentistReportAccess(req, dentistId) {
     status: 200,
     actorScope,
     message: "",
+    code: '',
   };
 }
 
@@ -725,7 +740,10 @@ router.get("/", async (req, res) => {
   try {
     const actorContext = assertReportActorContext(req, { disallowDentist: true });
     if (!actorContext.allowed) {
-      return res.status(actorContext.status).json({ message: actorContext.message });
+      return res.status(actorContext.status).json({
+        message: actorContext.message,
+        code: actorContext.code || 'REPORT_CONTEXT_FORBIDDEN',
+      });
     }
 
     const dateRange = resolveReportDateRange(req.query);
@@ -737,7 +755,10 @@ router.get("/", async (req, res) => {
     const actorScope = await getActorTenantScope(req);
     const tenantScopeAccess = assertResolvedTenantScope(actorScope);
     if (!tenantScopeAccess.allowed) {
-      return res.status(tenantScopeAccess.status).json({ message: tenantScopeAccess.message });
+      return res.status(tenantScopeAccess.status).json({
+        message: tenantScopeAccess.message,
+        code: tenantScopeAccess.code || 'REPORT_SCOPE_FORBIDDEN',
+      });
     }
     const supportsAppointmentClinic = await hasAppointmentClinicColumn();
     const supportsAppointmentBranch = await hasAppointmentBranchColumn();
@@ -1065,7 +1086,10 @@ router.get("/services/popularity", async (req, res) => {
       requireDentistContextForDentist: true,
     });
     if (!actorContext.allowed) {
-      return res.status(actorContext.status).json({ message: actorContext.message });
+      return res.status(actorContext.status).json({
+        message: actorContext.message,
+        code: actorContext.code || 'REPORT_CONTEXT_FORBIDDEN',
+      });
     }
 
     const actorRole = actorContext.role;
@@ -1073,7 +1097,10 @@ router.get("/services/popularity", async (req, res) => {
     const actorScope = await getActorTenantScope(req);
     const tenantScopeAccess = assertResolvedTenantScope(actorScope);
     if (!tenantScopeAccess.allowed) {
-      return res.status(tenantScopeAccess.status).json({ message: tenantScopeAccess.message });
+      return res.status(tenantScopeAccess.status).json({
+        message: tenantScopeAccess.message,
+        code: tenantScopeAccess.code || 'REPORT_SCOPE_FORBIDDEN',
+      });
     }
     const supportsAppointmentClinic = await hasAppointmentClinicColumn();
     const supportsAppointmentBranch = await hasAppointmentBranchColumn();
@@ -1087,6 +1114,7 @@ router.get("/services/popularity", async (req, res) => {
       if (effectiveDentistId && Number(effectiveDentistId) !== Number(actorDentist)) {
         return res.status(403).json({
           message: "Dentists can only access their own report data.",
+          code: 'REPORT_DENTIST_SELF_ONLY',
         });
       }
       effectiveDentistId = actorDentist;
@@ -1233,7 +1261,10 @@ router.get("/dentist/:id/summary", async (req, res) => {
   try {
     const access = await assertDentistReportAccess(req, dentistId);
     if (!access.allowed) {
-      return res.status(access.status || 403).json({ error: access.message });
+      return res.status(access.status || 403).json({
+        error: access.message,
+        code: access.code || 'REPORT_ACCESS_FORBIDDEN',
+      });
     }
 
     const actorScope = access.actorScope;
@@ -1434,7 +1465,10 @@ router.get("/dentist/:id/patients", async (req, res) => {
   try {
     const access = await assertDentistReportAccess(req, dentistId);
     if (!access.allowed) {
-      return res.status(access.status || 403).json({ error: access.message });
+      return res.status(access.status || 403).json({
+        error: access.message,
+        code: access.code || 'REPORT_ACCESS_FORBIDDEN',
+      });
     }
 
     const actorScope = access.actorScope;

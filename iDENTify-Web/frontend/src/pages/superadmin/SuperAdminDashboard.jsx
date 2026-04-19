@@ -65,6 +65,24 @@ function normalizeBoolean(value) {
     return normalized === '1' || normalized === 'true';
 }
 
+function resolveDashboardMessage(error, fallback = 'Failed to load dashboard data.') {
+    const code = String(error?.body?.code || '').trim().toUpperCase();
+
+    if (code === 'SUPERADMIN_NOT_APPROVED') {
+        return 'Your superadmin access is not approved yet. Complete your request and wait for approval.';
+    }
+
+    if (code === 'TENANT_ASSIGNMENT_REQUIRED') {
+        return 'Your account needs a clinic or branch assignment before reports can be loaded.';
+    }
+
+    if (error?.status === 403 && error?.message) {
+        return error.message;
+    }
+
+    return error?.message || fallback;
+}
+
 function SuperAdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -135,14 +153,14 @@ function SuperAdminDashboard() {
                     if (clinicSummaryResult.status === 'rejected') {
                         const summaryError = clinicSummaryResult.reason;
                         if (summaryError?.status === 403) {
-                            setClinicSummaryNotice('Clinic summary is showing fallback values. Global admin access is required for full summary endpoint data.');
+                            setClinicSummaryNotice(resolveDashboardMessage(summaryError, 'Clinic summary is showing fallback values because your current account cannot access summary endpoint data.'));
                         } else {
                             setClinicSummaryNotice('Clinic summary endpoint is currently unavailable. Showing fallback values from clinic list.');
                         }
                     }
                 }
             } catch (err) {
-                setError(err?.message || 'Failed to load dashboard data.');
+                setError(resolveDashboardMessage(err, 'Failed to load dashboard data.'));
             } finally {
                 setLoading(false);
             }

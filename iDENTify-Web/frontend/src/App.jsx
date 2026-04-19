@@ -57,7 +57,7 @@ function normalizeApprovalStatus(value) {
         return normalized;
     }
 
-    return 'approved';
+    return 'pending_requirements';
 }
 
 function App() {

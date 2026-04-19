@@ -91,7 +91,10 @@ async function enforceAdminAccess(req, res, {
   const userId = actorUserId(req);
 
   if (!role || !userId) {
-    res.status(403).json({ message: 'User context is missing. Please sign in again.' });
+    res.status(403).json({
+      message: 'User context is missing. Please sign in again.',
+      code: 'ADMIN_CONTEXT_MISSING',
+    });
     return { ok: false, role: null, userId: null, actor: null };
   }
 
@@ -101,7 +104,10 @@ async function enforceAdminAccess(req, res, {
   );
 
   if (!roleAllowed) {
-    res.status(403).json({ message: 'You are not allowed to perform this action.' });
+    res.status(403).json({
+      message: 'You are not allowed to perform this action.',
+      code: 'ADMIN_FORBIDDEN_ROLE',
+    });
     return { ok: false, role, userId, actor: null };
   }
 
@@ -115,12 +121,18 @@ async function enforceAdminAccess(req, res, {
   }
 
   if (!actor || actor.role !== role) {
-    res.status(403).json({ message: 'Actor context is invalid. Please sign in again.' });
+    res.status(403).json({
+      message: 'Actor context is invalid. Please sign in again.',
+      code: 'ADMIN_ACTOR_INVALID',
+    });
     return { ok: false, role, userId, actor: null };
   }
 
   if (actor.is_archived) {
-    res.status(403).json({ message: 'This account has been archived.' });
+    res.status(403).json({
+      message: 'This account has been archived.',
+      code: 'ADMIN_ACTOR_ARCHIVED',
+    });
     return { ok: false, role, userId, actor };
   }
 
