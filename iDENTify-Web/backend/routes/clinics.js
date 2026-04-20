@@ -103,14 +103,15 @@ async function getClinicColumnSupport() {
 }
 
 async function getBranchColumnSupport() {
-  const [status, suspended_at, deactivated_at, archived_at] = await Promise.all([
+  const [status, suspended_at, deactivated_at, archived_at, address] = await Promise.all([
     hasTableColumn('clinic_branches', 'status'),
     hasTableColumn('clinic_branches', 'suspended_at'),
     hasTableColumn('clinic_branches', 'deactivated_at'),
     hasTableColumn('clinic_branches', 'archived_at'),
+    hasTableColumn('clinic_branches', 'address'),
   ]);
 
-  return { status, suspended_at, deactivated_at, archived_at };
+  return { status, suspended_at, deactivated_at, archived_at, address };
 }
 
 function buildLifecycleUpdateClauses({ support, nextStatus, archiveMode = 'none' }) {
@@ -179,6 +180,7 @@ async function selectClinicById(clinicId, support) {
 
 async function selectBranchById(branchId, support) {
   const columns = ['id', 'clinic_id', 'name', 'code', 'is_active'];
+  if (support.address) columns.push('address');
   if (support.status) columns.push('status');
   if (support.suspended_at) columns.push('suspended_at');
   if (support.deactivated_at) columns.push('deactivated_at');
@@ -561,6 +563,7 @@ router.get('/:clinicId/branches', async (req, res) => {
     }
 
     const columns = ['id', 'clinic_id', 'name', 'code', 'is_active'];
+    if (branchSupport.address) columns.push('address');
     if (branchSupport.status) columns.push('status');
     if (branchSupport.suspended_at) columns.push('suspended_at');
     if (branchSupport.deactivated_at) columns.push('deactivated_at');
@@ -588,6 +591,7 @@ router.post('/:clinicId/branches', async (req, res) => {
   const clinicId = toOptionalPositiveInt(req.params.clinicId);
   const name = cleanText(req.body?.name);
   const code = cleanText(req.body?.code, 64);
+  const address = cleanText(req.body?.address, 500);
 
   if (!clinicId) {
     return res.status(400).json({ message: 'Invalid clinic id.' });
@@ -610,11 +614,23 @@ router.post('/:clinicId/branches', async (req, res) => {
     const branchSupport = await getBranchColumnSupport();
 
     let result;
-    if (branchSupport.status) {
+    if (branchSupport.status && branchSupport.address) {
+      [result] = await db.query(
+        `INSERT INTO clinic_branches (clinic_id, name, code, address, is_active, status)
+         VALUES (?, ?, ?, ?, 1, 'Active')`,
+        [clinicId, name, code || null, address || null]
+      );
+    } else if (branchSupport.status) {
       [result] = await db.query(
         `INSERT INTO clinic_branches (clinic_id, name, code, is_active, status)
          VALUES (?, ?, ?, 1, 'Active')`,
         [clinicId, name, code || null]
+      );
+    } else if (branchSupport.address) {
+      [result] = await db.query(
+        `INSERT INTO clinic_branches (clinic_id, name, code, address, is_active)
+         VALUES (?, ?, ?, ?, 1)`,
+        [clinicId, name, code || null, address || null]
       );
     } else {
       [result] = await db.query(

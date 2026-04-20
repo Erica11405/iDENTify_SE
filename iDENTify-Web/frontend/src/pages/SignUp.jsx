@@ -6,6 +6,15 @@ import useAppStore from "../store/useAppStore";
 import toothLogo from "../assets/toothlogo.svg";
 import "../styles/pages/Signup.css"; 
 
+function resolveSignupErrorMessage(error, fallback) {
+    const code = String(error?.body?.code || '').trim().toUpperCase();
+    if (code === 'SUPERADMIN_WORKFLOW_NOT_CONFIGURED') {
+        return 'Superadmin approval workflow is not configured yet. Please run the latest backend migrations and try again.';
+    }
+
+    return error?.message || fallback;
+}
+
 function shouldRequirePasswordChange(user, responseFlag) {
     if (responseFlag === true) return true;
 
@@ -65,8 +74,9 @@ function SignUp() {
 			toast.success("Verification code sent to your email!");
             setIsOtpStep(true);
 		} catch (error) {
-			toast.error(error.message || "Failed to send verification code.");
-            setErrors({ form: error.message });
+            const message = resolveSignupErrorMessage(error, "Failed to send verification code.");
+            toast.error(message);
+            setErrors({ form: message });
 		}
 	};
 
@@ -106,8 +116,9 @@ function SignUp() {
             toast.success("Account created. Submit your requirements for approval.");
 			navigate("/superadmin/request");
 		} catch (error) {
-			toast.error(error.message || "Signup failed.");
-            setErrors({ form: error.message });
+            const message = resolveSignupErrorMessage(error, "Signup failed.");
+            toast.error(message);
+            setErrors({ form: message });
 		}
     }
 

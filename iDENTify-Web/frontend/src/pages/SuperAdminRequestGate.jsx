@@ -5,6 +5,15 @@ import api from '../api/apiClient';
 import useAppStore from '../store/useAppStore';
 import '../styles/pages/SuperAdminRequestGate.css';
 
+function resolveWorkflowErrorMessage(error, fallback) {
+    const code = String(error?.body?.code || '').trim().toUpperCase();
+    if (code === 'SUPERADMIN_WORKFLOW_NOT_CONFIGURED') {
+        return 'Superadmin approval workflow is not configured yet. Please run the latest backend migrations and refresh this page.';
+    }
+
+    return error?.message || fallback;
+}
+
 function normalizeApprovalStatus(value) {
     const normalized = String(value || '').trim().toLowerCase();
     if (normalized === 'pendingrequirements') return 'pending_requirements';
@@ -86,9 +95,11 @@ function SuperAdminRequestGate() {
     const [request, setRequest] = useState(null);
     const [approvalStatus, setApprovalStatus] = useState(normalizeApprovalStatus(user?.approval_status));
     const [form, setForm] = useState(emptyForm);
+    const [workflowError, setWorkflowError] = useState('');
 
     const loadRequest = useCallback(async () => {
         setLoading(true);
+        setWorkflowError('');
         try {
             const result = await api.getMySuperadminRequest();
             const normalizedStatus = normalizeApprovalStatus(result?.user?.approval_status || user?.approval_status);
@@ -105,7 +116,9 @@ function SuperAdminRequestGate() {
                 });
             }
         } catch (error) {
-            toast.error(error.message || 'Failed to load request status.');
+            const message = resolveWorkflowErrorMessage(error, 'Failed to load request status.');
+            setWorkflowError(message);
+            toast.error(message);
         } finally {
             setLoading(false);
         }
@@ -156,7 +169,9 @@ function SuperAdminRequestGate() {
             toast.success('Requirements submitted. Please wait for global admin response.');
             await loadRequest();
         } catch (error) {
-            toast.error(error.message || 'Failed to submit requirements.');
+            const message = resolveWorkflowErrorMessage(error, 'Failed to submit requirements.');
+            setWorkflowError(message);
+            toast.error(message);
         } finally {
             setSaving(false);
         }
@@ -204,6 +219,17 @@ function SuperAdminRequestGate() {
                     <h2>Super Admin Access Request</h2>
                     <p>Submit your compliance requirements for global admin review.</p>
                 </div>
+
+                {workflowError ? (
+                    <div className="request-state declined">
+                        <h3>Workflow Not Ready</h3>
+                        <p>{workflowError}</p>
+                        <div className="request-gate-actions">
+                            <button type="button" className="request-gate-secondary" onClick={loadRequest}>Refresh Status</button>
+                            <button type="button" className="request-gate-secondary" onClick={handleLogout}>Log Out</button>
+                        </div>
+                    </div>
+                ) : null}
 
                 {waitingReview ? (
                     <div className="request-state waiting">

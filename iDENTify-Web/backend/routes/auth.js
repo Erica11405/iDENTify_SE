@@ -19,6 +19,7 @@ let signupOtpTableReady = false;
 let signupOtpTableUnavailable = false;
 let hasPasswordChangeRequiredColumnCache = null;
 let hasApprovalStatusColumnCache = null;
+let hasSuperadminRequestsTableCache = null;
 let hasLoginAuditEventsTableCache = null;
 
 function normalizeRole(role) {
@@ -103,6 +104,30 @@ async function hasApprovalStatusColumn() {
     }
 
     return hasApprovalStatusColumnCache;
+}
+
+async function hasSuperadminRequestsTable() {
+    if (hasSuperadminRequestsTableCache !== null) {
+        return hasSuperadminRequestsTableCache;
+    }
+
+    try {
+        const [rows] = await db.query("SHOW TABLES LIKE 'superadmin_access_requests'");
+        hasSuperadminRequestsTableCache = rows.length > 0;
+    } catch (_err) {
+        hasSuperadminRequestsTableCache = false;
+    }
+
+    return hasSuperadminRequestsTableCache;
+}
+
+async function isSuperadminWorkflowReady() {
+    const [supportsApprovalStatus, hasRequestsTable] = await Promise.all([
+        hasApprovalStatusColumn(),
+        hasSuperadminRequestsTable(),
+    ]);
+
+    return supportsApprovalStatus && hasRequestsTable;
 }
 
 async function hasLoginAuditEventsTable() {
@@ -322,6 +347,14 @@ router.post('/signup/superadmin/send-otp', async (req, res) => {
     }
 
     try {
+        const workflowReady = await isSuperadminWorkflowReady();
+        if (!workflowReady) {
+            return res.status(503).json({
+                error: 'Superadmin approval workflow is not configured yet. Run latest migration first.',
+                code: 'SUPERADMIN_WORKFLOW_NOT_CONFIGURED',
+            });
+        }
+
         const isAvailable = await ensureEmailNotRegistered(email);
         if (!isAvailable) {
             return res.status(400).json({ error: 'Email is already registered.' });
@@ -387,40 +420,38 @@ router.post('/signup/superadmin', async (req, res) => {
 
         const fullName = composeFullName(firstName, middleName, surname);
         const hashedPassword = await bcrypt.hash(password, 10);
-        const supportsApprovalStatus = await hasApprovalStatusColumn();
-
-        if (supportsApprovalStatus) {
-            await db.query(
-                `INSERT INTO users (
-                    email,
-                    password_hash,
-                    full_name,
-                    last_name,
-                    role,
-                    is_verified,
-                    is_archived,
-                    approval_status,
-                    approved_at,
-                    approved_by_user_id,
-                    declined_at,
-                    decline_reason
-                )
-                VALUES (?, ?, ?, ?, 'superadmin', 1, 0, 'pending_requirements', NULL, NULL, NULL, NULL)`,
-                [email, hashedPassword, fullName, String(surname).trim()]
-            );
-        } else {
-            await db.query(
-                `INSERT INTO users (email, password_hash, full_name, last_name, role, is_verified, is_archived)
-                 VALUES (?, ?, ?, ?, 'superadmin', 1, 0)`,
-                [email, hashedPassword, fullName, String(surname).trim()]
-            );
+        const workflowReady = await isSuperadminWorkflowReady();
+        if (!workflowReady) {
+            return res.status(503).json({
+                error: 'Superadmin approval workflow is not configured yet. Run latest migration first.',
+                code: 'SUPERADMIN_WORKFLOW_NOT_CONFIGURED',
+            });
         }
+
+        await db.query(
+            `INSERT INTO users (
+                email,
+                password_hash,
+                full_name,
+                last_name,
+                role,
+                is_verified,
+                is_archived,
+                approval_status,
+                approved_at,
+                approved_by_user_id,
+                declined_at,
+                decline_reason
+            )
+            VALUES (?, ?, ?, ?, 'superadmin', 1, 0, 'pending_requirements', NULL, NULL, NULL, NULL)`,
+            [email, hashedPassword, fullName, String(surname).trim()]
+        );
 
         await clearSignupOtp('superadmin', email);
 
         res.status(201).json({
             message: 'Super admin account created. Please submit your requirements for approval.',
-            approval_status: supportsApprovalStatus ? 'pending_requirements' : 'approved',
+            approval_status: 'pending_requirements',
         });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -577,6 +608,23 @@ router.post('/login', async (req, res) => {
         }
 
         if (role === 'superadmin' || role === 'globaladmin') {
+            if (role === 'superadmin') {
+                const workflowReady = await isSuperadminWorkflowReady();
+                if (!workflowReady) {
+                    await writeLoginAuditEvent({
+                        req,
+                        userRecord,
+                        email,
+                        outcome: 'blocked',
+                        failureReason: 'superadmin_workflow_not_configured',
+                    });
+                    return res.status(503).json({
+                        error: 'Superadmin approval workflow is not configured yet. Run latest migration first.',
+                        code: 'SUPERADMIN_WORKFLOW_NOT_CONFIGURED',
+                    });
+                }
+            }
+
             const approvalStatus = normalizeApprovalStatus(userRecord.approval_status);
             await writeLoginAuditEvent({
                 req,

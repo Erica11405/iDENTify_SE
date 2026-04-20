@@ -191,14 +191,16 @@ export const getAdminUsers = async ({ role = 'all', archived = 'false' } = {}) =
     if (role) params.set('role', role);
     if (archived) params.set('archived', archived);
 
-    const res = await fetch(`${API_BASE}/admin/users?${params.toString()}`);
+    const res = await fetch(`${API_BASE}/admin/users?${params.toString()}`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
 export const archiveAdminUser = async (id) => {
     const res = await fetch(`${API_BASE}/admin/users/${id}/archive`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
     });
     return handleResponse(res);
 };
@@ -206,7 +208,7 @@ export const archiveAdminUser = async (id) => {
 export const restoreAdminUser = async (id) => {
     const res = await fetch(`${API_BASE}/admin/users/${id}/restore`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
     });
     return handleResponse(res);
 };

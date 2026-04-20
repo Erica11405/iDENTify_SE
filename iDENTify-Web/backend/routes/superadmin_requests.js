@@ -13,6 +13,8 @@ const { sendEmail } = require('../utils/mailer');
 
 let hasRequestsTableCache = null;
 let usersApprovalColumnsSupportCache = null;
+const WORKFLOW_NOT_CONFIGURED_CODE = 'SUPERADMIN_WORKFLOW_NOT_CONFIGURED';
+const WORKFLOW_NOT_CONFIGURED_MESSAGE = 'Superadmin approval workflow is not configured yet. Run latest migration first.';
 
 function sanitizeText(value, max = 255) {
   const text = String(value || '').trim();
@@ -44,6 +46,22 @@ function normalizeRequestStatus(value) {
     return normalized;
   }
   return 'pending_review';
+}
+
+function sendWorkflowNotConfigured(res) {
+  return res.status(503).json({
+    message: WORKFLOW_NOT_CONFIGURED_MESSAGE,
+    code: WORKFLOW_NOT_CONFIGURED_CODE,
+  });
+}
+
+function isWorkflowNotConfiguredError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    message.includes('approval workflow is not configured')
+    || message.includes('approval status column is not available')
+    || message.includes('run latest migration first')
+  );
 }
 
 async function hasRequestsTable() {
@@ -339,9 +357,7 @@ router.get('/me', async (req, res) => {
   const hasTable = await hasRequestsTable();
 
   if (!hasApprovalColumn || !hasTable) {
-    return res.status(500).json({
-      message: 'Approval workflow is not configured on this environment yet. Run latest migration first.',
-    });
+    return sendWorkflowNotConfigured(res);
   }
 
   try {
@@ -383,9 +399,7 @@ router.post('/me/submit', async (req, res) => {
   const hasTable = await hasRequestsTable();
 
   if (!hasApprovalColumn || !hasTable) {
-    return res.status(500).json({
-      message: 'Approval workflow is not configured on this environment yet. Run latest migration first.',
-    });
+    return sendWorkflowNotConfigured(res);
   }
 
   const { payload, errors } = validateSubmissionPayload(req.body || {});
@@ -551,6 +565,10 @@ router.post('/me/submit', async (req, res) => {
       approval_status: 'pending_review',
     });
   } catch (error) {
+    if (isWorkflowNotConfiguredError(error)) {
+      return sendWorkflowNotConfigured(res);
+    }
+
     if (connection) {
       try {
         await connection.rollback();
@@ -577,7 +595,7 @@ router.get('/review', async (req, res) => {
 
   const hasTable = await hasRequestsTable();
   if (!hasTable) {
-    return res.status(500).json({ message: 'Approval workflow is not configured yet. Run latest migration first.' });
+    return sendWorkflowNotConfigured(res);
   }
 
   const statusFilter = String(req.query?.status || 'pending_review').trim().toLowerCase();
@@ -642,7 +660,7 @@ router.get('/review/:requestId', async (req, res) => {
 
   const hasTable = await hasRequestsTable();
   if (!hasTable) {
-    return res.status(500).json({ message: 'Approval workflow is not configured yet. Run latest migration first.' });
+    return sendWorkflowNotConfigured(res);
   }
 
   const requestId = toPositiveInt(req.params.requestId);
@@ -684,7 +702,7 @@ router.patch('/review/:requestId/approve', async (req, res) => {
 
   const hasTable = await hasRequestsTable();
   if (!hasTable) {
-    return res.status(500).json({ message: 'Approval workflow is not configured yet. Run latest migration first.' });
+    return sendWorkflowNotConfigured(res);
   }
 
   const requestId = toPositiveInt(req.params.requestId);
@@ -770,6 +788,10 @@ router.patch('/review/:requestId/approve', async (req, res) => {
       approval_status: 'approved',
     });
   } catch (error) {
+    if (isWorkflowNotConfiguredError(error)) {
+      return sendWorkflowNotConfigured(res);
+    }
+
     if (connection) {
       try {
         await connection.rollback();
@@ -796,7 +818,7 @@ router.patch('/review/:requestId/decline', async (req, res) => {
 
   const hasTable = await hasRequestsTable();
   if (!hasTable) {
-    return res.status(500).json({ message: 'Approval workflow is not configured yet. Run latest migration first.' });
+    return sendWorkflowNotConfigured(res);
   }
 
   const requestId = toPositiveInt(req.params.requestId);
@@ -885,6 +907,10 @@ router.patch('/review/:requestId/decline', async (req, res) => {
       approval_status: 'declined',
     });
   } catch (error) {
+    if (isWorkflowNotConfiguredError(error)) {
+      return sendWorkflowNotConfigured(res);
+    }
+
     if (connection) {
       try {
         await connection.rollback();

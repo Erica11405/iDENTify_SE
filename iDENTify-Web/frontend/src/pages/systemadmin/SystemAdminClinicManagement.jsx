@@ -36,7 +36,7 @@ function SystemAdminClinicManagement() {
 	const [branchStatusDrafts, setBranchStatusDrafts] = useState({});
 
 	const [newClinic, setNewClinic] = useState({ name: '', code: '' });
-	const [newBranch, setNewBranch] = useState({ clinicId: '', name: '', code: '' });
+	const [newBranch, setNewBranch] = useState({ clinicId: '', name: '', code: '', address: '' });
 
 	const loadClinics = useCallback(async () => {
 		const rows = await api.getClinics({ includeInactive: true });
@@ -161,6 +161,7 @@ function SystemAdminClinicManagement() {
 		const clinicId = String(newBranch.clinicId || '').trim();
 		const name = String(newBranch.name || '').trim();
 		const code = String(newBranch.code || '').trim();
+		const address = String(newBranch.address || '').trim();
 
 		if (!clinicId) {
 			toast.error('Select a clinic before adding a branch.');
@@ -173,9 +174,13 @@ function SystemAdminClinicManagement() {
 
 		try {
 			setBusy('create-branch');
-			await api.createClinicBranch(clinicId, { name, code: code || undefined });
+			await api.createClinicBranch(clinicId, {
+				name,
+				code: code || undefined,
+				address: address || undefined,
+			});
 			toast.success('Branch created successfully.');
-			setNewBranch((prev) => ({ ...prev, name: '', code: '' }));
+			setNewBranch((prev) => ({ ...prev, name: '', code: '', address: '' }));
 			await Promise.all([loadClinics(), loadBranches(clinicId)]);
 			setSelectedClinicId(clinicId);
 		} catch (error) {
@@ -378,6 +383,16 @@ function SystemAdminClinicManagement() {
 											placeholder="Code"
 										/>
 									</div>
+									<div className="systemadmin-field">
+										<label htmlFor="new-branch-address">Branch Address (Optional)</label>
+										<input
+											id="new-branch-address"
+											type="text"
+											value={newBranch.address}
+											onChange={(event) => setNewBranch((prev) => ({ ...prev, address: event.target.value }))}
+											placeholder="Address"
+										/>
+									</div>
 								</div>
 								<button type="submit" disabled={busyAction === 'create-branch'}>
 									{busyAction === 'create-branch' ? 'Creating...' : 'Create Branch'}
@@ -499,6 +514,7 @@ function SystemAdminClinicManagement() {
 										<tr>
 											<th>Branch</th>
 											<th>Code</th>
+											<th>Address</th>
 											<th>Status</th>
 											<th>Archived At</th>
 											<th>Actions</th>
@@ -514,6 +530,7 @@ function SystemAdminClinicManagement() {
 												<tr key={branch.id}>
 													<td>{branch.name}</td>
 													<td>{branch.code || '-'}</td>
+													<td>{branch.address || '-'}</td>
 													<td>
 														<select
 															value={draftStatus}
