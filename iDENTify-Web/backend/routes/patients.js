@@ -12,6 +12,20 @@ const safeJsonParse = (data, fallback) => {
 // Helper: Convert undefined to null for MySQL
 const safeVal = (val) => val === undefined ? null : val;
 
+// Keep age as a birthdate-derived display value rather than persisted vitals metadata.
+const sanitizeVitalsPayload = (vitals) => {
+  if (!vitals || typeof vitals !== "object" || Array.isArray(vitals)) {
+    return {};
+  }
+
+  const normalized = { ...vitals };
+  if (Object.prototype.hasOwnProperty.call(normalized, "age")) {
+    delete normalized.age;
+  }
+
+  return normalized;
+};
+
 // GET ALL PATIENTS (FIXED: Now properly listens for the 'email' query to fetch the correct user)
 router.get("/", async (req, res) => {
   try {
@@ -126,7 +140,7 @@ router.post("/", async (req, res) => {
     await db.query(
       `INSERT INTO patient_annual_records (patient_id, record_year, dental_history, vitals, xrays, status)
        VALUES (?, 1, ?, ?, ?, 'Active')`,
-      [newId, safeVal(dental_history) || "", JSON.stringify(vitals || {}), JSON.stringify(xrays || [])]
+      [newId, safeVal(dental_history) || "", JSON.stringify(sanitizeVitalsPayload(vitals)), JSON.stringify(xrays || [])]
     );
 
     res.status(201).json({ id: newId, message: "Patient and initial record created" });
@@ -170,7 +184,10 @@ router.put("/:id", async (req, res) => {
         let updateQuery = "UPDATE patient_annual_records SET ";
         let updateParams = [];
 
-        if (vitals !== undefined) { updateQuery += "vitals=?, "; updateParams.push(JSON.stringify(vitals || {})); }
+        if (vitals !== undefined) {
+          updateQuery += "vitals=?, ";
+          updateParams.push(JSON.stringify(sanitizeVitalsPayload(vitals)));
+        }
         if (dental_history !== undefined) { updateQuery += "dental_history=?, "; updateParams.push(dental_history || ""); }
         if (xrays !== undefined) { updateQuery += "xrays=?, "; updateParams.push(JSON.stringify(xrays || [])); }
 

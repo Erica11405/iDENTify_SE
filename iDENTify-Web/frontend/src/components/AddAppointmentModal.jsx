@@ -35,6 +35,22 @@ function getLocalToday() {
   return `${year}-${month}-${day}`;
 }
 
+function computeAgeFromBirthdate(value) {
+  if (!value) return "";
+
+  const dob = new Date(value);
+  if (Number.isNaN(dob.getTime())) return "";
+
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+
+  return age >= 0 ? String(age) : "";
+}
+
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // --- COMPONENT ---
@@ -112,14 +128,10 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
 
   // Dynamic Age Calculation
   useEffect(() => {
-    if (form.birthdate) {
-      const today = new Date();
-      const dob = new Date(form.birthdate);
-      let age = today.getFullYear() - dob.getFullYear();
-      const m = today.getMonth() - dob.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-      setForm(prev => ({ ...prev, age: age >= 0 ? age.toString() : "0" }));
-    }
+    setForm((prev) => ({
+      ...prev,
+      age: computeAgeFromBirthdate(form.birthdate),
+    }));
   }, [form.birthdate]);
 
   // 3. FETCH APPOINTMENTS WHEN DENTIST/DATE CHANGES
@@ -274,6 +286,8 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
   };
 
   const handleSelectOldPatient = (p) => {
+    const normalizedBirthdate = p.birthdate ? p.birthdate.split('T')[0] : "";
+
     setForm(prev => ({
       ...prev,
       patient_id: p.id,
@@ -283,8 +297,8 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
       last_name: p.last_name || "",
       contact_number: p.contact_number || "", 
       sex: p.gender || p.sex || "",           
-      birthdate: p.birthdate ? p.birthdate.split('T')[0] : "",
-      age: (p.vitals?.age || p.age || "").toString(), 
+      birthdate: normalizedBirthdate,
+      age: computeAgeFromBirthdate(normalizedBirthdate),
       notes: prev.notes || ""
     }));
     setSearchResults([]);

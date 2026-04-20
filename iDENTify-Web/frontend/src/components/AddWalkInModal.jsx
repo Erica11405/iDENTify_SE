@@ -4,6 +4,22 @@ import useAppStore from '../store/useAppStore';
 import '../styles/components/AddWalkInModal.css';
 import api from "../api/apiClient"; 
 
+function computeAgeFromBirthdate(value) {
+  if (!value) return "";
+
+  const dob = new Date(value);
+  if (Number.isNaN(dob.getTime())) return "";
+
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+
+  return age >= 0 ? String(age) : "";
+}
+
 const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
   const dentists = useAppStore((state) => state.dentists); 
 
@@ -51,18 +67,7 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
 
   // AUTO-CALCULATE AGE LOGIC
   useEffect(() => {
-    if (birthday) {
-      const dob = new Date(birthday); 
-      const today = new Date(); 
-      let age = today.getFullYear() - dob.getFullYear(); 
-      const m = today.getMonth() - dob.getMonth(); 
-      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-        age--; 
-      }
-      setCalculatedAge(age >= 0 ? age : 0); 
-    } else {
-      setCalculatedAge(''); 
-    }
+    setCalculatedAge(computeAgeFromBirthdate(birthday));
   }, [birthday]);
 
   // SEARCH LOGIC
@@ -82,16 +87,18 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
   };
 
   const handleSelectOldPatient = (patient) => {
+    const normalizedBirthdate = patient.birthdate ? patient.birthdate.split('T')[0] : "";
+
     setSelectedPatientId(patient.id); // ADDED: Save the ID of the selected patient
     
     setFirstName(patient.first_name || patient.full_name || ""); 
     setMiddleName(patient.middle_name || ""); 
     setLastName(patient.last_name || ""); 
 
-    setBirthday(patient.birthdate ? patient.birthdate.split('T')[0] : ""); 
+    setBirthday(normalizedBirthdate); 
     setSex(patient.gender || patient.sex || ""); 
     setContact(patient.contact_number || patient.contact || ""); 
-    setCalculatedAge((patient.vitals?.age || patient.age || "").toString()); 
+    setCalculatedAge(computeAgeFromBirthdate(normalizedBirthdate)); 
 
     toast.success("Patient selected!"); 
     setSearchResults([]); 
@@ -145,7 +152,6 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
       last_name: lastName,
       full_name: fullNameCombined,
       birthdate: birthday,
-      age: calculatedAge,
       sex,
       contact,
       notes: reasonString,

@@ -51,11 +51,14 @@ function Queue() {
       // MODIFIED: Only create a new database record if it is explicitly a New Patient
       if (patientData.isNewPatient || !patientId) {
           const patientPayload = {
-            full_name: patientData.full_name,
+            first_name: patientData.first_name || "",
+            middle_name: patientData.middle_name || "",
+            last_name: patientData.last_name || "",
+            birthdate: patientData.birthdate || null,
             gender: patientData.sex,
             contact_number: patientData.contact,
+            address: "Update profile",
             medicalAlerts: [],
-            vitals: { age: patientData.age }
           };
 
           const createdPatient = await api.createPatient(patientPayload);
@@ -85,7 +88,7 @@ function Queue() {
         time_added: mysqlDateTime,
       });
 
-      toast.success(patientData.isNewPatient ? "New walk-in patient added." : "Existing patient added to queue.");
+      toast.success(patientData.isNewPatient ? "New walk-in patient added." : "Existing patient added to Walk In list.");
       setIsModalOpen(false);
       await api.loadQueue(); 
 
@@ -214,7 +217,7 @@ function Queue() {
   return (
     <div className="queue-page">
       <div className="queue-header">
-        <h2 className="queue-title">Queue List</h2>
+        <h2 className="queue-title">Walk In List</h2>
         <div className="queue-actions">
           <button className="add-walk-in-btn" onClick={() => setIsModalOpen(true)}>
             Add Walk-In Patient
@@ -232,7 +235,7 @@ function Queue() {
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         onConfirm={handleConfirmDelete}
-        message={`Are you sure you want to remove ${itemToDelete?.name || 'this patient'} from the queue?`}
+        message={`Are you sure you want to remove ${itemToDelete?.name || 'this patient'} from the Walk In list?`}
       />
 
       <div className="queue-table-container">
@@ -252,7 +255,7 @@ function Queue() {
           </thead>
           <tbody>
             {queueWithDetails.length === 0 ? (
-              <tr><td colSpan="9" style={{ textAlign: 'center', padding: '2rem' }}>No patients in active queue.</td></tr>
+              <tr><td colSpan="9" style={{ textAlign: 'center', padding: '2rem' }}>No patients in the active Walk In list.</td></tr>
             ) : (
               queueWithDetails.map((q) => (
                 <tr

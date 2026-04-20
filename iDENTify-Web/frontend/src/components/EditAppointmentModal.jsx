@@ -36,6 +36,22 @@ function getLocalToday() {
   return `${year}-${month}-${day}`;
 }
 
+function computeAgeFromBirthdate(value) {
+  if (!value) return "";
+
+  const dob = new Date(value);
+  if (Number.isNaN(dob.getTime())) return "";
+
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age.toString() : "";
+}
+
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function EditAppointmentModal({ appointment, initialContact, initialAge, initialSex, onSave, onCancel, dentists = [] }) {
@@ -146,14 +162,10 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
 
   // --- DYNAMIC AGE ---
   useEffect(() => {
-    if (formData.birthdate) {
-      const today = new Date();
-      const dob = new Date(formData.birthdate);
-      let age = today.getFullYear() - dob.getFullYear();
-      const m = today.getMonth() - dob.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
-      setFormData(prev => ({ ...prev, age: age >= 0 ? age.toString() : "0" }));
-    }
+    setFormData((prev) => ({
+      ...prev,
+      age: computeAgeFromBirthdate(formData.birthdate),
+    }));
   }, [formData.birthdate]);
 
   // --- FETCH SCHEDULE DATA ---

@@ -71,6 +71,28 @@ function Patients() {
     return list;
   }, [patients, allSearch]);
 
+  const getDisplayAge = (patient) => {
+    const birthdate = patient?.birthdate || patient?.birthday;
+    if (birthdate) {
+      const dob = new Date(birthdate);
+      if (!Number.isNaN(dob.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - dob.getFullYear();
+        const monthDiff = today.getMonth() - dob.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+          age -= 1;
+        }
+        return age >= 0 ? age : "--";
+      }
+    }
+
+    if (patient?.age !== undefined && patient?.age !== null && patient.age !== "") {
+      return patient.age;
+    }
+
+    return "--";
+  };
+
   // --- RENDER TABLE COMPONENT ---
   const PatientTable = ({ data, emptyMessage }) => (
     <div className="patients-table-container">
@@ -91,7 +113,7 @@ function Patients() {
                 <td>
                   <span style={{ fontWeight: 500, color: "#333" }}>{p.name}</span>
                 </td>
-                <td>{p.age || "--"}</td>
+                <td>{getDisplayAge(p)}</td>
                 <td style={{ color: "#666" }}>{getLastProcedure(p.id)}</td>
                 <td style={{ color: "#666", fontSize: '0.9rem' }}>
                   {(() => {

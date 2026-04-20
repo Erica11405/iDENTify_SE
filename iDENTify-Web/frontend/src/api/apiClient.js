@@ -346,6 +346,24 @@ export const updateAppointment = async (id, payload) => {
     return handleResponse(res);
 };
 
+export const approveAppointment = async (id, payload = {}) => {
+    const res = await fetch(`${API_BASE}/appointments/${id}/approve`, {
+        method: 'PATCH',
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const declineAppointment = async (id, payload) => {
+    const res = await fetch(`${API_BASE}/appointments/${id}/decline`, {
+        method: 'PATCH',
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
 /* --- Payments Functions --- */
 export const getPayments = async ({ startDate, endDate, search } = {}) => {
     const params = new URLSearchParams();
@@ -577,6 +595,56 @@ export const createClinicBranch = async (clinicId, payload) => {
     return handleResponse(res);
 };
 
+export const updateClinicStatus = async (clinicId, payload) => {
+    const res = await fetch(`${API_BASE}/clinics/${clinicId}/status`, {
+        method: 'PATCH',
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const archiveClinic = async (clinicId) => {
+    const res = await fetch(`${API_BASE}/clinics/${clinicId}/archive`, {
+        method: 'PATCH',
+        headers: jsonHeaders(),
+    });
+    return handleResponse(res);
+};
+
+export const restoreClinic = async (clinicId) => {
+    const res = await fetch(`${API_BASE}/clinics/${clinicId}/restore`, {
+        method: 'PATCH',
+        headers: jsonHeaders(),
+    });
+    return handleResponse(res);
+};
+
+export const updateClinicBranchStatus = async (clinicId, branchId, payload) => {
+    const res = await fetch(`${API_BASE}/clinics/${clinicId}/branches/${branchId}/status`, {
+        method: 'PATCH',
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const archiveClinicBranch = async (clinicId, branchId) => {
+    const res = await fetch(`${API_BASE}/clinics/${clinicId}/branches/${branchId}/archive`, {
+        method: 'PATCH',
+        headers: jsonHeaders(),
+    });
+    return handleResponse(res);
+};
+
+export const restoreClinicBranch = async (clinicId, branchId) => {
+    const res = await fetch(`${API_BASE}/clinics/${clinicId}/branches/${branchId}/restore`, {
+        method: 'PATCH',
+        headers: jsonHeaders(),
+    });
+    return handleResponse(res);
+};
+
 export const getClinicDiscovery = async () => {
     const res = await fetch(`${API_BASE}/clinics/discover`);
     return handleResponse(res);
@@ -682,13 +750,16 @@ const api = {
     getDentists, createDentist, updateDentist, deleteDentist,
     getPatients, getPatientById, createPatient, updatePatient, searchPatients,
     getQueue, addQueueItem, updateQueueItem, deleteQueueItem,
-    getAppointments, createAppointment, checkAppointmentLimit, updateAppointment,
+    getAppointments, createAppointment, checkAppointmentLimit, updateAppointment, approveAppointment, declineAppointment,
     getPayments, getPaymentById, getPaymentByQueueId, getUnpaidPaymentMatches, createPaymentRecord, updatePaymentRecord, addPaymentInstallment,
     getReports, getServicePopularityReport, getDentistPatientsForReport, getDentistReportSummary, get,
     getServices, createService, updateService, deleteService,
     getClinicMedications, createClinicMedication, updateClinicMedication, deleteClinicMedication,
     getDentistTypes, createDentistType, updateDentistType, deleteDentistType,
-    getClinics, getClinicSummary, createClinic, getClinicBranches, createClinicBranch, getClinicDiscovery,
+    getClinics, getClinicSummary, createClinic, getClinicBranches, createClinicBranch,
+    updateClinicStatus, archiveClinic, restoreClinic,
+    updateClinicBranchStatus, archiveClinicBranch, restoreClinicBranch,
+    getClinicDiscovery,
     getAnnualRecord, saveAnnualRecord, getToothConditions, upsertToothCondition,
     getTreatmentTimeline, addTreatmentTimelineEntry, getMedications, addMedication, deleteMedication
 };

@@ -33,7 +33,12 @@ import SuperAdminUsers from './pages/superadmin/SuperAdminUsers';
 import SuperAdminReports from './pages/superadmin/SuperAdminReports';
 import SuperAdminSettings from './pages/superadmin/SuperAdminSettings';
 import SuperAdminArchive from './pages/superadmin/SuperAdminArchive';
-import SuperAdminApprovals from './pages/superadmin/SuperAdminApprovals';
+
+// --- System Admin (Global Admin) Pages ---
+import SystemAdminDashboard from './pages/systemadmin/SystemAdminDashboard';
+import SystemAdminApprovals from './pages/systemadmin/SystemAdminApprovals';
+import SystemAdminClinicManagement from './pages/systemadmin/SystemAdminClinicManagement';
+import SystemAdminArchive from './pages/systemadmin/SystemAdminArchive';
 
 function requiresPasswordChange(user) {
     if (!user || typeof user !== 'object') {
@@ -117,18 +122,28 @@ function App() {
                     </>
                 )}
 
-                {(user.role === 'superadmin' || user.role === 'globaladmin') && (
+                {user.role === 'globaladmin' && (
+                    <>
+                        <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+                        <Route path="/admin/dashboard" element={<SystemAdminDashboard />} />
+                        <Route path="/admin/approvals" element={<SystemAdminApprovals />} />
+                        <Route path="/admin/settings" element={<SystemAdminClinicManagement />} />
+                        <Route path="/admin/archive" element={<SystemAdminArchive />} />
+                        <Route path="/admin/users" element={<Navigate to="/admin/dashboard" replace />} />
+                        <Route path="/admin/reports" element={<Navigate to="/admin/dashboard" replace />} />
+                        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+                    </>
+                )}
+
+                {user.role === 'superadmin' && (
                     <>
                         <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
                         <Route path="/admin/dashboard" element={<SuperAdminDashboard />} />
                         <Route path="/admin/users" element={<SuperAdminUsers />} />
-                        <Route
-                            path="/admin/approvals"
-                            element={user.role === 'globaladmin' ? <SuperAdminApprovals /> : <Navigate to="/admin/dashboard" replace />}
-                        />
                         <Route path="/admin/reports" element={<SuperAdminReports />} />
                         <Route path="/admin/settings" element={<SuperAdminSettings />} />
                         <Route path="/admin/archive" element={<SuperAdminArchive />} />
+                        <Route path="/admin/approvals" element={<Navigate to="/admin/dashboard" replace />} />
                         <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
                     </>
                 )}
@@ -141,7 +156,8 @@ function App() {
                         <Route path="/patients/new" element={<PatientForm />} />
                         <Route path="/patients/:id" element={<PatientForm />} />
                         <Route path="/appointments" element={<Appointments />} />
-                        <Route path="/queue" element={<Queue />} />
+                        <Route path="/walk-in" element={<Queue />} />
+                        <Route path="/queue" element={<Navigate to="/walk-in" replace />} />
                         <Route path="/history" element={<History />} />
                         <Route path="/dentists" element={<Dentists />} />
                         <Route path="/payments" element={<Payments />} />

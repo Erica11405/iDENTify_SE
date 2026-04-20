@@ -178,7 +178,6 @@ function PatientForm({ userRole }) {
 
 	const getDisplayAge = (p) => {
 		if (!p) return "N/A";
-		if (p.vitals && p.vitals.age) return p.vitals.age;
 		if (p.birthdate) {
 			const today = new Date();
 			const dob = new Date(p.birthdate);
@@ -187,6 +186,7 @@ function PatientForm({ userRole }) {
 			if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) { age--; }
 			return age;
 		}
+		if (p.vitals && p.vitals.age) return p.vitals.age;
 		if (p.age !== undefined && p.age !== null) return p.age;
 		return "N/A";
 	};

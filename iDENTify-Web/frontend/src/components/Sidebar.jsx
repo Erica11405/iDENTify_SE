@@ -250,7 +250,26 @@ function Sidebar({ role }) {
                 )}
 
                 <nav>
-                    {(role === 'superadmin' || role === 'globaladmin') ? (
+                    {role === 'globaladmin' ? (
+                        <>
+                            <NavLink to="/admin/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={DashboardIcon} alt="Dashboard" />
+                                <span>Dashboard</span>
+                            </NavLink>
+                            <NavLink to="/admin/approvals" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={QueueIcon} alt="Approvals" />
+                                <span>Approvals</span>
+                            </NavLink>
+                            <NavLink to="/admin/settings" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={AppointmentIcon} alt="Clinic Management" />
+                                <span>Clinic Management</span>
+                            </NavLink>
+                            <NavLink to="/admin/archive" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={QueueIcon} alt="Archive" />
+                                <span>Archive</span>
+                            </NavLink>
+                        </>
+                    ) : role === 'superadmin' ? (
                         <>
                             <NavLink to="/admin/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
                                 <img src={DashboardIcon} alt="Dashboard" />
@@ -260,12 +279,6 @@ function Sidebar({ role }) {
                                 <img src={DentistIcon} alt="Users" />
                                 <span>User Management</span>
                             </NavLink>
-                            {role === 'globaladmin' ? (
-                                <NavLink to="/admin/approvals" className={({ isActive }) => isActive ? 'active' : ''}>
-                                    <img src={QueueIcon} alt="Approvals" />
-                                    <span>Approvals</span>
-                                </NavLink>
-                            ) : null}
                             <NavLink to="/admin/reports" className={({ isActive }) => isActive ? 'active' : ''}>
                                 <img src={ReportIcon} alt="Reports" />
                                 <span>Reports</span>
@@ -313,9 +326,9 @@ function Sidebar({ role }) {
                                 <img src={AppointmentIcon} alt="Appointments" />
                                 <span>Appointments</span>
                             </NavLink>
-                            <NavLink to="/queue" className={({ isActive }) => isActive ? 'active' : ''}>
-                                <img src={QueueIcon} alt="Queue" />
-                                <span>Queue</span>
+                            <NavLink to="/walk-in" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={QueueIcon} alt="Walk In" />
+                                <span>Walk In</span>
                             </NavLink>
                             <NavLink to="/history" className={({ isActive }) => isActive ? 'active' : ''}>
                                 <img src={ReportIcon} alt="History" />

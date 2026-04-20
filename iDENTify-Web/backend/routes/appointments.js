@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const { getTenantLifecycleStatus, getLifecycleBlockMessage } = require("../utils/accessControl");
 
 const DEFAULT_DURATION_MINUTES = 30;
 const CANCELLATION_LOCK_MINUTES = 30;
@@ -12,6 +13,8 @@ let hasQueueClinicColumnCache = null;
 let hasQueueBranchColumnCache = null;
 let hasUsersClinicColumnCache = null;
 let hasUsersBranchColumnCache = null;
+let hasAppointmentServiceItemsTableCache = null;
+let appointmentDecisionColumnSupportCache = null;
 
 function parseTime(dateTimeStr) {
   if (!dateTimeStr) return null;
@@ -41,6 +44,52 @@ function normalizeActorRole(value) {
 
 function actorUserId(req) {
   return toPositiveInt(req.headers["x-user-id"]);
+}
+
+function actorRole(req) {
+  return normalizeActorRole(req.headers["x-user-role"]);
+}
+
+async function hasAppointmentServiceItemsTable() {
+  if (hasAppointmentServiceItemsTableCache !== null) {
+    return hasAppointmentServiceItemsTableCache;
+  }
+
+  try {
+    const [rows] = await db.query("SHOW TABLES LIKE 'appointment_service_items'");
+    hasAppointmentServiceItemsTableCache = rows.length > 0;
+  } catch (_err) {
+    hasAppointmentServiceItemsTableCache = false;
+  }
+
+  return hasAppointmentServiceItemsTableCache;
+}
+
+async function getAppointmentDecisionColumnSupport() {
+  if (appointmentDecisionColumnSupportCache !== null) {
+    return appointmentDecisionColumnSupportCache;
+  }
+
+  const columnNames = ["decision_status", "decided_at", "decided_by_user_id", "decline_reason"];
+  try {
+    const checks = await Promise.all(
+      columnNames.map(async (columnName) => {
+        const [rows] = await db.query(`SHOW COLUMNS FROM appointments LIKE '${columnName}'`);
+        return [columnName, rows.length > 0];
+      })
+    );
+
+    appointmentDecisionColumnSupportCache = Object.fromEntries(checks);
+  } catch (_err) {
+    appointmentDecisionColumnSupportCache = {
+      decision_status: false,
+      decided_at: false,
+      decided_by_user_id: false,
+      decline_reason: false,
+    };
+  }
+
+  return appointmentDecisionColumnSupportCache;
 }
 
 async function hasAppointmentClinicColumn() {
@@ -327,6 +376,19 @@ async function resolveAppointmentTenant({ clinicId, branchId, dentistId, actorSc
   };
 }
 
+async function getLifecycleBlockPayload({ clinicId, branchId, action = "booking" }) {
+  const lifecycle = await getTenantLifecycleStatus({ clinicId, branchId });
+  const lifecycleBlockMessage = getLifecycleBlockMessage(lifecycle, { action });
+
+  if (!lifecycleBlockMessage) return null;
+
+  return {
+    message: lifecycleBlockMessage,
+    code: "TENANT_LIFECYCLE_BLOCKED",
+    lifecycle,
+  };
+}
+
 function toDate(value) {
   if (!value) return null;
   if (value instanceof Date) {
@@ -360,6 +422,297 @@ function splitServiceNames(value) {
     .split(",")
     .map((item) => String(item || "").trim())
     .filter(Boolean);
+}
+
+function normalizeServiceItemsInput(serviceItems) {
+  if (!Array.isArray(serviceItems)) return [];
+
+  return serviceItems
+    .map((item, index) => {
+      const source = item && typeof item === "object" ? item : {};
+      return {
+        sequence_order: toPositiveInt(source.sequence_order || source.sequenceOrder) || (index + 1),
+        service_id: toPositiveInt(source.service_id || source.serviceId),
+        service_name_snapshot: String(
+          source.service_name_snapshot
+          || source.service_name
+          || source.serviceName
+          || source.name
+          || source.service
+          || ""
+        ).trim(),
+        dentist_id: toPositiveInt(source.dentist_id || source.dentistId),
+        duration_minutes: toPositiveInt(source.duration_minutes || source.durationMinutes),
+        notes: String(source.notes || "").trim(),
+      };
+    })
+    .sort((a, b) => a.sequence_order - b.sequence_order)
+    .map((item, index) => ({ ...item, sequence_order: index + 1 }));
+}
+
+function pickFirstDentistFromServiceItems(serviceItems) {
+  const normalized = normalizeServiceItemsInput(serviceItems);
+  const match = normalized.find((item) => item.dentist_id);
+  return match ? match.dentist_id : null;
+}
+
+async function lookupClinicServiceDetails({ serviceIds = [], serviceNames = [] }) {
+  const ids = [...new Set(serviceIds.map((value) => toPositiveInt(value)).filter(Boolean))];
+  const names = [...new Set(serviceNames.map((value) => String(value || "").trim().toLowerCase()).filter(Boolean))];
+
+  const byId = new Map();
+  const byName = new Map();
+
+  if (!ids.length && !names.length) {
+    return { byId, byName };
+  }
+
+  try {
+    const clauses = [];
+    const params = [];
+
+    if (ids.length) {
+      clauses.push(`id IN (${ids.map(() => "?").join(",")})`);
+      params.push(...ids);
+    }
+
+    if (names.length) {
+      clauses.push(`LOWER(TRIM(name)) IN (${names.map(() => "?").join(",")})`);
+      params.push(...names);
+    }
+
+    const [rows] = await db.query(
+      `SELECT id, name, estimated_duration FROM clinic_services WHERE ${clauses.join(" OR ")}`,
+      params
+    );
+
+    rows.forEach((row) => {
+      const normalizedName = String(row.name || "").trim();
+      const normalizedKey = normalizedName.toLowerCase();
+      const detail = {
+        id: toPositiveInt(row.id),
+        name: normalizedName,
+        duration_minutes: toPositiveInt(row.estimated_duration) || DEFAULT_DURATION_MINUTES,
+      };
+
+      if (detail.id) byId.set(detail.id, detail);
+      if (normalizedKey) byName.set(normalizedKey, detail);
+    });
+  } catch (_err) {
+    return { byId, byName };
+  }
+
+  return { byId, byName };
+}
+
+async function buildAppointmentServiceItems({
+  serviceItemsInput,
+  services,
+  procedure,
+  defaultDentistId,
+  fallbackDurationMinutes,
+  appointmentStart,
+}) {
+  const normalizedProvidedItems = normalizeServiceItemsInput(serviceItemsInput);
+  const normalizedServices = normalizeServiceList(services, procedure);
+
+  const baseItems = normalizedProvidedItems.length > 0
+    ? normalizedProvidedItems
+    : (normalizedServices.length > 0
+      ? normalizedServices.map((serviceName, index) => ({
+          sequence_order: index + 1,
+          service_id: null,
+          service_name_snapshot: serviceName,
+          dentist_id: null,
+          duration_minutes: null,
+          notes: "",
+        }))
+      : [{
+          sequence_order: 1,
+          service_id: null,
+          service_name_snapshot: String(procedure || "General Consultation").trim() || "General Consultation",
+          dentist_id: null,
+          duration_minutes: toPositiveInt(fallbackDurationMinutes) || DEFAULT_DURATION_MINUTES,
+          notes: "",
+        }]);
+
+  const lookup = await lookupClinicServiceDetails({
+    serviceIds: baseItems.map((item) => item.service_id),
+    serviceNames: baseItems.map((item) => item.service_name_snapshot),
+  });
+
+  let cursor = appointmentStart;
+  const builtItems = [];
+
+  for (const item of baseItems) {
+    const serviceById = item.service_id ? lookup.byId.get(item.service_id) : null;
+    const serviceByName = item.service_name_snapshot
+      ? lookup.byName.get(String(item.service_name_snapshot).trim().toLowerCase())
+      : null;
+
+    const resolvedDentistId = item.dentist_id || defaultDentistId;
+    if (!resolvedDentistId) {
+      const error = new Error("Each selected service must have an assigned dentist.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const resolvedServiceId = item.service_id || serviceById?.id || serviceByName?.id || null;
+    const resolvedServiceName = item.service_name_snapshot
+      || serviceById?.name
+      || serviceByName?.name
+      || "General Consultation";
+
+    const resolvedDuration = item.duration_minutes
+      || serviceById?.duration_minutes
+      || serviceByName?.duration_minutes
+      || DEFAULT_DURATION_MINUTES;
+
+    const segmentEnd = addMinutes(cursor, resolvedDuration);
+    if (!segmentEnd) {
+      const error = new Error("Invalid computed end time.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    builtItems.push({
+      sequence_order: item.sequence_order,
+      service_id: resolvedServiceId,
+      service_name_snapshot: resolvedServiceName,
+      dentist_id: resolvedDentistId,
+      duration_minutes: resolvedDuration,
+      segment_start: cursor,
+      segment_end: segmentEnd,
+      notes: item.notes || "",
+    });
+
+    cursor = segmentEnd;
+  }
+
+  return builtItems;
+}
+
+async function attachServiceItemsToAppointments(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows;
+
+  const supportsServiceItemsTable = await hasAppointmentServiceItemsTable();
+  if (!supportsServiceItemsTable) {
+    rows.forEach((row) => {
+      if (!Object.prototype.hasOwnProperty.call(row, "service_items")) {
+        row.service_items = [];
+      }
+    });
+    return rows;
+  }
+
+  const appointmentIds = rows
+    .map((row) => toPositiveInt(row.id))
+    .filter(Boolean);
+
+  if (!appointmentIds.length) {
+    rows.forEach((row) => {
+      if (!Object.prototype.hasOwnProperty.call(row, "service_items")) {
+        row.service_items = [];
+      }
+    });
+    return rows;
+  }
+
+  const [serviceRows] = await db.query(
+    `SELECT
+       appointment_id,
+       sequence_order,
+       service_id,
+       service_name_snapshot,
+       dentist_id,
+       duration_minutes,
+       segment_start,
+       segment_end,
+       notes
+     FROM appointment_service_items
+     WHERE appointment_id IN (${appointmentIds.map(() => "?").join(",")})
+     ORDER BY appointment_id ASC, sequence_order ASC`,
+    appointmentIds
+  );
+
+  const groupedItems = new Map();
+  serviceRows.forEach((item) => {
+    const appointmentId = toPositiveInt(item.appointment_id);
+    if (!appointmentId) return;
+
+    if (!groupedItems.has(appointmentId)) {
+      groupedItems.set(appointmentId, []);
+    }
+
+    groupedItems.get(appointmentId).push(item);
+  });
+
+  rows.forEach((row) => {
+    const appointmentId = toPositiveInt(row.id);
+    row.service_items = appointmentId ? (groupedItems.get(appointmentId) || []) : [];
+  });
+
+  return rows;
+}
+
+async function hasDentistOverlap({ connection, dentistId, startDateTime, endDateTime, excludeAppointmentId = null }) {
+  const queryConnection = connection || db;
+  const parsedExcludeId = toPositiveInt(excludeAppointmentId);
+  const supportsServiceItemsTable = await hasAppointmentServiceItemsTable();
+
+  const legacyParams = [dentistId, endDateTime, startDateTime];
+  let legacyExcludeClause = "";
+  if (parsedExcludeId) {
+    legacyExcludeClause = "AND a.id != ?";
+    legacyParams.push(parsedExcludeId);
+  }
+
+  const legacyServiceItemsExclusion = supportsServiceItemsTable
+    ? `AND NOT EXISTS (
+         SELECT 1
+         FROM appointment_service_items asi_legacy
+         WHERE asi_legacy.appointment_id = a.id
+       )`
+    : "";
+
+  const [legacyConflictRows] = await queryConnection.query(
+    `SELECT a.id
+     FROM appointments a
+     WHERE a.dentist_id = ?
+       AND a.status NOT IN ('Cancelled', 'Declined')
+       AND a.appointment_datetime < ?
+       AND COALESCE(a.end_datetime, DATE_ADD(a.appointment_datetime, INTERVAL 30 MINUTE)) > ?
+       ${legacyExcludeClause}
+       ${legacyServiceItemsExclusion}
+     LIMIT 1`,
+    legacyParams
+  );
+
+  if (legacyConflictRows.length > 0) return true;
+
+  if (!supportsServiceItemsTable) return false;
+
+  const lineItemParams = [dentistId, endDateTime, startDateTime];
+  let lineItemExcludeClause = "";
+  if (parsedExcludeId) {
+    lineItemExcludeClause = "AND a.id != ?";
+    lineItemParams.push(parsedExcludeId);
+  }
+
+  const [lineItemConflictRows] = await queryConnection.query(
+    `SELECT asi.id
+     FROM appointment_service_items asi
+     INNER JOIN appointments a ON a.id = asi.appointment_id
+     WHERE asi.dentist_id = ?
+       AND a.status NOT IN ('Cancelled', 'Declined')
+       AND asi.segment_start < ?
+       AND asi.segment_end > ?
+       ${lineItemExcludeClause}
+     LIMIT 1`,
+    lineItemParams
+  );
+
+  return lineItemConflictRows.length > 0;
 }
 
 function buildReasonText(services, procedure) {
@@ -457,7 +810,7 @@ router.get("/check-limit", async (req, res) => {
     const whereClauses = [
       "a.dentist_id = ?",
       "DATE(a.appointment_datetime) = ?",
-      "a.status != 'Cancelled'",
+      "a.status NOT IN ('Cancelled', 'Declined')",
     ];
     const params = [dentist_id, date];
 
@@ -540,6 +893,7 @@ router.get("/", async (req, res) => {
     query += " ORDER BY a.appointment_datetime ASC";
 
     const [rows] = await db.query(query, params);
+    await attachServiceItemsToAppointments(rows);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ message: "Fetch failed" });
@@ -594,6 +948,7 @@ router.get("/:id", async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ message: "Appointment not found" });
     }
+    await attachServiceItemsToAppointments(rows);
     res.json(rows[0]);
   } catch (err) {
     console.error("Error fetching single appointment:", err);
@@ -609,6 +964,7 @@ router.post("/", async (req, res) => {
     timeStart,
     procedure,
     services,
+    service_items,
     notes,
     status,
     estimated_duration_minutes,
@@ -617,7 +973,7 @@ router.post("/", async (req, res) => {
   } = req.body;
 
   const patientId = toPositiveInt(patient_id);
-  const dentistId = toPositiveInt(dentist_id);
+  const dentistId = toPositiveInt(dentist_id) || pickFirstDentistFromServiceItems(service_items);
   const appointment_datetime = parseTime(timeStart);
 
   if (!patientId || !dentistId) {
@@ -645,34 +1001,66 @@ router.post("/", async (req, res) => {
       return res.status(403).json({ message: resolvedTenant.scopeViolation });
     }
 
-    connection = await db.getConnection();
-    await connection.beginTransaction();
+    const lifecycle = await getTenantLifecycleStatus({
+      clinicId: resolvedTenant.clinicId,
+      branchId: resolvedTenant.branchId,
+    });
+    const lifecycleBlockMessage = getLifecycleBlockMessage(lifecycle, { action: "booking" });
+    if (lifecycleBlockMessage) {
+      return res.status(403).json({
+        message: lifecycleBlockMessage,
+        code: "TENANT_LIFECYCLE_BLOCKED",
+        lifecycle,
+      });
+    }
 
-    const finalReason = buildReasonText(services, procedure);
-    const durationMinutes = await resolveDurationMinutes({
+    const fallbackDurationMinutes = await resolveDurationMinutes({
       services,
-      procedure: finalReason,
+      procedure,
       durationHint: estimated_duration_minutes,
     });
-    const endDateTime = addMinutes(appointment_datetime, durationMinutes);
+
+    const builtServiceItems = await buildAppointmentServiceItems({
+      serviceItemsInput: service_items,
+      services,
+      procedure,
+      defaultDentistId: dentistId,
+      fallbackDurationMinutes,
+      appointmentStart: appointment_datetime,
+    });
+
+    const finalReason = buildReasonText(
+      builtServiceItems.map((item) => item.service_name_snapshot),
+      procedure
+    );
+    const endDateTime = builtServiceItems[builtServiceItems.length - 1]?.segment_end;
 
     if (!endDateTime) {
       return res.status(400).json({ message: "Invalid computed end time." });
     }
 
-    const [existingConflict] = await connection.query(
-      `SELECT id FROM appointments 
-       WHERE dentist_id = ? 
-       AND status NOT IN ('Cancelled', 'Declined')
-       AND appointment_datetime < ?
-       AND COALESCE(end_datetime, DATE_ADD(appointment_datetime, INTERVAL 30 MINUTE)) > ?`,
-      [dentistId, endDateTime, appointment_datetime]
-    );
+    const uniqueDentistIds = [...new Set(builtServiceItems.map((item) => item.dentist_id).filter(Boolean))];
 
-    if (existingConflict.length > 0) {
-      await connection.rollback();
-      return res.status(409).json({ message: "This time slot is already booked for this dentist. Please select another time." });
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    for (const itemDentistId of uniqueDentistIds) {
+      const hasConflict = await hasDentistOverlap({
+        connection,
+        dentistId: itemDentistId,
+        startDateTime: appointment_datetime,
+        endDateTime,
+      });
+
+      if (hasConflict) {
+        const error = new Error("This time slot is already booked for one or more selected dentists. Please select another time.");
+        error.statusCode = 409;
+        throw error;
+      }
     }
+
+    const supportsServiceItemsTable = await hasAppointmentServiceItemsTable();
+    const primaryDentistId = builtServiceItems[0]?.dentist_id || dentistId;
 
     const appointmentColumns = [
       "patient_id",
@@ -685,7 +1073,7 @@ router.post("/", async (req, res) => {
     ];
     const appointmentValues = [
       patientId,
-      dentistId,
+      primaryDentistId,
       appointment_datetime,
       endDateTime,
       finalReason,
@@ -709,6 +1097,36 @@ router.post("/", async (req, res) => {
       appointmentValues
     );
 
+    if (supportsServiceItemsTable && builtServiceItems.length > 0) {
+      for (const item of builtServiceItems) {
+        await connection.query(
+          `INSERT INTO appointment_service_items (
+             appointment_id,
+             sequence_order,
+             service_id,
+             service_name_snapshot,
+             dentist_id,
+             duration_minutes,
+             segment_start,
+             segment_end,
+             notes
+           )
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            result.insertId,
+            item.sequence_order,
+            item.service_id || null,
+            item.service_name_snapshot,
+            item.dentist_id,
+            item.duration_minutes,
+            item.segment_start,
+            item.segment_end,
+            item.notes || null,
+          ]
+        );
+      }
+    }
+
     const [existingQueueRows] = await connection.query(
       `SELECT id FROM walk_in_queue WHERE appointment_id = ? LIMIT 1`,
       [result.insertId]
@@ -726,7 +1144,7 @@ router.post("/", async (req, res) => {
       ];
       const queueValues = [
         patientId,
-        dentistId,
+        primaryDentistId,
         result.insertId,
         "appointment",
         status || "Scheduled",
@@ -760,12 +1178,30 @@ router.post("/", async (req, res) => {
         [result.insertId]
     );
 
+    rows[0].service_items = supportsServiceItemsTable
+      ? builtServiceItems.map((item) => ({
+          appointment_id: result.insertId,
+          sequence_order: item.sequence_order,
+          service_id: item.service_id || null,
+          service_name_snapshot: item.service_name_snapshot,
+          dentist_id: item.dentist_id,
+          duration_minutes: item.duration_minutes,
+          segment_start: item.segment_start,
+          segment_end: item.segment_end,
+          notes: item.notes || null,
+        }))
+      : [];
+
     await connection.commit();
     res.status(201).json(rows[0]);
   } catch (err) {
     if (connection) {
       await connection.rollback();
     }
+    if (err?.statusCode) {
+      return res.status(err.statusCode).json({ message: err.message });
+    }
+
     console.error("Save error:", err);
     res.status(500).json({ message: "Database save failed" });
   } finally {
@@ -877,23 +1313,29 @@ router.put("/:id", async (req, res) => {
       return res.status(403).json({ message: resolvedTenant.scopeViolation });
     }
 
+    const lifecycleBlockPayload = await getLifecycleBlockPayload({
+      clinicId: resolvedTenant.clinicId,
+      branchId: resolvedTenant.branchId,
+      action: "booking",
+    });
+    if (lifecycleBlockPayload) {
+      return res.status(403).json(lifecycleBlockPayload);
+    }
+
     const nextEnd = addMinutes(nextStart, durationMinutes);
     if (!nextEnd) {
       return res.status(400).json({ message: "Invalid computed end time." });
     }
 
     if (fields.timeStart || fields.dentist_id || fields.procedure || fields.services) {
-      const [existingConflict] = await db.query(
-        `SELECT id FROM appointments 
-         WHERE dentist_id = ? 
-         AND status NOT IN ('Cancelled', 'Declined')
-         AND appointment_datetime < ?
-         AND COALESCE(end_datetime, DATE_ADD(appointment_datetime, INTERVAL 30 MINUTE)) > ?
-         AND id != ?`,
-        [nextDentistId, nextEnd, nextStart, id]
-      );
+      const hasConflict = await hasDentistOverlap({
+        dentistId: nextDentistId,
+        startDateTime: nextStart,
+        endDateTime: nextEnd,
+        excludeAppointmentId: id,
+      });
 
-      if (existingConflict.length > 0) {
+      if (hasConflict) {
         return res.status(409).json({ message: "This time slot is already booked for this dentist. Please select another time." });
       }
     }
@@ -947,10 +1389,235 @@ router.put("/:id", async (req, res) => {
        WHERE a.id = ?`, 
       [id]
     );
+    await attachServiceItemsToAppointments(rows);
     res.json(rows[0]);
   } catch (err) {
     console.error("Update error:", err);
     res.status(500).json({ message: "Update failed" });
+  }
+});
+
+// --- APPROVE APPOINTMENT (Dentist/Aide) ---
+router.patch("/:id/approve", async (req, res) => {
+  const appointmentId = toPositiveInt(req.params.id);
+  const role = actorRole(req);
+  const decisionActorUserId = actorUserId(req);
+
+  if (!appointmentId) {
+    return res.status(400).json({ message: "Invalid appointment id." });
+  }
+
+  if (!decisionActorUserId || (role !== "dentist" && role !== "aide")) {
+    return res.status(403).json({ message: "Only dentist and aide accounts can approve appointments." });
+  }
+
+  try {
+    const actorScope = await getActorTenantScope(req);
+    const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+    const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+    const decisionColumns = await getAppointmentDecisionColumnSupport();
+
+    const [rows] = await db.query(
+      `SELECT id, status, dentist_id${supportsAppointmentClinic ? ", clinic_id" : ""}${supportsAppointmentBranch ? ", branch_id" : ""}
+       FROM appointments
+       WHERE id = ?
+       LIMIT 1`,
+      [appointmentId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    const row = rows[0];
+    let scopedClinicId = supportsAppointmentClinic ? toPositiveInt(row.clinic_id) : null;
+    let scopedBranchId = supportsAppointmentBranch ? toPositiveInt(row.branch_id) : null;
+
+    if (!supportsAppointmentClinic || !supportsAppointmentBranch) {
+      const inferredTenant = await inferTenantFromDentist(row.dentist_id);
+      if (!scopedClinicId) scopedClinicId = inferredTenant.clinicId;
+      if (!scopedBranchId) scopedBranchId = inferredTenant.branchId;
+    }
+
+    const scopeViolation = hasTenantScopeViolation(actorScope, scopedClinicId, scopedBranchId);
+    if (scopeViolation) {
+      return res.status(403).json({ message: scopeViolation });
+    }
+
+    const lifecycleBlockPayload = await getLifecycleBlockPayload({
+      clinicId: scopedClinicId,
+      branchId: scopedBranchId,
+      action: "booking",
+    });
+    if (lifecycleBlockPayload) {
+      return res.status(403).json(lifecycleBlockPayload);
+    }
+
+    if (String(row.status || "").trim().toLowerCase() === "cancelled") {
+      return res.status(400).json({ message: "Cancelled appointments cannot be approved." });
+    }
+
+    const updateClauses = ["status = 'Scheduled'"];
+    const updateValues = [];
+
+    if (decisionColumns.decision_status) {
+      updateClauses.push("decision_status = 'approved'");
+    }
+    if (decisionColumns.decided_at) {
+      updateClauses.push("decided_at = NOW()");
+    }
+    if (decisionColumns.decided_by_user_id) {
+      updateClauses.push("decided_by_user_id = ?");
+      updateValues.push(decisionActorUserId);
+    }
+    if (decisionColumns.decline_reason) {
+      updateClauses.push("decline_reason = NULL");
+    }
+
+    updateValues.push(appointmentId);
+
+    await db.query(
+      `UPDATE appointments
+       SET ${updateClauses.join(", ")}
+       WHERE id = ?`,
+      updateValues
+    );
+
+    await db.query(
+      `UPDATE walk_in_queue
+       SET status = 'Scheduled'
+       WHERE appointment_id = ?
+         AND status IN ('Cancelled', 'Declined')`,
+      [appointmentId]
+    );
+
+    const [updatedRows] = await db.query(
+      `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       LEFT JOIN dentists d ON a.dentist_id = d.id
+       WHERE a.id = ?`,
+      [appointmentId]
+    );
+
+    await attachServiceItemsToAppointments(updatedRows);
+    return res.json(updatedRows[0]);
+  } catch (error) {
+    console.error("Approve appointment error:", error);
+    return res.status(500).json({ message: "Failed to approve appointment." });
+  }
+});
+
+// --- DECLINE APPOINTMENT (Dentist/Aide) ---
+router.patch("/:id/decline", async (req, res) => {
+  const appointmentId = toPositiveInt(req.params.id);
+  const role = actorRole(req);
+  const decisionActorUserId = actorUserId(req);
+  const declineReason = String(req.body?.reason || req.body?.decline_reason || "").trim();
+
+  if (!appointmentId) {
+    return res.status(400).json({ message: "Invalid appointment id." });
+  }
+
+  if (!decisionActorUserId || (role !== "dentist" && role !== "aide")) {
+    return res.status(403).json({ message: "Only dentist and aide accounts can decline appointments." });
+  }
+
+  if (!declineReason) {
+    return res.status(400).json({ message: "A decline reason is required." });
+  }
+
+  try {
+    const actorScope = await getActorTenantScope(req);
+    const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+    const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+    const decisionColumns = await getAppointmentDecisionColumnSupport();
+
+    const [rows] = await db.query(
+      `SELECT id, status, dentist_id${supportsAppointmentClinic ? ", clinic_id" : ""}${supportsAppointmentBranch ? ", branch_id" : ""}
+       FROM appointments
+       WHERE id = ?
+       LIMIT 1`,
+      [appointmentId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    const row = rows[0];
+    let scopedClinicId = supportsAppointmentClinic ? toPositiveInt(row.clinic_id) : null;
+    let scopedBranchId = supportsAppointmentBranch ? toPositiveInt(row.branch_id) : null;
+
+    if (!supportsAppointmentClinic || !supportsAppointmentBranch) {
+      const inferredTenant = await inferTenantFromDentist(row.dentist_id);
+      if (!scopedClinicId) scopedClinicId = inferredTenant.clinicId;
+      if (!scopedBranchId) scopedBranchId = inferredTenant.branchId;
+    }
+
+    const scopeViolation = hasTenantScopeViolation(actorScope, scopedClinicId, scopedBranchId);
+    if (scopeViolation) {
+      return res.status(403).json({ message: scopeViolation });
+    }
+
+    const lifecycleBlockPayload = await getLifecycleBlockPayload({
+      clinicId: scopedClinicId,
+      branchId: scopedBranchId,
+      action: "booking",
+    });
+    if (lifecycleBlockPayload) {
+      return res.status(403).json(lifecycleBlockPayload);
+    }
+
+    const updateClauses = ["status = 'Declined'"];
+    const updateValues = [];
+
+    if (decisionColumns.decision_status) {
+      updateClauses.push("decision_status = 'declined'");
+    }
+    if (decisionColumns.decided_at) {
+      updateClauses.push("decided_at = NOW()");
+    }
+    if (decisionColumns.decided_by_user_id) {
+      updateClauses.push("decided_by_user_id = ?");
+      updateValues.push(decisionActorUserId);
+    }
+    if (decisionColumns.decline_reason) {
+      updateClauses.push("decline_reason = ?");
+      updateValues.push(declineReason);
+    }
+
+    updateValues.push(appointmentId);
+
+    await db.query(
+      `UPDATE appointments
+       SET ${updateClauses.join(", ")}
+       WHERE id = ?`,
+      updateValues
+    );
+
+    await db.query(
+      `UPDATE walk_in_queue
+       SET status = 'Cancelled'
+       WHERE appointment_id = ?
+         AND status NOT IN ('Done', 'Cancelled', 'No-Show')`,
+      [appointmentId]
+    );
+
+    const [updatedRows] = await db.query(
+      `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       LEFT JOIN dentists d ON a.dentist_id = d.id
+       WHERE a.id = ?`,
+      [appointmentId]
+    );
+
+    await attachServiceItemsToAppointments(updatedRows);
+    return res.json(updatedRows[0]);
+  } catch (error) {
+    console.error("Decline appointment error:", error);
+    return res.status(500).json({ message: "Failed to decline appointment." });
   }
 });
 
@@ -986,6 +1653,15 @@ router.delete("/:id", async (req, res) => {
     const scopeViolation = hasTenantScopeViolation(actorScope, scopedClinicId, scopedBranchId);
     if (scopeViolation) {
       return res.status(403).json({ message: scopeViolation });
+    }
+
+    const lifecycleBlockPayload = await getLifecycleBlockPayload({
+      clinicId: scopedClinicId,
+      branchId: scopedBranchId,
+      action: "booking",
+    });
+    if (lifecycleBlockPayload) {
+      return res.status(403).json(lifecycleBlockPayload);
     }
 
     await db.query("DELETE FROM appointments WHERE id = ?", [req.params.id]);

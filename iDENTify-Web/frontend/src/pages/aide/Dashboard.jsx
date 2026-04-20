@@ -208,7 +208,7 @@ function Dashboard() {
           <div className="quick-actions">
             <button className="quick-action-btn" onClick={() => setIsAddWalkInOpen(true)}>Add Walk-In Patient</button>
             <button className="quick-action-btn" onClick={() => setIsAddAppointmentOpen(true)}>Add Appointment</button>
-            <button className="quick-action-btn" onClick={() => navigate('/queue')}>Open Queue</button>
+            <button className="quick-action-btn" onClick={() => navigate('/walk-in')}>Open Walk In</button>
             <button className="quick-action-btn" onClick={() => navigate('/reports')}>View Summary</button>
           </div>
         </div>

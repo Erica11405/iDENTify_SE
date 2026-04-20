@@ -1,0 +1,162 @@
+.systemadmin-page {
+  padding: 1.75rem;
+}
+
+.systemadmin-header {
+  margin-bottom: 1.25rem;
+}
+
+.systemadmin-header h2 {
+  margin: 0;
+  font-size: 1.85rem;
+  color: #0f172a;
+}
+
+.systemadmin-header p {
+  margin: 0.45rem 0 0;
+  color: #475569;
+}
+
+.systemadmin-loading {
+  color: #334155;
+}
+
+.systemadmin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.systemadmin-stat-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+}
+
+.systemadmin-stat-card p {
+  margin: 0;
+  color: #475569;
+  font-size: 0.85rem;
+}
+
+.systemadmin-stat-card h4 {
+  margin: 0.2rem 0 0;
+  color: #0f172a;
+  font-size: 1.3rem;
+}
+
+.systemadmin-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0.85rem;
+}
+
+.systemadmin-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.systemadmin-card h3 {
+  margin: 0 0 0.7rem;
+  color: #0f172a;
+}
+
+.systemadmin-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.systemadmin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.systemadmin-field label {
+  font-size: 0.86rem;
+  color: #334155;
+  font-weight: 600;
+}
+
+.systemadmin-field input,
+.systemadmin-field select,
+.systemadmin-table select {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.92rem;
+}
+
+.systemadmin-card button,
+.systemadmin-actions-inline button {
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  background: #0284c7;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.systemadmin-card button.secondary,
+.systemadmin-table button.secondary {
+  background: #475569;
+}
+
+.systemadmin-card button.danger,
+.systemadmin-table button.danger {
+  background: #dc2626;
+}
+
+.systemadmin-card button:disabled,
+.systemadmin-actions-inline button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.systemadmin-actions-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.systemadmin-actions-inline .danger {
+  background: #dc2626;
+}
+
+.systemadmin-actions-inline .secondary {
+  background: #475569;
+}
+
+.systemadmin-table-wrap {
+  overflow-x: auto;
+}
+
+.systemadmin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.systemadmin-table th,
+.systemadmin-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.7rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.systemadmin-table th {
+  background: #f8fafc;
+  color: #475569;
+}
+
+.systemadmin-table tbody tr.selected-row {
+  background: #e0f2fe;
+}

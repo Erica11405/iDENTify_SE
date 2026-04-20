@@ -18,6 +18,7 @@ export default function ConfirmAppointment() {
     serviceId,
     serviceIds,
     servicesJson,
+    serviceItemsJson,
     serviceDuration,
     servicePrice,
     clinicId,
@@ -45,9 +46,91 @@ export default function ConfirmAppointment() {
     }
   }, [servicesJson]);
 
-  const selectedServiceNames = useMemo(() => {
+  const parsedServiceItems = useMemo(() => {
+    if (!serviceItemsJson) return [];
+
+    try {
+      const parsed = JSON.parse(String(serviceItemsJson));
+      if (!Array.isArray(parsed)) return [];
+
+      return parsed
+        .map((item, index) => {
+          const duration = Number.parseInt(String(item?.duration_minutes || item?.estimated_duration || ""), 10);
+          const dentistId = Number.parseInt(String(item?.dentist_id || ""), 10);
+          const serviceIdValue = item?.service_id ?? item?.id ?? null;
+          const parsedServiceId = Number.parseInt(String(serviceIdValue ?? ""), 10);
+
+          return {
+            sequence_order: Number.parseInt(String(item?.sequence_order || index + 1), 10) || (index + 1),
+            service_id: Number.isFinite(parsedServiceId) ? parsedServiceId : null,
+            name: String(item?.service_name || item?.service_name_snapshot || item?.name || "").trim(),
+            dentist_id: Number.isFinite(dentistId)
+              ? dentistId
+              : (Number.parseInt(String(docId || ""), 10) || null),
+            dentist_name: String(item?.dentist_name || "").trim(),
+            duration_minutes: Number.isFinite(duration) && duration > 0 ? duration : 30,
+          };
+        })
+        .filter((item) => item.name)
+        .sort((a, b) => a.sequence_order - b.sequence_order);
+    } catch (_err) {
+      return [];
+    }
+  }, [serviceItemsJson, docId]);
+
+  const normalizedServiceItems = useMemo(() => {
+    if (parsedServiceItems.length > 0) {
+      return parsedServiceItems;
+    }
+
     if (parsedServices.length > 0) {
-      return parsedServices.map((item) => item.name).filter(Boolean);
+      const fallbackDentistId = Number.parseInt(String(docId || ""), 10);
+      return parsedServices.map((item, index) => {
+        const duration = Number.parseInt(String(item?.estimated_duration || ""), 10);
+        const parsedServiceId = Number.parseInt(String(item?.id ?? ""), 10);
+        return {
+          sequence_order: index + 1,
+          service_id: Number.isFinite(parsedServiceId) ? parsedServiceId : null,
+          name: String(item?.name || "").trim(),
+          dentist_id: Number.isFinite(fallbackDentistId) ? fallbackDentistId : null,
+          dentist_name: String(doctor || "").trim(),
+          duration_minutes: Number.isFinite(duration) && duration > 0 ? duration : 30,
+        };
+      });
+    }
+
+    const fallbackNames = String(serviceName || service || "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    const fallbackDentistId = Number.parseInt(String(docId || ""), 10);
+    const hintedDuration = Number.parseInt(String(serviceDuration || ""), 10);
+    const perServiceDuration = Number.isFinite(hintedDuration) && hintedDuration > 0
+      ? Math.max(30, Math.round(hintedDuration / Math.max(fallbackNames.length, 1)))
+      : 30;
+
+    return fallbackNames.map((name, index) => {
+      const fallbackServiceId = String(serviceIds || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)[index];
+      const parsedServiceId = Number.parseInt(String(fallbackServiceId || serviceId || ""), 10);
+
+      return {
+        sequence_order: index + 1,
+        service_id: Number.isFinite(parsedServiceId) ? parsedServiceId : null,
+        name,
+        dentist_id: Number.isFinite(fallbackDentistId) ? fallbackDentistId : null,
+        dentist_name: String(doctor || "").trim(),
+        duration_minutes: perServiceDuration,
+      };
+    });
+  }, [parsedServiceItems, parsedServices, serviceName, service, docId, doctor, serviceDuration, serviceIds, serviceId]);
+
+  const selectedServiceNames = useMemo(() => {
+    if (normalizedServiceItems.length > 0) {
+      return normalizedServiceItems.map((item) => item.name).filter(Boolean);
     }
 
     const fallback = String(serviceName || service || "");
@@ -55,11 +138,17 @@ export default function ConfirmAppointment() {
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
-  }, [parsedServices, serviceName, service]);
+  }, [normalizedServiceItems, serviceName, service]);
 
   const selectedServiceName = selectedServiceNames.join(", ").trim();
 
   const selectedServiceIds = useMemo(() => {
+    const fromServiceItems = normalizedServiceItems
+      .map((item) => (Number.isFinite(item.service_id) ? String(item.service_id) : ""))
+      .filter(Boolean);
+
+    if (fromServiceItems.length > 0) return fromServiceItems;
+
     if (serviceIds) {
       return String(serviceIds)
         .split(",")
@@ -73,9 +162,16 @@ export default function ConfirmAppointment() {
 
     if (fromParsed.length > 0) return fromParsed;
     return serviceId ? [String(serviceId)] : [];
-  }, [serviceIds, parsedServices, serviceId]);
+  }, [normalizedServiceItems, serviceIds, parsedServices, serviceId]);
 
   const selectedDurationMinutes = useMemo(() => {
+    if (normalizedServiceItems.length > 0) {
+      return normalizedServiceItems.reduce((total, item) => {
+        const duration = Number.parseInt(String(item.duration_minutes || ""), 10);
+        return total + (Number.isFinite(duration) && duration > 0 ? duration : 30);
+      }, 0);
+    }
+
     const hinted = Number.parseInt(String(serviceDuration || ""), 10);
     if (Number.isFinite(hinted) && hinted > 0) {
       return hinted;
@@ -89,7 +185,7 @@ export default function ConfirmAppointment() {
       const duration = Number.parseInt(String(item.estimated_duration || ""), 10);
       return total + (Number.isFinite(duration) && duration > 0 ? duration : 30);
     }, 0);
-  }, [serviceDuration, parsedServices]);
+  }, [normalizedServiceItems, serviceDuration, parsedServices]);
 
   const locationLabel = useMemo(() => {
     const clinic = String(clinicName || '').trim();
@@ -138,10 +234,11 @@ export default function ConfirmAppointment() {
         const resAppts = await fetch(`${API.appointments}`);
         const allAppts = await resAppts.json();
         if (Array.isArray(allAppts)) {
-          const dentistAppts = allAppts.filter(a =>
-            String(a.dentist_id) === String(docId) && a.status !== 'Cancelled'
-          );
-          setAppointments(dentistAppts);
+          const activeAppointments = allAppts.filter((appointment) => {
+            const status = String(appointment?.status || '').trim().toLowerCase();
+            return status !== 'cancelled' && status !== 'declined';
+          });
+          setAppointments(activeAppointments);
         }
 
         // 2. Load User Profile & Family
@@ -253,11 +350,167 @@ export default function ConfirmAppointment() {
 
   const availableSlots = useMemo(() => {
     if (!dentist) return [];
+
     const toMin = (t) => {
       if (!t) return 0;
       const [h, m] = t.split(':').map(Number);
       return h * 60 + m;
     };
+
+    const parseDateFromDateTime = (value) => {
+      if (!value) return null;
+
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+
+        if (trimmed.includes("T")) {
+          const parsed = new Date(trimmed);
+          if (!Number.isNaN(parsed.getTime())) {
+            return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+          }
+        }
+
+        if (trimmed.includes(" ")) {
+          return trimmed.split(" ")[0] || null;
+        }
+
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+          return trimmed;
+        }
+
+        const parsed = new Date(trimmed);
+        if (!Number.isNaN(parsed.getTime())) {
+          return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+        }
+      }
+
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+    };
+
+    const parseMinutesFromDateTime = (value) => {
+      if (!value) return null;
+
+      if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+
+        if (trimmed.includes("T")) {
+          const parsed = new Date(trimmed);
+          if (!Number.isNaN(parsed.getTime())) {
+            return parsed.getHours() * 60 + parsed.getMinutes();
+          }
+        }
+
+        const source = trimmed.includes(" ") ? trimmed.split(" ")[1] : trimmed;
+        const [hours, minutes] = String(source || "").split(":").map(Number);
+        if (Number.isFinite(hours) && Number.isFinite(minutes)) {
+          return hours * 60 + minutes;
+        }
+      }
+
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.getHours() * 60 + parsed.getMinutes();
+    };
+
+    const primaryDentistId = Number.parseInt(String(docId || ""), 10);
+
+    const effectiveServiceItems = normalizedServiceItems.length > 0
+      ? normalizedServiceItems
+      : [{
+          sequence_order: 1,
+          name: selectedServiceName || "Checkup",
+          dentist_id: Number.isFinite(primaryDentistId) ? primaryDentistId : null,
+          duration_minutes: selectedDurationMinutes,
+        }];
+
+    const relevantDentistIds = new Set(
+      effectiveServiceItems
+        .map((item) => Number.parseInt(String(item.dentist_id || ""), 10))
+        .filter((value) => Number.isFinite(value))
+    );
+    if (Number.isFinite(primaryDentistId)) {
+      relevantDentistIds.add(primaryDentistId);
+    }
+
+    const getAppointmentIntervals = (appointment) => {
+      const fallbackDentistId = Number.parseInt(String(appointment?.dentist_id || ""), 10);
+
+      if (Array.isArray(appointment?.service_items) && appointment.service_items.length > 0) {
+        const serviceIntervals = appointment.service_items
+          .map((segment) => {
+            const segmentDentistId = Number.parseInt(String(segment?.dentist_id || fallbackDentistId || ""), 10);
+            const segmentStart = parseMinutesFromDateTime(segment?.segment_start);
+            let segmentEnd = parseMinutesFromDateTime(segment?.segment_end);
+
+            if (!Number.isFinite(segmentEnd) && Number.isFinite(segmentStart)) {
+              const durationHint = Number.parseInt(String(segment?.duration_minutes || ""), 10);
+              segmentEnd = segmentStart + (Number.isFinite(durationHint) && durationHint > 0 ? durationHint : 30);
+            }
+
+            if (!Number.isFinite(segmentDentistId) || !Number.isFinite(segmentStart) || !Number.isFinite(segmentEnd)) {
+              return null;
+            }
+
+            return {
+              dentistId: segmentDentistId,
+              start: segmentStart,
+              end: segmentEnd,
+            };
+          })
+          .filter(Boolean);
+
+        if (serviceIntervals.length > 0) {
+          return serviceIntervals;
+        }
+      }
+
+      const startMins = parseMinutesFromDateTime(appointment?.appointment_datetime);
+      if (!Number.isFinite(startMins)) return [];
+
+      let endMins = parseMinutesFromDateTime(appointment?.end_datetime);
+      if (!Number.isFinite(endMins)) {
+        endMins = startMins + 30;
+      }
+
+      if (!Number.isFinite(fallbackDentistId)) return [];
+      return [{ dentistId: fallbackDentistId, start: startMins, end: endMins }];
+    };
+
+    const occupiedIntervals = appointments
+      .filter((appointment) => {
+        const appointmentDate = parseDateFromDateTime(
+          appointment?.appointment_datetime
+          || appointment?.service_items?.[0]?.segment_start
+        );
+        return appointmentDate === selectedDate;
+      })
+      .flatMap((appointment) => getAppointmentIntervals(appointment))
+      .filter((interval) => relevantDentistIds.has(interval.dentistId));
+
+    const buildServiceSegments = (slotStartMinutes) => {
+      let cursor = slotStartMinutes;
+      return effectiveServiceItems
+        .map((item) => {
+          const durationHint = Number.parseInt(String(item?.duration_minutes || item?.estimated_duration || ""), 10);
+          const duration = Number.isFinite(durationHint) && durationHint > 0 ? durationHint : 30;
+          const segmentDentistId = Number.parseInt(String(item?.dentist_id || primaryDentistId || ""), 10);
+
+          const segment = {
+            dentistId: Number.isFinite(segmentDentistId) ? segmentDentistId : null,
+            start: cursor,
+            end: cursor + duration,
+          };
+
+          cursor = segment.end;
+          return segment;
+        })
+        .filter((segment) => Number.isFinite(segment.dentistId));
+    };
+
     const slots = [];
     const operatingStart = dentist.operatingHours?.start || "09:00";
     const operatingEnd = dentist.operatingHours?.end || "17:00";
@@ -277,53 +530,13 @@ export default function ConfirmAppointment() {
     const isToday = selectedDate === todayStr;
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    const todayAppts = appointments.filter(a => {
-      if (!a.appointment_datetime) return false;
-
-      let aDate;
-      if (a.appointment_datetime.includes("T")) {
-        const d = new Date(a.appointment_datetime);
-        aDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      } else {
-        aDate = a.appointment_datetime.split(" ")[0];
-      }
-      return aDate === selectedDate;
-
-    }).map(a => {
-      let h, m;
-      if (a.appointment_datetime.includes("T")) {
-        const d = new Date(a.appointment_datetime);
-        h = d.getHours();
-        m = d.getMinutes();
-      } else {
-        const timePart = a.appointment_datetime.split(" ")[1];
-        if (!timePart) return { start: -1, end: -1 };
-        [h, m] = timePart.split(':').map(Number);
-      }
-
-      const startMins = h * 60 + m;
-      let endMins = startMins + 30;
-
-      if (a.end_datetime) {
-        if (a.end_datetime.includes("T")) {
-          const endDate = new Date(a.end_datetime);
-          endMins = endDate.getHours() * 60 + endDate.getMinutes();
-        } else {
-          const endTimePart = a.end_datetime.split(" ")[1];
-          if (endTimePart) {
-            const [endH, endM] = endTimePart.split(':').map(Number);
-            endMins = endH * 60 + endM;
-          }
-        }
-      }
-
-      return { start: startMins, end: endMins };
-    });
-
     for (let time = startMin; time < endMin; time += 30) {
       const h = Math.floor(time / 60);
       const m = time % 60;
-      const slotEnd = time + selectedDurationMinutes;
+      const serviceSegments = buildServiceSegments(time);
+      const slotEnd = serviceSegments.length > 0
+        ? serviceSegments[serviceSegments.length - 1].end
+        : (time + selectedDurationMinutes);
       let type = 'open';
       const timeStr24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
       const h12 = h % 12 || 12;
@@ -345,14 +558,21 @@ export default function ConfirmAppointment() {
       if (type === 'open' && isToday && time <= currentMinutes) type = 'past';
       if (type === 'open' && slotEnd > endMin) type = 'booked';
       if (type === 'open') {
-        for (let appt of todayAppts) {
-          if (time < appt.end && slotEnd > appt.start) { type = 'booked'; break; }
+        const hasConflict = serviceSegments.some((segment) => (
+          occupiedIntervals.some((interval) => {
+            if (Number(interval.dentistId) !== Number(segment.dentistId)) return false;
+            return segment.start < interval.end && segment.end > interval.start;
+          })
+        ));
+
+        if (hasConflict) {
+          type = 'booked';
         }
       }
       slots.push({ value: timeStr24, label: label, type: type });
     }
     return slots;
-  }, [dentist, selectedDate, appointments, selectedDurationMinutes, getDayStatus]);
+  }, [dentist, docId, selectedDate, appointments, selectedDurationMinutes, selectedServiceName, normalizedServiceItems, getDayStatus]);
 
   const bookAppointment = async (timeSlot) => {
     if (!selectedPatient || !selectedPatient.id) {
@@ -366,8 +586,35 @@ export default function ConfirmAppointment() {
       const normalizedServices = selectedServiceNames.length > 0
         ? selectedServiceNames
         : [selectedServiceName || "Checkup"];
-      const parsedSingleServiceId = selectedServiceIds.length === 1
-        ? Number.parseInt(selectedServiceIds[0], 10)
+
+      const serviceItemsPayload = (normalizedServiceItems.length > 0
+        ? normalizedServiceItems
+        : [{
+            sequence_order: 1,
+            service_id: selectedServiceIds.length === 1 ? Number.parseInt(selectedServiceIds[0], 10) : null,
+            name: normalizedServices[0],
+            dentist_id: Number.parseInt(String(docId || ""), 10),
+            duration_minutes: selectedDurationMinutes,
+          }])
+        .map((item, index) => {
+          const parsedServiceId = Number.parseInt(String(item?.service_id ?? item?.id ?? ""), 10);
+          const parsedDentistId = Number.parseInt(String(item?.dentist_id || docId || ""), 10);
+          const parsedDuration = Number.parseInt(String(item?.duration_minutes || item?.estimated_duration || ""), 10);
+
+          return {
+            sequence_order: index + 1,
+            service_id: Number.isFinite(parsedServiceId) ? parsedServiceId : undefined,
+            service_name: String(item?.name || item?.service_name || item?.service_name_snapshot || "").trim() || normalizedServices[index] || "Checkup",
+            dentist_id: Number.isFinite(parsedDentistId) ? parsedDentistId : undefined,
+            duration_minutes: Number.isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : 30,
+          };
+        })
+        .filter((item) => item.service_name && Number.isFinite(item.dentist_id));
+
+      const primaryDentistId = serviceItemsPayload[0]?.dentist_id || Number.parseInt(String(docId || ""), 10);
+
+      const parsedSingleServiceId = serviceItemsPayload.length === 1
+        ? Number.parseInt(String(serviceItemsPayload[0]?.service_id || ""), 10)
         : null;
       const parsedClinicId = Number.parseInt(String(clinicId || ''), 10);
       const parsedBranchId = Number.parseInt(String(branchId || ''), 10);
@@ -382,11 +629,12 @@ export default function ConfirmAppointment() {
 
       const payload = {
         patient_id: selectedPatient.id,
-        dentist_id: docId,
+        dentist_id: Number.isFinite(primaryDentistId) ? primaryDentistId : undefined,
         timeStart: fullDateTimeStart,
         procedure: normalizedServices.join(", "),
         services: normalizedServices,
         service_id: Number.isFinite(parsedSingleServiceId) ? parsedSingleServiceId : undefined,
+        service_items: serviceItemsPayload,
         estimated_duration_minutes: selectedDurationMinutes,
         status: "Scheduled",
         clinic_id: Number.isFinite(parsedClinicId) ? parsedClinicId : undefined,
@@ -436,7 +684,17 @@ export default function ConfirmAppointment() {
     ? (selectedPatient.full_name || `${selectedPatient.first_name || ""} ${selectedPatient.last_name || ""}`.trim() || "Unknown")
     : "Profile Not Found";
 
-  const selectedDentistName = String(doctor || dentist?.name || "Assigned Dentist");
+  const selectedDentistName = useMemo(() => {
+    const fromServiceItems = normalizedServiceItems
+      .map((item) => String(item?.dentist_name || "").trim())
+      .filter(Boolean);
+
+    if (fromServiceItems.length > 0) {
+      return [...new Set(fromServiceItems)].join(", ");
+    }
+
+    return String(doctor || dentist?.name || "Assigned Dentist");
+  }, [normalizedServiceItems, doctor, dentist]);
 
   const handleOpenConfirmation = (slot) => {
     if (!slot || slot.type !== "open") return;
@@ -470,7 +728,7 @@ export default function ConfirmAppointment() {
         </TouchableOpacity>
 
         <Text style={styles.title}>Confirm Booking</Text>
-        <Text style={styles.subtitle}>with {doctor}</Text>
+        <Text style={styles.subtitle}>with {selectedDentistName}</Text>
       </View>
 
       <TouchableOpacity
@@ -632,7 +890,7 @@ export default function ConfirmAppointment() {
               <Text style={styles.confirmDetailValue}>{selectedServiceName || "Checkup"}</Text>
             </View>
             <View style={styles.confirmDetailRow}>
-              <Text style={styles.confirmDetailLabel}>Dentist</Text>
+              <Text style={styles.confirmDetailLabel}>{selectedDentistName.includes(",") ? "Dentists" : "Dentist"}</Text>
               <Text style={styles.confirmDetailValue}>{selectedDentistName}</Text>
             </View>
             <View style={styles.confirmDetailRow}>

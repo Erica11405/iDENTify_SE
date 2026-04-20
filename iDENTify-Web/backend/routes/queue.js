@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const { getTenantLifecycleStatus, getLifecycleBlockMessage } = require("../utils/accessControl");
 const CANCELLATION_LOCK_MINUTES = 30;
 const SQL_PH_NOW = "DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR)";
 
@@ -206,6 +207,19 @@ function normalizeQueueStatus(value, fallback = null) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) return fallback;
   return QUEUE_STATUS_MAP[normalized] || fallback;
+}
+
+async function getLifecycleBlockPayload({ clinicId, branchId, action = "booking" }) {
+  const lifecycle = await getTenantLifecycleStatus({ clinicId, branchId });
+  const lifecycleBlockMessage = getLifecycleBlockMessage(lifecycle, { action });
+
+  if (!lifecycleBlockMessage) return null;
+
+  return {
+    message: lifecycleBlockMessage,
+    code: "TENANT_LIFECYCLE_BLOCKED",
+    lifecycle,
+  };
 }
 
 function formatSqlDateTime(date) {
@@ -552,6 +566,19 @@ router.post("/", async (req, res) => {
       return res.status(403).json({ message: resolvedTenant.scopeViolation });
     }
 
+    const lifecycle = await getTenantLifecycleStatus({
+      clinicId: resolvedTenant.clinicId,
+      branchId: resolvedTenant.branchId,
+    });
+    const lifecycleBlockMessage = getLifecycleBlockMessage(lifecycle, { action: "booking" });
+    if (lifecycleBlockMessage) {
+      return res.status(403).json({
+        message: lifecycleBlockMessage,
+        code: "TENANT_LIFECYCLE_BLOCKED",
+        lifecycle,
+      });
+    }
+
     if (appointmentId) {
       const [existingRows] = await db.query(
         `SELECT q.*, p.full_name, d.name as dentist_name
@@ -666,6 +693,15 @@ router.put("/:id", async (req, res) => {
       return res.status(403).json({ message: scopeViolation });
     }
 
+    const lifecycleBlockPayload = await getLifecycleBlockPayload({
+      clinicId: scopedClinicId,
+      branchId: scopedBranchId,
+      action: "booking",
+    });
+    if (lifecycleBlockPayload) {
+      return res.status(403).json(lifecycleBlockPayload);
+    }
+
     const linkedAppointmentId = toPositiveInt(row.appointment_id);
     if (normalizedStatus === "Cancelled" && linkedAppointmentId) {
       const minutesUntil = await getMinutesUntilAppointment(linkedAppointmentId);
@@ -739,6 +775,15 @@ router.delete("/:id", async (req, res) => {
     const scopeViolation = hasTenantScopeViolation(actorScope, scopedClinicId, scopedBranchId);
     if (scopeViolation) {
       return res.status(403).json({ message: scopeViolation });
+    }
+
+    const lifecycleBlockPayload = await getLifecycleBlockPayload({
+      clinicId: scopedClinicId,
+      branchId: scopedBranchId,
+      action: "booking",
+    });
+    if (lifecycleBlockPayload) {
+      return res.status(403).json(lifecycleBlockPayload);
     }
 
     await db.query("DELETE FROM walk_in_queue WHERE id = ?", [queueId]);

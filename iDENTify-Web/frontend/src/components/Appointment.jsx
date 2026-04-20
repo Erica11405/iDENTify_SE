@@ -21,6 +21,22 @@ function toMinutes(timeString) {
   return hour * 60 + minute;
 }
 
+function computeAgeFromBirthdate(value) {
+  if (!value) return "";
+
+  const dob = new Date(value);
+  if (Number.isNaN(dob.getTime())) return "";
+
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDiff = today.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+
+  return age >= 0 ? String(age) : "";
+}
+
 function Appointments() {
   const navigate = useNavigate();
   const api = useApi();
@@ -201,15 +217,27 @@ function Appointments() {
       const updates = {};
       const pid = updatedAppointment.patient_id;
 
-      const existingPatient = patients.find(p => p.id === pid);
+      const recomposedName = `${updatedAppointment.first_name || ""} ${updatedAppointment.middle_name ? `${updatedAppointment.middle_name} ` : ""}${updatedAppointment.last_name || ""}`.trim();
+      if (recomposedName) updates.full_name = recomposedName;
+      else if (updatedAppointment.patient_name) updates.full_name = updatedAppointment.patient_name;
 
-      if (updatedAppointment.patient_name) updates.full_name = updatedAppointment.patient_name;
-      if (updatedAppointment.contact_number) updates.contact_number = updatedAppointment.contact_number;
-      if (updatedAppointment.sex) updates.gender = updatedAppointment.sex;
-      if (updatedAppointment.age) {
-        updates.age = updatedAppointment.age;
-        const existingVitals = existingPatient?.vitals || {};
-        updates.vitals = { ...existingVitals, age: updatedAppointment.age };
+      if (Object.prototype.hasOwnProperty.call(updatedAppointment, "first_name")) {
+        updates.first_name = updatedAppointment.first_name || "";
+      }
+      if (Object.prototype.hasOwnProperty.call(updatedAppointment, "middle_name")) {
+        updates.middle_name = updatedAppointment.middle_name || "";
+      }
+      if (Object.prototype.hasOwnProperty.call(updatedAppointment, "last_name")) {
+        updates.last_name = updatedAppointment.last_name || "";
+      }
+      if (Object.prototype.hasOwnProperty.call(updatedAppointment, "contact_number")) {
+        updates.contact_number = updatedAppointment.contact_number || "";
+      }
+      if (Object.prototype.hasOwnProperty.call(updatedAppointment, "sex")) {
+        updates.gender = updatedAppointment.sex || "";
+      }
+      if (Object.prototype.hasOwnProperty.call(updatedAppointment, "birthdate")) {
+        updates.birthdate = updatedAppointment.birthdate || null;
       }
 
       if (pid && Object.keys(updates).length > 0) {
@@ -241,21 +269,37 @@ function Appointments() {
 
   const handleAddAppointment = async (appointmentData) => {
     try {
-      const newPatient = await api.createPatient({
-        full_name: appointmentData.patient_name,
-        contact_number: appointmentData.contact_number,
-        gender: appointmentData.sex,
-        age: appointmentData.age,
-        vitals: { age: appointmentData.age }
-      });
+      let finalPatientId = appointmentData.patient_id;
+
+      if (appointmentData.isNewPatient || !finalPatientId) {
+        const fullName = `${appointmentData.first_name || ""} ${appointmentData.middle_name ? `${appointmentData.middle_name} ` : ""}${appointmentData.last_name || ""}`.trim() || appointmentData.patient_name;
+
+        const newPatient = await api.createPatient({
+          first_name: appointmentData.first_name || "",
+          middle_name: appointmentData.middle_name || "",
+          last_name: appointmentData.last_name || "",
+          full_name: fullName || "Unknown",
+          birthdate: appointmentData.birthdate || null,
+          gender: appointmentData.sex,
+          contact_number: appointmentData.contact_number,
+          email: appointmentData.email || "",
+          address: "Update profile"
+        });
+
+        finalPatientId = newPatient?.id;
+      }
+
+      if (!finalPatientId) {
+        throw new Error("Failed to resolve patient ID");
+      }
 
       const appointmentToCreate = {
         ...appointmentData,
-        patient_id: newPatient.id,
+        patient_id: finalPatientId,
       };
 
       await api.createAppointment(appointmentToCreate);
-      toast.success("Appointment added");
+      toast.success(appointmentData.isNewPatient ? "New patient and appointment added." : "Appointment scheduled for existing patient.");
       setIsAddModalOpen(false);
     } catch {
       toast.error('Failed to add appointment');
@@ -266,8 +310,12 @@ function Appointments() {
     if (!selectedAppointment) return "";
     const p = patients.find((p) => p.id === selectedAppointment.patient_id);
     if (!p) return "";
-    if (field === 'contact') return p.contact || "";
-    if (field === 'age') return p.age || p.vitals?.age || "";
+    if (field === 'contact') return p.contact_number || p.contact || "";
+    if (field === 'age') {
+      const derivedAge = computeAgeFromBirthdate(p.birthdate || p.birthday || null);
+      if (derivedAge) return derivedAge;
+      return p.age || p.vitals?.age || "";
+    }
     if (field === 'sex') return p.sex || p.gender || "";
     return "";
   };

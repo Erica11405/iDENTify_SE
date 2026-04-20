@@ -150,6 +150,15 @@
   color: #212529;
 }
 
+.summary-balance-due {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.summary-balance-amount {
+  color: #b91c1c;
+}
+
 .payments-table-container {
   background-color: #fff;
   padding: 1.5rem;
@@ -186,7 +195,48 @@
 }
 
 .payments-balance-cell {
+  min-width: 130px;
+}
+
+.payments-money-cell {
+  font-variant-numeric: tabular-nums;
+}
+
+.payments-balance-cell strong {
+  display: block;
+  font-size: 0.98rem;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.payments-balance-cell span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
   font-weight: 700;
+  width: fit-content;
+}
+
+.payments-balance-cell.is-outstanding strong {
+  color: #b91c1c;
+}
+
+.payments-balance-cell.is-outstanding span {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.payments-balance-cell.is-settled strong {
+  color: #166534;
+}
+
+.payments-balance-cell.is-settled span {
+  background: #dcfce7;
+  color: #166534;
 }
 
 .payments-empty-state {

@@ -145,7 +145,6 @@ function PaymentModal({
   const alreadyPaid = toNumeric(form.already_paid, 0);
   const amountPaidNow = toNumeric(form.amount_paid_now, 0);
 
-  const balanceBefore = Math.max(totalDue - alreadyPaid, 0);
   const balanceAfter = Math.max(totalDue - (alreadyPaid + amountPaidNow), 0);
 
   if (!isOpen) return null;
@@ -368,19 +367,31 @@ function PaymentModal({
               </div>
             )}
 
+            <div className={`payment-balance-focus ${balanceAfter > 0 ? "has-remaining" : "settled"}`}>
+              <span>Remaining Balance After This Payment</span>
+              <strong>{formatCurrency(balanceAfter)}</strong>
+              <p>
+                {balanceAfter > 0
+                  ? "Additional payment is still required to settle this record."
+                  : "This payment settles the record in full."}
+              </p>
+            </div>
+
             <div className="payment-preview-grid">
-              {form.is_deposit && (
-                <div>
-                  <span>Already Paid</span>
-                  <strong>{formatCurrency(alreadyPaid)}</strong>
-                </div>
-              )}
-              <div>
-                <span>Balance Before</span>
-                <strong>{formatCurrency(balanceBefore)}</strong>
+              <div className="payment-preview-item due">
+                <span>Total Due</span>
+                <strong>{formatCurrency(totalDue)}</strong>
               </div>
-              <div>
-                <span>Balance After</span>
+              <div className="payment-preview-item paid">
+                <span>Paid So Far</span>
+                <strong>{formatCurrency(alreadyPaid)}</strong>
+              </div>
+              <div className="payment-preview-item current">
+                <span>Payment This Entry</span>
+                <strong>{formatCurrency(amountPaidNow)}</strong>
+              </div>
+              <div className={`payment-preview-item remaining ${balanceAfter > 0 ? "remaining-open" : "remaining-settled"}`}>
+                <span>Remaining After Payment</span>
                 <strong>{formatCurrency(balanceAfter)}</strong>
               </div>
             </div>

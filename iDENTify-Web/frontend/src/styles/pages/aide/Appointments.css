@@ -193,7 +193,7 @@
   margin: 0 0 0.5rem 0;
 }
 
-.edit-btn, .start-btn, .delete-btn {
+.edit-btn, .start-btn, .delete-btn, .approve-btn, .decline-btn {
   background-color: #4c6ef5;
   color: #fff;
   border: none;
@@ -205,8 +205,16 @@
   margin-right: 0.5rem;
 }
 
-.edit-btn:hover, .start-btn:hover, .delete-btn:hover {
+.edit-btn:hover, .start-btn:hover, .delete-btn:hover, .approve-btn:hover, .decline-btn:hover {
   background-color: #3b5bdb;
+}
+
+.approve-btn {
+  background-color: #2f9e44;
+}
+
+.approve-btn:hover {
+  background-color: #2b8a3e;
 }
 
 .start-btn {
@@ -227,6 +235,14 @@
 }
 
 .delete-btn:hover {
+  background-color: #c82333;
+}
+
+.decline-btn {
+  background-color: #dc3545;
+}
+
+.decline-btn:hover {
   background-color: #c82333;
 }
 

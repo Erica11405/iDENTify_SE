@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
 import "../../styles/pages/dentist/DentistAppointments.css";
@@ -21,6 +22,7 @@ function DentistAppointments() {
 
   // 3. Set up the Calendar State (Defaults to Today in YYYY-MM-DD format)
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [decisionLoadingId, setDecisionLoadingId] = useState(null);
 
   useEffect(() => {
     // Load data when page mounts
@@ -58,6 +60,52 @@ function DentistAppointments() {
     const isSelectedDate = queueDateStr === selectedDate;
     return isWalkIn && isMyPatient && isSelectedDate;
   });
+
+  const canDecideAppointment = (appointment) => {
+    const status = String(appointment?.status || '').trim().toLowerCase();
+    return !['done', 'cancelled', 'declined', 'no-show'].includes(status);
+  };
+
+  const isDecisionBusy = (appointmentId, action) => decisionLoadingId === `${action}-${appointmentId}`;
+
+  const handleApprove = async (appointment) => {
+    if (!appointment?.id) return;
+
+    try {
+      setDecisionLoadingId(`approve-${appointment.id}`);
+      await api.approveAppointment(appointment.id, {});
+      toast.success('Appointment approved.');
+      await Promise.all([api.loadAppointments(), api.loadQueue()]);
+    } catch (error) {
+      toast.error(error?.message || 'Failed to approve appointment.');
+    } finally {
+      setDecisionLoadingId(null);
+    }
+  };
+
+  const handleDecline = async (appointment) => {
+    if (!appointment?.id) return;
+
+    const input = window.prompt('Please provide a reason for declining this appointment:');
+    if (input === null) return;
+
+    const reason = String(input || '').trim();
+    if (!reason) {
+      toast.error('Decline reason is required.');
+      return;
+    }
+
+    try {
+      setDecisionLoadingId(`decline-${appointment.id}`);
+      await api.declineAppointment(appointment.id, { reason });
+      toast.success('Appointment declined.');
+      await Promise.all([api.loadAppointments(), api.loadQueue()]);
+    } catch (error) {
+      toast.error(error?.message || 'Failed to decline appointment.');
+    } finally {
+      setDecisionLoadingId(null);
+    }
+  };
 
   return (
     <div className="appointments-container">
@@ -117,12 +165,32 @@ function DentistAppointments() {
                       </span>
                     </td>
                     <td>
-                      <button 
-                        className="review-chart-btn"
-                        onClick={() => navigate(`/patients/${appt.patient_id}`)} 
-                      >
-                        Review Form
-                      </button>
+                      <div className="appt-action-group">
+                        {canDecideAppointment(appt) ? (
+                          <>
+                            <button
+                              className="decision-btn approve-btn"
+                              onClick={() => handleApprove(appt)}
+                              disabled={isDecisionBusy(appt.id, 'approve') || isDecisionBusy(appt.id, 'decline')}
+                            >
+                              {isDecisionBusy(appt.id, 'approve') ? 'Approving...' : 'Approve'}
+                            </button>
+                            <button
+                              className="decision-btn decline-btn"
+                              onClick={() => handleDecline(appt)}
+                              disabled={isDecisionBusy(appt.id, 'approve') || isDecisionBusy(appt.id, 'decline')}
+                            >
+                              {isDecisionBusy(appt.id, 'decline') ? 'Declining...' : 'Decline'}
+                            </button>
+                          </>
+                        ) : null}
+                        <button
+                          className="review-chart-btn"
+                          onClick={() => navigate(`/patients/${appt.patient_id}`)}
+                        >
+                          Review Form
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

@@ -2,6 +2,22 @@ import { useCallback, useState, useMemo } from 'react';
 import api from '../api/apiClient';
 import useAppStore from '../store/useAppStore';
 
+function computeAgeFromBirthdate(value) {
+  if (!value) return null;
+
+  const birthdate = new Date(value);
+  if (Number.isNaN(birthdate.getTime())) return null;
+
+  const now = new Date();
+  let age = now.getFullYear() - birthdate.getFullYear();
+  const monthDiff = now.getMonth() - birthdate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birthdate.getDate())) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : null;
+}
+
 export default function useApi() {
   const setPatients = useAppStore((s) => s.setPatients);
   const setAppointments = useAppStore((s) => s.setAppointments);
@@ -27,14 +43,8 @@ export default function useApi() {
       const list = await api.getPatients();
       const transformed = list.map((p) => {
         const birthdate = p.birthdate || p.birthday || null;
-        let age = p.age || null;
-        if (birthdate) {
-          const b = new Date(birthdate);
-          const now = new Date();
-          age = now.getFullYear() - b.getFullYear();
-          const m = now.getMonth() - b.getMonth();
-          if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age -= 1;
-        }
+        const derivedAge = computeAgeFromBirthdate(birthdate);
+        const age = derivedAge ?? p.age ?? p.vitals?.age ?? null;
         return { ...p, age, name: p.full_name || p.name || "" };
       });
       setPatients(transformed);
@@ -119,6 +129,18 @@ export default function useApi() {
     if (updated?.id && updateAppointmentStore) updateAppointmentStore(updated);
     return updated;
   }, [updateAppointmentStore]);
+
+  const approveAppointment = useCallback(async (id, payload = {}) => {
+    const updated = await api.approveAppointment(id, payload);
+    if (updated?.id && updateAppointmentStore) updateAppointmentStore(updated);
+    return updated;
+  }, [updateAppointmentStore]);
+
+  const declineAppointment = useCallback(async (id, payload) => {
+    const updated = await api.declineAppointment(id, payload);
+    if (updated?.id && updateAppointmentStore) updateAppointmentStore(updated);
+    return updated;
+  }, [updateAppointmentStore]);
   
   const removeAppointment = useCallback(async (id) => {
     await api.deleteAppointment(id);
@@ -181,6 +203,8 @@ export default function useApi() {
     updatePatient,
     createAppointment,
     updateAppointment,
+    approveAppointment,
+    declineAppointment,
     removeAppointment,
     addQueue,
     updateQueueItem,
@@ -202,6 +226,6 @@ export default function useApi() {
     loading, error, loadPatients, loadAppointments, loadQueue, loadQueueHistory, 
     deleteQueue, setDentists, updateDentistStore, removeDentistStore,
     getPatientById, createPatient, updatePatient, createAppointment, updateAppointment,
-    removeAppointment, addQueue, updateQueueItem, loadReports
+    approveAppointment, declineAppointment, removeAppointment, addQueue, updateQueueItem, loadReports
   ]);
 }

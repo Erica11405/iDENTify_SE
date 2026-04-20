@@ -61,6 +61,7 @@ function Appointments() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [decisionLoadingId, setDecisionLoadingId] = useState(null);
 
   const [filters, setFilters] = useState({
     dentist: "all",
@@ -122,7 +123,10 @@ function Appointments() {
               data.map((a) => {
                 const s = (a.status || "").toLowerCase().trim();
                 const canStart = !["done", "cancelled", "declined", "no-show", "missed"].includes(s);
+                const canDecide = !["done", "cancelled", "declined", "no-show", "missed"].includes(s);
                 const apptDate = a.appointment_datetime ? new Date(a.appointment_datetime).toLocaleDateString() : "-";
+                const isApproveBusy = decisionLoadingId === `approve-${a.id}`;
+                const isDeclineBusy = decisionLoadingId === `decline-${a.id}`;
 
                 return (
                   <tr key={a.id}>
@@ -146,6 +150,24 @@ function Appointments() {
                     </td>
                     {showActions && (
                       <td>
+                        {canDecide ? (
+                          <>
+                            <button
+                              className="approve-btn"
+                              onClick={() => handleApprove(a)}
+                              disabled={isApproveBusy || isDeclineBusy}
+                            >
+                              {isApproveBusy ? "Approving..." : "Approve"}
+                            </button>
+                            <button
+                              className="decline-btn"
+                              onClick={() => handleDecline(a)}
+                              disabled={isApproveBusy || isDeclineBusy}
+                            >
+                              {isDeclineBusy ? "Declining..." : "Decline"}
+                            </button>
+                          </>
+                        ) : null}
                         {showEdit ? <button className="edit-btn" onClick={() => handleEdit(a)}>Edit</button> : null}
                         <button
                           className="start-btn"
@@ -227,6 +249,46 @@ function Appointments() {
   };
 
   const handleFilterChange = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
+
+  const handleApprove = async (appointment) => {
+    if (!appointment?.id) return;
+
+    try {
+      setDecisionLoadingId(`approve-${appointment.id}`);
+      await api.approveAppointment(appointment.id, {});
+      toast.success("Appointment approved.");
+      await Promise.all([api.loadAppointments(), api.loadQueue()]);
+    } catch (err) {
+      toast.error(err?.message || "Failed to approve appointment.");
+    } finally {
+      setDecisionLoadingId(null);
+    }
+  };
+
+  const handleDecline = async (appointment) => {
+    if (!appointment?.id) return;
+
+    const input = window.prompt("Please provide a reason for declining this appointment:");
+    if (input === null) return;
+
+    const reason = String(input || "").trim();
+    if (!reason) {
+      toast.error("Decline reason is required.");
+      return;
+    }
+
+    try {
+      setDecisionLoadingId(`decline-${appointment.id}`);
+      await api.declineAppointment(appointment.id, { reason });
+      toast.success("Appointment declined.");
+      await Promise.all([api.loadAppointments(), api.loadQueue()]);
+    } catch (err) {
+      toast.error(err?.message || "Failed to decline appointment.");
+    } finally {
+      setDecisionLoadingId(null);
+    }
+  };
+
   const handleEdit = (appointment) => { setSelectedAppointment(appointment); setIsEditModalOpen(true); };
   const handleDelete = (appointment) => { setSelectedAppointment(appointment); setIsDeleteModalOpen(true); };
   const handleCloseModal = () => { setSelectedAppointment(null); setIsEditModalOpen(false); setIsDeleteModalOpen(false); };
@@ -315,6 +377,8 @@ function Appointments() {
             <option value="Scheduled">Scheduled</option>
             <option value="Checked-In">Checked-In</option>
             <option value="Done">Done</option>
+            <option value="Declined">Declined</option>
+            <option value="Cancelled">Cancelled</option>
           </select>
         </div>
 

@@ -244,6 +244,10 @@ function Payments({
     const paid = filteredRows.filter((row) => isPaidRecord(row)).length;
     const billedAmount = filteredRows.reduce((sum, row) => sum + Number(row.total_due || 0), 0);
     const collectedAmount = filteredRows.reduce((sum, row) => sum + Number(row.amount_paid || 0), 0);
+    const outstandingAmount = filteredRows.reduce((sum, row) => sum + Math.max(Number(row.balance_due || 0), 0), 0);
+    const collectionRate = billedAmount > 0
+      ? Math.min((collectedAmount / billedAmount) * 100, 100)
+      : 0;
     const total = billing + paid;
 
     return {
@@ -252,6 +256,8 @@ function Payments({
       total,
       billedAmount,
       collectedAmount,
+      outstandingAmount,
+      collectionRate,
     };
   }, [filteredRows]);
 
@@ -356,7 +362,7 @@ function Payments({
           await apiClient.updateQueueItem(continuationQueueId, { status: "Done" });
         } catch (syncError) {
           console.error("Failed to sync queue status after installment", syncError);
-          toast.error("Payment saved, but queue status sync failed.");
+          toast.error("Payment saved, but Walk In status sync failed.");
         } finally {
           setContinuationPaymentId(null);
           setContinuationQueueId(null);
@@ -575,7 +581,7 @@ function Payments({
         <>
           <div className="payments-summary-grid">
             <article className="payments-summary-card">
-              <p>In Billing Queue</p>
+              <p>With Remaining Balance</p>
               <h3>{totals.billing}</h3>
             </article>
             <article className="payments-summary-card">
@@ -594,6 +600,14 @@ function Payments({
               <p>Collected</p>
               <h3>{formatCurrency(totals.collectedAmount)}</h3>
             </article>
+            <article className="payments-summary-card summary-balance-due">
+              <p>Remaining Balance</p>
+              <h3 className="summary-balance-amount">{formatCurrency(totals.outstandingAmount)}</h3>
+            </article>
+            <article className="payments-summary-card">
+              <p>Collection Rate</p>
+              <h3>{totals.collectionRate.toFixed(1)}%</h3>
+            </article>
           </div>
 
           <div className="payments-table-container">
@@ -604,9 +618,9 @@ function Payments({
                   <th>Dentist</th>
                   <th>Last Payment</th>
                   <th>Services</th>
-                  <th>Due</th>
-                  <th>Paid</th>
-                  <th>Balance</th>
+                  <th>Total Due</th>
+                  <th>Paid So Far</th>
+                  <th>Remaining Balance</th>
                   <th>Deposit</th>
                   <th>Status</th>
                   <th>Latest Method</th>
@@ -621,34 +635,44 @@ function Payments({
                     </td>
                   </tr>
                 ) : (
-                  filteredRows.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.patient_name || "Unknown"}</td>
-                      <td>{row.dentist_name || "Unassigned"}</td>
-                      <td>{formatDateTime(row.latest_payment_at || row.updated_at || row.created_at)}</td>
-                      <td className="payments-services-cell">{row.services_text || "-"}</td>
-                      <td>{formatCurrency(row.total_due)}</td>
-                      <td>{formatCurrency(row.amount_paid)}</td>
-                      <td className="payments-balance-cell">{formatCurrency(row.balance_due)}</td>
-                      <td>{row.is_deposit ? "Yes" : "No"}</td>
-                      <td>{row.payment_status || "-"}</td>
-                      <td>{formatMethodLabel(row.latest_payment_method)}</td>
-                      <td>
-                        {isBillingRecord(row) ? (
-                          <button
-                            type="button"
-                            className="review-btn"
-                            onClick={() => handleOpenRecord(row)}
-                            disabled={busyId === row.id || openingRecordId === row.id}
-                          >
-                            {busyId === row.id ? "Saving..." : openingRecordId === row.id ? "Loading..." : "Update / Add Payment"}
-                          </button>
-                        ) : (
-                          <span className="status-paid-text">Paid</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                  filteredRows.map((row) => {
+                    const totalDue = Number(row.total_due || 0);
+                    const amountPaid = Number(row.amount_paid || 0);
+                    const balanceDue = Math.max(Number(row.balance_due || 0), 0);
+                    const isOutstanding = balanceDue > 0;
+
+                    return (
+                      <tr key={row.id}>
+                        <td>{row.patient_name || "Unknown"}</td>
+                        <td>{row.dentist_name || "Unassigned"}</td>
+                        <td>{formatDateTime(row.latest_payment_at || row.updated_at || row.created_at)}</td>
+                        <td className="payments-services-cell">{row.services_text || "-"}</td>
+                        <td className="payments-money-cell">{formatCurrency(totalDue)}</td>
+                        <td className="payments-money-cell">{formatCurrency(amountPaid)}</td>
+                        <td className={`payments-balance-cell ${isOutstanding ? "is-outstanding" : "is-settled"}`}>
+                          <strong>{formatCurrency(balanceDue)}</strong>
+                          <span>{isOutstanding ? "Remaining" : "Settled"}</span>
+                        </td>
+                        <td>{row.is_deposit ? "Yes" : "No"}</td>
+                        <td>{row.payment_status || "-"}</td>
+                        <td>{formatMethodLabel(row.latest_payment_method)}</td>
+                        <td>
+                          {isBillingRecord(row) ? (
+                            <button
+                              type="button"
+                              className="review-btn"
+                              onClick={() => handleOpenRecord(row)}
+                              disabled={busyId === row.id || openingRecordId === row.id}
+                            >
+                              {busyId === row.id ? "Saving..." : openingRecordId === row.id ? "Loading..." : "Update / Add Payment"}
+                            </button>
+                          ) : (
+                            <span className="status-paid-text">Paid</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

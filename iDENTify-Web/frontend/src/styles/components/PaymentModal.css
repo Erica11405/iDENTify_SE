@@ -178,24 +178,91 @@
   gap: 0.55rem;
 }
 
-.payment-preview-grid > div {
+.payment-balance-focus {
+  margin-top: 1rem;
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.payment-balance-focus span {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.payment-balance-focus strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.25rem;
+  line-height: 1.15;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.payment-balance-focus p {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.payment-balance-focus.has-remaining {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.payment-balance-focus.has-remaining strong {
+  color: #b91c1c;
+}
+
+.payment-balance-focus.settled {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.payment-balance-focus.settled strong {
+  color: #166534;
+}
+
+.payment-preview-item {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 0.55rem;
   background: #ffffff;
 }
 
-.payment-preview-grid span {
+.payment-preview-item span {
   display: block;
   font-size: 0.78rem;
   color: #64748b;
 }
 
-.payment-preview-grid strong {
+.payment-preview-item strong {
   display: block;
   margin-top: 0.2rem;
   color: #0f172a;
   font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.payment-preview-item.remaining-open {
+  border-color: #fca5a5;
+  background: #fff1f2;
+}
+
+.payment-preview-item.remaining-open strong {
+  color: #b91c1c;
+}
+
+.payment-preview-item.remaining-settled {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.payment-preview-item.remaining-settled strong {
+  color: #166534;
 }
 
 .payment-history-block {

@@ -3,7 +3,12 @@ const router = express.Router();
 const db = require('../db'); 
 const bcrypt = require('bcrypt');
 const { sendEmail } = require('../utils/mailer');
-const { normalizeApprovalStatus } = require('../utils/accessControl');
+const {
+    normalizeApprovalStatus,
+    getUserTenantAssignment,
+    getTenantLifecycleStatus,
+    getLifecycleBlockMessage,
+} = require('../utils/accessControl');
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
 const LOGIN_OTP_ROLES = new Set(['dentist', 'aide']);
@@ -14,6 +19,7 @@ let signupOtpTableReady = false;
 let signupOtpTableUnavailable = false;
 let hasPasswordChangeRequiredColumnCache = null;
 let hasApprovalStatusColumnCache = null;
+let hasLoginAuditEventsTableCache = null;
 
 function normalizeRole(role) {
     const normalized = String(role || '').trim().toLowerCase();
@@ -35,6 +41,12 @@ function normalizeOtp(value) {
 
 function generateOtpCode() {
     return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function toPositiveInt(value) {
+    const parsed = Number.parseInt(String(value || ''), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return parsed;
 }
 
 function composeFullName(firstName, middleName, surname) {
@@ -86,6 +98,114 @@ async function hasApprovalStatusColumn() {
     }
 
     return hasApprovalStatusColumnCache;
+}
+
+async function hasLoginAuditEventsTable() {
+    if (hasLoginAuditEventsTableCache !== null) {
+        return hasLoginAuditEventsTableCache;
+    }
+
+    try {
+        const [rows] = await db.query("SHOW TABLES LIKE 'login_audit_events'");
+        hasLoginAuditEventsTableCache = rows.length > 0;
+    } catch (_err) {
+        hasLoginAuditEventsTableCache = false;
+    }
+
+    return hasLoginAuditEventsTableCache;
+}
+
+function resolveClientIp(req) {
+    const forwarded = String(req.headers['x-forwarded-for'] || '').trim();
+    if (forwarded) {
+        return forwarded.split(',')[0].trim();
+    }
+
+    return String(req.socket?.remoteAddress || req.ip || '').trim() || null;
+}
+
+function isStaffLifecycleRole(role) {
+    return role === 'superadmin' || role === 'dentist' || role === 'aide';
+}
+
+async function resolveLifecycleBlockForUser(userRecord) {
+    const role = normalizeRole(userRecord?.role);
+    if (!isStaffLifecycleRole(role)) return null;
+
+    let clinicId = toPositiveInt(userRecord?.clinic_id);
+    let branchId = toPositiveInt(userRecord?.branch_id);
+
+    if (!clinicId && !branchId && userRecord?.id) {
+        const assignment = await getUserTenantAssignment(userRecord.id);
+        clinicId = assignment.clinicId;
+        branchId = assignment.branchId;
+    }
+
+    if (!clinicId && !branchId) return null;
+
+    try {
+        const lifecycle = await getTenantLifecycleStatus({ clinicId, branchId });
+        const message = getLifecycleBlockMessage(lifecycle, { action: 'login' });
+
+        if (!message) return null;
+
+        return {
+            message,
+            lifecycle,
+            clinicId,
+            branchId,
+        };
+    } catch (error) {
+        console.error('Failed to evaluate tenant lifecycle during login:', error);
+        return null;
+    }
+}
+
+async function writeLoginAuditEvent({ req, userRecord = null, email = null, role = null, outcome = 'failed', failureReason = null }) {
+    const hasAuditTable = await hasLoginAuditEventsTable();
+    if (!hasAuditTable) return;
+
+    const userId = toPositiveInt(userRecord?.id);
+    const normalizedRole = normalizeRole(role || userRecord?.role);
+
+    let clinicId = toPositiveInt(userRecord?.clinic_id);
+    let branchId = toPositiveInt(userRecord?.branch_id);
+
+    if (!clinicId && !branchId && userId) {
+        const assignment = await getUserTenantAssignment(userId);
+        clinicId = assignment.clinicId;
+        branchId = assignment.branchId;
+    }
+
+    try {
+        await db.query(
+            `INSERT INTO login_audit_events (
+                user_id,
+                attempted_email,
+                role,
+                clinic_id,
+                branch_id,
+                outcome,
+                failure_reason,
+                ip_address,
+                user_agent
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                userId || null,
+                email || userRecord?.email || null,
+                normalizedRole || null,
+                clinicId || null,
+                branchId || null,
+                String(outcome || 'failed').slice(0, 32),
+                failureReason ? String(failureReason).slice(0, 255) : null,
+                resolveClientIp(req),
+                String(req.headers['user-agent'] || '').slice(0, 500) || null,
+            ]
+        );
+    } catch (error) {
+        console.error('Failed to write login audit event:', error.message || error);
+    }
 }
 
 async function sendOtpEmail({ email, name, otpCode, subject, introText }) {
@@ -388,21 +508,67 @@ router.post('/login', async (req, res) => {
 
     try {
         const [users] = await db.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
-        if (users.length === 0) return res.status(404).json({ error: "Account not found." });
+        if (users.length === 0) {
+            await writeLoginAuditEvent({
+                req,
+                email,
+                outcome: 'failed',
+                failureReason: 'account_not_found',
+            });
+            return res.status(404).json({ error: "Account not found." });
+        }
 
         const userRecord = users[0];
         const role = normalizeRole(userRecord.role);
         const requirePasswordChange = Boolean(Number(userRecord.password_change_required || 0));
 
         if (Number(userRecord.is_archived) === 1) {
+            await writeLoginAuditEvent({
+                req,
+                userRecord,
+                email,
+                outcome: 'blocked',
+                failureReason: 'account_archived',
+            });
             return res.status(403).json({ error: 'This account has been archived. Please contact the super admin.' });
         }
 
         const isMatch = await bcrypt.compare(password, userRecord.password_hash);
-        if (!isMatch) return res.status(401).json({ error: "Invalid password." });
+        if (!isMatch) {
+            await writeLoginAuditEvent({
+                req,
+                userRecord,
+                email,
+                outcome: 'failed',
+                failureReason: 'invalid_password',
+            });
+            return res.status(401).json({ error: "Invalid password." });
+        }
+
+        const lifecycleBlock = await resolveLifecycleBlockForUser(userRecord);
+        if (lifecycleBlock) {
+            await writeLoginAuditEvent({
+                req,
+                userRecord,
+                email,
+                outcome: 'blocked',
+                failureReason: lifecycleBlock.message,
+            });
+            return res.status(403).json({
+                error: lifecycleBlock.message,
+                code: 'TENANT_LIFECYCLE_BLOCKED',
+                lifecycle: lifecycleBlock.lifecycle,
+            });
+        }
 
         if (role === 'superadmin' || role === 'globaladmin') {
             const approvalStatus = normalizeApprovalStatus(userRecord.approval_status);
+            await writeLoginAuditEvent({
+                req,
+                userRecord,
+                email,
+                outcome: 'success',
+            });
             return res.status(200).json({ 
                 message: role === 'globaladmin' || approvalStatus === 'approved'
                     ? 'Login successful'
@@ -414,6 +580,13 @@ router.post('/login', async (req, res) => {
         }
 
         if (!LOGIN_OTP_ROLES.has(role)) {
+            await writeLoginAuditEvent({
+                req,
+                userRecord,
+                email,
+                outcome: 'failed',
+                failureReason: 'unsupported_role',
+            });
             return res.status(403).json({ error: 'Unsupported account role.' });
         }
 
@@ -430,6 +603,13 @@ router.post('/login', async (req, res) => {
             introText: 'Your login verification code is',
         });
 
+        await writeLoginAuditEvent({
+            req,
+            userRecord,
+            email,
+            outcome: 'otp_challenge',
+        });
+
         res.status(200).json({
             message: "OTP sent to your email",
             requireOtp: true,
@@ -438,6 +618,12 @@ router.post('/login', async (req, res) => {
 
     } catch (err) {
         console.error("Login Crash:", err);
+        await writeLoginAuditEvent({
+            req,
+            email,
+            outcome: 'failed',
+            failureReason: 'server_error',
+        });
         res.status(500).json({ error: "Server crash: " + err.message });
     }
 });
@@ -453,33 +639,99 @@ router.post('/verify-otp', async (req, res) => {
 
     try {
         const [users] = await db.query('SELECT * FROM users WHERE email = ? LIMIT 1', [email]);
-        if (users.length === 0) return res.status(404).json({ error: "Account not found." });
+        if (users.length === 0) {
+            await writeLoginAuditEvent({
+                req,
+                email,
+                outcome: 'failed',
+                failureReason: 'otp_account_not_found',
+            });
+            return res.status(404).json({ error: "Account not found." });
+        }
 
         const userRecord = users[0];
         const role = normalizeRole(userRecord.role);
         const requirePasswordChange = Boolean(Number(userRecord.password_change_required || 0));
 
         if (Number(userRecord.is_archived) === 1) {
+            await writeLoginAuditEvent({
+                req,
+                userRecord,
+                email,
+                outcome: 'blocked',
+                failureReason: 'account_archived',
+            });
             return res.status(403).json({ error: 'This account has been archived. Please contact the super admin.' });
         }
 
         if (role === 'superadmin' || role === 'globaladmin') {
+            await writeLoginAuditEvent({
+                req,
+                userRecord,
+                email,
+                outcome: 'failed',
+                failureReason: 'otp_not_required_for_admin',
+            });
             return res.status(400).json({ error: 'Admin accounts do not require OTP during login.' });
         }
 
         if (!LOGIN_OTP_ROLES.has(role)) {
+            await writeLoginAuditEvent({
+                req,
+                userRecord,
+                email,
+                outcome: 'failed',
+                failureReason: 'unsupported_role',
+            });
             return res.status(403).json({ error: 'Unsupported account role.' });
         }
 
         if (!userRecord.otp_code || userRecord.otp_code !== otp) {
+            await writeLoginAuditEvent({
+                req,
+                userRecord,
+                email,
+                outcome: 'failed',
+                failureReason: 'invalid_otp',
+            });
             return res.status(400).json({ error: "Invalid verification code." });
         }
 
         if (new Date() > new Date(userRecord.otp_expires_at)) {
+            await writeLoginAuditEvent({
+                req,
+                userRecord,
+                email,
+                outcome: 'failed',
+                failureReason: 'otp_expired',
+            });
             return res.status(400).json({ error: "Verification code has expired." });
         }
 
+        const lifecycleBlock = await resolveLifecycleBlockForUser(userRecord);
+        if (lifecycleBlock) {
+            await writeLoginAuditEvent({
+                req,
+                userRecord,
+                email,
+                outcome: 'blocked',
+                failureReason: lifecycleBlock.message,
+            });
+            return res.status(403).json({
+                error: lifecycleBlock.message,
+                code: 'TENANT_LIFECYCLE_BLOCKED',
+                lifecycle: lifecycleBlock.lifecycle,
+            });
+        }
+
         await db.query('UPDATE users SET otp_code = NULL, otp_expires_at = NULL WHERE id = ?', [userRecord.id]);
+
+        await writeLoginAuditEvent({
+            req,
+            userRecord,
+            email,
+            outcome: 'success',
+        });
 
         res.status(200).json({ 
             message: "Login successful", 
@@ -489,6 +741,12 @@ router.post('/verify-otp', async (req, res) => {
 
     } catch (err) {
         console.error("OTP Verification Error:", err);
+        await writeLoginAuditEvent({
+            req,
+            email,
+            outcome: 'failed',
+            failureReason: 'otp_server_error',
+        });
         res.status(500).json({ error: "Server crash during OTP verification." });
     }
 });
