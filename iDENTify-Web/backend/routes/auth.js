@@ -49,6 +49,11 @@ function toPositiveInt(value) {
     return parsed;
 }
 
+function isMailerNotConfiguredError(error) {
+    const message = String(error?.message || '').toLowerCase();
+    return message.includes('mailer is not configured') || message.includes('mailer credentials are not configured');
+}
+
 function composeFullName(firstName, middleName, surname) {
     return [firstName, middleName, surname]
         .map((part) => String(part || '').trim())
@@ -337,6 +342,11 @@ router.post('/signup/superadmin/send-otp', async (req, res) => {
         res.status(200).json({ message: 'Verification code sent to email.' });
     } catch (err) {
         console.error('Super Admin OTP Send Error:', err);
+        if (isMailerNotConfiguredError(err)) {
+            return res.status(503).json({
+                error: 'OTP email service is not configured. Set MAILER_USER, MAILER_PASS, and MAILER_FROM in backend .env.',
+            });
+        }
         res.status(500).json({ error: 'Failed to send verification email.' });
     }
 });
@@ -450,6 +460,11 @@ router.post('/signup/dentist/send-otp', async (req, res) => {
         res.status(200).json({ message: "Verification code sent to email." });
     } catch (err) {
         console.error("OTP Send Error:", err);
+        if (isMailerNotConfiguredError(err)) {
+            return res.status(503).json({
+                error: 'OTP email service is not configured. Set MAILER_USER, MAILER_PASS, and MAILER_FROM in backend .env.',
+            });
+        }
         res.status(500).json({ error: "Failed to send verification email." });
     }
 });

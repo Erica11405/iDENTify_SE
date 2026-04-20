@@ -56,7 +56,7 @@ async function handleResponse(res) {
         } catch {
             body = null;
         }
-        const message = body?.message || res.statusText || 'API Error';
+        const message = body?.message || body?.error || res.statusText || 'API Error';
         const error = new Error(message);
         error.status = res.status;
         error.body = body;
@@ -358,6 +358,22 @@ export const approveAppointment = async (id, payload = {}) => {
 export const declineAppointment = async (id, payload) => {
     const res = await fetch(`${API_BASE}/appointments/${id}/decline`, {
         method: 'PATCH',
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
+export const getAppointmentServiceItems = async (id) => {
+    const res = await fetch(`${API_BASE}/appointments/${id}/service-items`, {
+        headers: { ...actorHeaders() },
+    });
+    return handleResponse(res);
+};
+
+export const updateAppointmentServiceItems = async (id, payload) => {
+    const res = await fetch(`${API_BASE}/appointments/${id}/service-items`, {
+        method: 'PUT',
         headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
@@ -751,6 +767,7 @@ const api = {
     getPatients, getPatientById, createPatient, updatePatient, searchPatients,
     getQueue, addQueueItem, updateQueueItem, deleteQueueItem,
     getAppointments, createAppointment, checkAppointmentLimit, updateAppointment, approveAppointment, declineAppointment,
+    getAppointmentServiceItems, updateAppointmentServiceItems,
     getPayments, getPaymentById, getPaymentByQueueId, getUnpaidPaymentMatches, createPaymentRecord, updatePaymentRecord, addPaymentInstallment,
     getReports, getServicePopularityReport, getDentistPatientsForReport, getDentistReportSummary, get,
     getServices, createService, updateService, deleteService,

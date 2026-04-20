@@ -655,6 +655,86 @@ async function attachServiceItemsToAppointments(rows) {
   return rows;
 }
 
+function computeDurationMinutes(startDateTime, endDateTime, fallback = DEFAULT_DURATION_MINUTES) {
+  const start = toDate(startDateTime);
+  const end = toDate(endDateTime);
+  if (!start || !end) return fallback;
+
+  const diffMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  return diffMinutes > 0 ? diffMinutes : fallback;
+}
+
+function buildLegacyServiceItemsFromAppointment(appointmentRow) {
+  const startDateTime = formatSqlDateTime(appointmentRow?.appointment_datetime);
+  const endDateTime = formatSqlDateTime(appointmentRow?.end_datetime);
+  const durationMinutes = computeDurationMinutes(startDateTime, endDateTime, DEFAULT_DURATION_MINUTES);
+  const fallbackEnd = endDateTime || addMinutes(startDateTime, durationMinutes);
+
+  return [{
+    appointment_id: toPositiveInt(appointmentRow?.id),
+    sequence_order: 1,
+    service_id: null,
+    service_name_snapshot: String(appointmentRow?.reason || "General Consultation").trim() || "General Consultation",
+    dentist_id: toPositiveInt(appointmentRow?.dentist_id),
+    duration_minutes: durationMinutes,
+    segment_start: startDateTime,
+    segment_end: fallbackEnd,
+    notes: String(appointmentRow?.notes || "").trim() || null,
+  }];
+}
+
+async function getScopedAppointmentCore({ appointmentId, actorScope, queryConnection = db }) {
+  const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+  const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+  const supportsUsersClinic = await hasUsersClinicColumn();
+  const supportsUsersBranch = await hasUsersBranchColumn();
+
+  const needsOwnerJoin = actorScope.scoped && (
+    (actorScope.clinicId && !supportsAppointmentClinic && supportsUsersClinic)
+    || (actorScope.branchId && !supportsAppointmentBranch && supportsUsersBranch)
+  );
+
+  let query = `SELECT
+      a.id,
+      a.patient_id,
+      a.dentist_id,
+      a.appointment_datetime,
+      a.end_datetime,
+      a.reason,
+      a.notes,
+      a.status${supportsAppointmentClinic ? ", a.clinic_id" : ""}${supportsAppointmentBranch ? ", a.branch_id" : ""}
+    FROM appointments a`;
+
+  if (needsOwnerJoin) {
+    query += `
+      LEFT JOIN (
+        SELECT dentist_id, MAX(clinic_id) AS clinic_id, MAX(branch_id) AS branch_id
+        FROM users
+        GROUP BY dentist_id
+      ) owner ON owner.dentist_id = a.dentist_id`;
+  }
+
+  const whereClauses = ["a.id = ?"];
+  const params = [appointmentId];
+
+  appendTenantWhereClauses({
+    whereClauses,
+    params,
+    scope: actorScope,
+    clinicExpression: supportsAppointmentClinic ? "a.clinic_id" : (needsOwnerJoin ? "owner.clinic_id" : null),
+    branchExpression: supportsAppointmentBranch ? "a.branch_id" : (needsOwnerJoin ? "owner.branch_id" : null),
+  });
+
+  query += ` WHERE ${whereClauses.join(" AND ")} LIMIT 1`;
+
+  const [rows] = await queryConnection.query(query, params);
+  return {
+    row: rows[0] || null,
+    supportsAppointmentClinic,
+    supportsAppointmentBranch,
+  };
+}
+
 async function hasDentistOverlap({ connection, dentistId, startDateTime, endDateTime, excludeAppointmentId = null }) {
   const queryConnection = connection || db;
   const parsedExcludeId = toPositiveInt(excludeAppointmentId);
@@ -953,6 +1033,318 @@ router.get("/:id", async (req, res) => {
   } catch (err) {
     console.error("Error fetching single appointment:", err);
     res.status(500).json({ message: "Fetch failed" });
+  }
+});
+
+// --- GET APPOINTMENT SERVICE ITEMS ---
+router.get("/:id/service-items", async (req, res) => {
+  const appointmentId = toPositiveInt(req.params.id);
+  if (!appointmentId) {
+    return res.status(400).json({ message: "Invalid appointment id." });
+  }
+
+  try {
+    await syncOverdueAppointmentsToMissed();
+
+    const actorScope = await getActorTenantScope(req);
+    const scoped = await getScopedAppointmentCore({
+      appointmentId,
+      actorScope,
+      queryConnection: db,
+    });
+
+    if (!scoped.row) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    const supportsServiceItemsTable = await hasAppointmentServiceItemsTable();
+
+    let serviceItems = [];
+    if (supportsServiceItemsTable) {
+      const [rows] = await db.query(
+        `SELECT
+           appointment_id,
+           sequence_order,
+           service_id,
+           service_name_snapshot,
+           dentist_id,
+           duration_minutes,
+           segment_start,
+           segment_end,
+           notes
+         FROM appointment_service_items
+         WHERE appointment_id = ?
+         ORDER BY sequence_order ASC`,
+        [appointmentId]
+      );
+
+      serviceItems = rows;
+    }
+
+    if (!serviceItems.length) {
+      serviceItems = buildLegacyServiceItemsFromAppointment(scoped.row);
+    }
+
+    return res.json({
+      appointment_id: appointmentId,
+      appointment_datetime: scoped.row.appointment_datetime,
+      end_datetime: scoped.row.end_datetime,
+      dentist_id: scoped.row.dentist_id,
+      procedure: scoped.row.reason || "",
+      notes: scoped.row.notes || "",
+      service_items: serviceItems,
+    });
+  } catch (err) {
+    console.error("Error loading appointment service items:", err);
+    return res.status(500).json({ message: "Failed to load service items." });
+  }
+});
+
+// --- UPDATE APPOINTMENT SERVICE ITEMS ---
+router.put("/:id/service-items", async (req, res) => {
+  const appointmentId = toPositiveInt(req.params.id);
+  if (!appointmentId) {
+    return res.status(400).json({ message: "Invalid appointment id." });
+  }
+
+  const serviceItemsInput = req.body?.service_items;
+  if (!Array.isArray(serviceItemsInput) || serviceItemsInput.length === 0) {
+    return res.status(400).json({ message: "service_items is required and must be a non-empty array." });
+  }
+
+  let connection;
+  try {
+    await syncOverdueAppointmentsToMissed();
+
+    const supportsServiceItemsTable = await hasAppointmentServiceItemsTable();
+    if (!supportsServiceItemsTable) {
+      return res.status(500).json({
+        message: "Appointment service-item workflow is not configured. Run latest migration first.",
+        code: "MIGRATION_REQUIRED",
+      });
+    }
+
+    const actorScope = await getActorTenantScope(req);
+
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    const scoped = await getScopedAppointmentCore({
+      appointmentId,
+      actorScope,
+      queryConnection: connection,
+    });
+
+    if (!scoped.row) {
+      await connection.rollback();
+      return res.status(404).json({ message: "Appointment not found" });
+    }
+
+    const currentClinicId = scoped.supportsAppointmentClinic ? toPositiveInt(scoped.row.clinic_id) : null;
+    const currentBranchId = scoped.supportsAppointmentBranch ? toPositiveInt(scoped.row.branch_id) : null;
+
+    const resolvedTenant = await resolveAppointmentTenant({
+      clinicId: currentClinicId,
+      branchId: currentBranchId,
+      dentistId: scoped.row.dentist_id,
+      actorScope,
+    });
+
+    if (resolvedTenant.scopeViolation) {
+      await connection.rollback();
+      return res.status(403).json({ message: resolvedTenant.scopeViolation });
+    }
+
+    const lifecycleBlockPayload = await getLifecycleBlockPayload({
+      clinicId: resolvedTenant.clinicId,
+      branchId: resolvedTenant.branchId,
+      action: "booking",
+    });
+    if (lifecycleBlockPayload) {
+      await connection.rollback();
+      return res.status(403).json(lifecycleBlockPayload);
+    }
+
+    const requestedStart = Object.prototype.hasOwnProperty.call(req.body || {}, "timeStart")
+      ? parseTime(req.body.timeStart)
+      : formatSqlDateTime(scoped.row.appointment_datetime);
+
+    if (!requestedStart) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Invalid time format" });
+    }
+
+    const reasonSeed = Object.prototype.hasOwnProperty.call(req.body || {}, "procedure")
+      ? req.body.procedure
+      : scoped.row.reason;
+
+    const fallbackDurationMinutes = await resolveDurationMinutes({
+      services: req.body?.services,
+      procedure: reasonSeed,
+      durationHint: req.body?.estimated_duration_minutes,
+    });
+
+    const requestedDentistId = toPositiveInt(req.body?.dentist_id);
+    const defaultDentistId = pickFirstDentistFromServiceItems(serviceItemsInput)
+      || requestedDentistId
+      || toPositiveInt(scoped.row.dentist_id);
+
+    const builtServiceItems = await buildAppointmentServiceItems({
+      serviceItemsInput,
+      services: req.body?.services,
+      procedure: reasonSeed,
+      defaultDentistId,
+      fallbackDurationMinutes,
+      appointmentStart: requestedStart,
+    });
+
+    const nextEnd = builtServiceItems[builtServiceItems.length - 1]?.segment_end;
+    if (!nextEnd) {
+      await connection.rollback();
+      return res.status(400).json({ message: "Invalid computed end time." });
+    }
+
+    const finalReason = buildReasonText(
+      builtServiceItems.map((item) => item.service_name_snapshot),
+      reasonSeed
+    );
+    const primaryDentistId = builtServiceItems[0]?.dentist_id || defaultDentistId || toPositiveInt(scoped.row.dentist_id);
+
+    const uniqueDentistIds = [...new Set(builtServiceItems.map((item) => item.dentist_id).filter(Boolean))];
+    for (const itemDentistId of uniqueDentistIds) {
+      const hasConflict = await hasDentistOverlap({
+        connection,
+        dentistId: itemDentistId,
+        startDateTime: requestedStart,
+        endDateTime: nextEnd,
+        excludeAppointmentId: appointmentId,
+      });
+
+      if (hasConflict) {
+        await connection.rollback();
+        return res.status(409).json({
+          message: "This time slot is already booked for one or more selected dentists. Please select another time.",
+        });
+      }
+    }
+
+    const setClauses = [
+      "dentist_id = ?",
+      "appointment_datetime = ?",
+      "end_datetime = ?",
+      "reason = ?",
+    ];
+    const setValues = [
+      primaryDentistId,
+      requestedStart,
+      nextEnd,
+      finalReason,
+    ];
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "notes")) {
+      setClauses.push("notes = ?");
+      setValues.push(req.body.notes || "");
+    }
+
+    if (scoped.supportsAppointmentClinic) {
+      setClauses.push("clinic_id = ?");
+      setValues.push(resolvedTenant.clinicId || null);
+    }
+
+    if (scoped.supportsAppointmentBranch) {
+      setClauses.push("branch_id = ?");
+      setValues.push(resolvedTenant.branchId || null);
+    }
+
+    setValues.push(appointmentId);
+    await connection.query(
+      `UPDATE appointments SET ${setClauses.join(", ")} WHERE id = ?`,
+      setValues
+    );
+
+    await connection.query(
+      `DELETE FROM appointment_service_items WHERE appointment_id = ?`,
+      [appointmentId]
+    );
+
+    for (const item of builtServiceItems) {
+      await connection.query(
+        `INSERT INTO appointment_service_items (
+           appointment_id,
+           sequence_order,
+           service_id,
+           service_name_snapshot,
+           dentist_id,
+           duration_minutes,
+           segment_start,
+           segment_end,
+           notes
+         )
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          appointmentId,
+          item.sequence_order,
+          item.service_id || null,
+          item.service_name_snapshot,
+          item.dentist_id,
+          item.duration_minutes,
+          item.segment_start,
+          item.segment_end,
+          item.notes || null,
+        ]
+      );
+    }
+
+    await connection.query(
+      `UPDATE walk_in_queue
+       SET dentist_id = ?, notes = ?, time_added = ?
+       WHERE appointment_id = ?`,
+      [
+        primaryDentistId,
+        finalReason || req.body?.notes || "",
+        requestedStart,
+        appointmentId,
+      ]
+    );
+
+    const [rows] = await connection.query(
+      `SELECT a.*, a.reason AS \`procedure\`, p.full_name, d.name AS dentist_name
+       FROM appointments a
+       JOIN patients p ON a.patient_id = p.id
+       LEFT JOIN dentists d ON a.dentist_id = d.id
+       WHERE a.id = ?`,
+      [appointmentId]
+    );
+
+    rows[0].service_items = builtServiceItems.map((item) => ({
+      appointment_id: appointmentId,
+      sequence_order: item.sequence_order,
+      service_id: item.service_id || null,
+      service_name_snapshot: item.service_name_snapshot,
+      dentist_id: item.dentist_id,
+      duration_minutes: item.duration_minutes,
+      segment_start: item.segment_start,
+      segment_end: item.segment_end,
+      notes: item.notes || null,
+    }));
+
+    await connection.commit();
+    return res.json(rows[0]);
+  } catch (err) {
+    if (connection) {
+      await connection.rollback();
+    }
+
+    if (err?.statusCode) {
+      return res.status(err.statusCode).json({ message: err.message });
+    }
+
+    console.error("Service item update error:", err);
+    return res.status(500).json({ message: "Failed to update appointment service items." });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
 

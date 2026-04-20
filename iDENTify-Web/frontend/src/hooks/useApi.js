@@ -141,6 +141,16 @@ export default function useApi() {
     if (updated?.id && updateAppointmentStore) updateAppointmentStore(updated);
     return updated;
   }, [updateAppointmentStore]);
+
+  const getAppointmentServiceItems = useCallback(async (id) => {
+    return api.getAppointmentServiceItems(id);
+  }, []);
+
+  const updateAppointmentServiceItems = useCallback(async (id, payload) => {
+    const updated = await api.updateAppointmentServiceItems(id, payload);
+    if (updated?.id && updateAppointmentStore) updateAppointmentStore(updated);
+    return updated;
+  }, [updateAppointmentStore]);
   
   const removeAppointment = useCallback(async (id) => {
     await api.deleteAppointment(id);
@@ -205,6 +215,8 @@ export default function useApi() {
     updateAppointment,
     approveAppointment,
     declineAppointment,
+    getAppointmentServiceItems,
+    updateAppointmentServiceItems,
     removeAppointment,
     addQueue,
     updateQueueItem,
@@ -226,6 +238,7 @@ export default function useApi() {
     loading, error, loadPatients, loadAppointments, loadQueue, loadQueueHistory, 
     deleteQueue, setDentists, updateDentistStore, removeDentistStore,
     getPatientById, createPatient, updatePatient, createAppointment, updateAppointment,
-    approveAppointment, declineAppointment, removeAppointment, addQueue, updateQueueItem, loadReports
+    approveAppointment, declineAppointment, getAppointmentServiceItems, updateAppointmentServiceItems,
+    removeAppointment, addQueue, updateQueueItem, loadReports
   ]);
 }
