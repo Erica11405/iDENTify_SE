@@ -95,7 +95,24 @@ function SuperAdminRequestGate() {
     const [request, setRequest] = useState(null);
     const [approvalStatus, setApprovalStatus] = useState(normalizeApprovalStatus(user?.approval_status));
     const [form, setForm] = useState(emptyForm);
+    const [errors, setErrors] = useState({});
     const [workflowError, setWorkflowError] = useState('');
+
+    const validateField = (field, value) => {
+        let error = '';
+        if (!value || String(value).trim() === '') {
+            if (field === 'clinic_name') error = 'Clinic name is required.';
+            if (field === 'clinic_address') error = 'Clinic address is required.';
+            if (field === 'contact_phone') error = 'Contact phone is required.';
+            if (field === 'business_permit_or_license_number') error = 'Business permit number is required.';
+        }
+        if (field === 'branch_count' && (Number(value) < 1 || isNaN(value))) {
+            error = 'Branch count must be at least 1.';
+        }
+        
+        setErrors(prev => ({ ...prev, [field]: error }));
+        return !error;
+    };
 
     const loadRequest = useCallback(async () => {
         setLoading(true);
@@ -118,7 +135,6 @@ function SuperAdminRequestGate() {
         } catch (error) {
             const message = resolveWorkflowErrorMessage(error, 'Failed to load request status.');
             setWorkflowError(message);
-            toast.error(message);
         } finally {
             setLoading(false);
         }
@@ -129,8 +145,8 @@ function SuperAdminRequestGate() {
     }, [loadRequest, userId]);
 
     const canSubmit = useMemo(
-        () => approvalStatus === 'pending_requirements' || approvalStatus === 'declined',
-        [approvalStatus]
+        () => (approvalStatus === 'pending_requirements' || approvalStatus === 'declined') && !workflowError,
+        [approvalStatus, workflowError]
     );
 
     const waitingReview = approvalStatus === 'pending_review';
@@ -138,6 +154,7 @@ function SuperAdminRequestGate() {
 
     const handleInputChange = (field, value) => {
         setForm((prev) => ({ ...prev, [field]: value }));
+        validateField(field, value);
     };
 
     const handleFileChange = async (nameField, dataField, event) => {
@@ -159,6 +176,17 @@ function SuperAdminRequestGate() {
     const handleSubmit = async (event) => {
         event.preventDefault();
         if (!canSubmit) return;
+
+        const fieldsToValidate = ['clinic_name', 'branch_count', 'clinic_address', 'contact_phone', 'business_permit_or_license_number'];
+        let isFormValid = true;
+        fieldsToValidate.forEach(field => {
+            if (!validateField(field, form[field])) isFormValid = false;
+        });
+
+        if (!isFormValid) {
+            toast.error('Please fix the errors in the form.');
+            return;
+        }
 
         setSaving(true);
         try {
@@ -225,7 +253,7 @@ function SuperAdminRequestGate() {
                         <h3>Workflow Not Ready</h3>
                         <p>{workflowError}</p>
                         <div className="request-gate-actions">
-                            <button type="button" className="request-gate-secondary" onClick={loadRequest}>Refresh Status</button>
+                            <button type="button" className="request-gate-primary" onClick={loadRequest}>Refresh Status</button>
                             <button type="button" className="request-gate-secondary" onClick={handleLogout}>Log Out</button>
                         </div>
                     </div>
@@ -258,31 +286,58 @@ function SuperAdminRequestGate() {
                         <div className="request-grid two-col">
                             <div className="request-field">
                                 <label>Clinic Name *</label>
-                                <input type="text" value={form.clinic_name} onChange={(e) => handleInputChange('clinic_name', e.target.value)} />
+                                <input 
+                                    type="text" 
+                                    className={errors.clinic_name ? 'error' : ''}
+                                    value={form.clinic_name} 
+                                    onChange={(e) => handleInputChange('clinic_name', e.target.value)} 
+                                />
+                                {errors.clinic_name && <span className="error-message">{errors.clinic_name}</span>}
                             </div>
                             <div className="request-field">
                                 <label>Branch Count *</label>
-                                <input type="number" min="1" value={form.branch_count} onChange={(e) => handleInputChange('branch_count', e.target.value)} />
+                                <input 
+                                    type="number" 
+                                    min="1" 
+                                    className={errors.branch_count ? 'error' : ''}
+                                    value={form.branch_count} 
+                                    onChange={(e) => handleInputChange('branch_count', e.target.value)} 
+                                />
+                                {errors.branch_count && <span className="error-message">{errors.branch_count}</span>}
                             </div>
                         </div>
 
                         <div className="request-field">
                             <label>Clinic Address *</label>
-                            <textarea rows="2" value={form.clinic_address} onChange={(e) => handleInputChange('clinic_address', e.target.value)} />
+                            <textarea 
+                                rows="2" 
+                                className={errors.clinic_address ? 'error' : ''}
+                                value={form.clinic_address} 
+                                onChange={(e) => handleInputChange('clinic_address', e.target.value)} 
+                            />
+                            {errors.clinic_address && <span className="error-message">{errors.clinic_address}</span>}
                         </div>
 
                         <div className="request-field">
                             <label>Contact Phone *</label>
-                            <input type="text" value={form.contact_phone} onChange={(e) => handleInputChange('contact_phone', e.target.value)} />
+                            <input 
+                                type="text" 
+                                className={errors.contact_phone ? 'error' : ''}
+                                value={form.contact_phone} 
+                                onChange={(e) => handleInputChange('contact_phone', e.target.value)} 
+                            />
+                            {errors.contact_phone && <span className="error-message">{errors.contact_phone}</span>}
                         </div>
 
                         <div className="request-field">
                             <label>Business Permit/License Number *</label>
                             <input
                                 type="text"
+                                className={errors.business_permit_or_license_number ? 'error' : ''}
                                 value={form.business_permit_or_license_number}
                                 onChange={(e) => handleInputChange('business_permit_or_license_number', e.target.value)}
                             />
+                            {errors.business_permit_or_license_number && <span className="error-message">{errors.business_permit_or_license_number}</span>}
                         </div>
 
                         <div className="request-grid two-col">

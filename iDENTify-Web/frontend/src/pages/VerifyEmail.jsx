@@ -98,12 +98,33 @@ function VerifyEmail() {
         }
     };
 
+    const [canResend, setCanResend] = useState(true);
+    const [resendTimer, setResendTimer] = useState(0);
+
+    useEffect(() => {
+        let timer;
+        if (resendTimer > 0) {
+            timer = setInterval(() => {
+                setResendTimer((prev) => prev - 1);
+            }, 1000);
+        } else {
+            setCanResend(true);
+        }
+        return () => clearInterval(timer);
+    }, [resendTimer]);
+
     const handleResendOtp = async () => {
+        if (!canResend) return;
+        setIsSubmitting(true);
         try {
             await api.sendSuperadminSignupOtp({ email });
             toast.success("New code sent to your email!");
+            setCanResend(false);
+            setResendTimer(60); // 60 seconds cooldown
         } catch (error) {
             toast.error("Failed to resend code.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -160,22 +181,21 @@ function VerifyEmail() {
                         <p style={{ marginBottom: "10px", fontSize: "0.9rem", color: "#666" }}>
                             Didn't receive the code?
                         </p>
-                        <button 
-                            type="button" 
+                        <button
+                            type="button"
                             onClick={handleResendOtp}
-                            disabled={isSubmitting}
-                            style={{ 
-                                background: "none", 
-                                border: "none", 
-                                color: "var(--primary-color)", 
-                                cursor: "pointer", 
+                            disabled={isSubmitting || !canResend}
+                            style={{
+                                background: "none",
+                                border: "none",
+                                color: canResend ? "var(--primary-color)" : "#ccc",
+                                cursor: canResend ? "pointer" : "not-allowed",
                                 fontWeight: "bold",
-                                textDecoration: "underline"
+                                textDecoration: canResend ? "underline" : "none"
                             }}
                         >
-                            Resend Code
-                        </button>
-                    </div>
+                            {resendTimer > 0 ? `Resend Code (${resendTimer}s)` : "Resend Code"}
+                        </button>                    </div>
 
                     <p style={{ textAlign: "center", marginTop: "20px" }}>
                         <Link to="/signup" style={{ color: "#666", fontSize: "0.9rem" }}>

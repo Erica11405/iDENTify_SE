@@ -3,7 +3,6 @@ const router = express.Router();
 const db = require('../db'); 
 const bcrypt = require('bcrypt');
 const { sendEmail } = require('../utils/mailer');
-const resend = require('../utils/resend');
 const { emailOTPtemplate } = require('../utils/emailOTPtemplate');
 const {
     normalizeApprovalStatus,
@@ -19,10 +18,6 @@ const LOGIN_OTP_ROLES = new Set(['dentist', 'aide']);
 const signupOtpStore = new Map();
 let signupOtpTableReady = false;
 let signupOtpTableUnavailable = false;
-let hasPasswordChangeRequiredColumnCache = null;
-let hasApprovalStatusColumnCache = null;
-let hasSuperadminRequestsTableCache = null;
-let hasLoginAuditEventsTableCache = null;
 
 function normalizeRole(role) {
     const normalized = String(role || '').trim().toLowerCase();
@@ -54,7 +49,13 @@ function toPositiveInt(value) {
 
 function isMailerNotConfiguredError(error) {
     const message = String(error?.message || '').toLowerCase();
-    return message.includes('mailer is not configured') || message.includes('mailer credentials are not configured');
+    return (
+        message.includes('mailer is not configured') ||
+        message.includes('mailer credentials are not configured') ||
+        message.includes('resend is not configured') ||
+        message.includes('invalid login') ||
+        message.includes('535 5.7.8')
+    );
 }
 
 function composeFullName(firstName, middleName, surname) {
@@ -79,48 +80,30 @@ function toPublicUser(userRecord) {
 }
 
 async function hasPasswordChangeRequiredColumn() {
-    if (hasPasswordChangeRequiredColumnCache !== null) {
-        return hasPasswordChangeRequiredColumnCache;
-    }
-
     try {
         const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'password_change_required'");
-        hasPasswordChangeRequiredColumnCache = rows.length > 0;
+        return rows.length > 0;
     } catch (_err) {
-        hasPasswordChangeRequiredColumnCache = false;
+        return false;
     }
-
-    return hasPasswordChangeRequiredColumnCache;
 }
 
 async function hasApprovalStatusColumn() {
-    if (hasApprovalStatusColumnCache !== null) {
-        return hasApprovalStatusColumnCache;
-    }
-
     try {
         const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'approval_status'");
-        hasApprovalStatusColumnCache = rows.length > 0;
+        return rows.length > 0;
     } catch (_err) {
-        hasApprovalStatusColumnCache = false;
+        return false;
     }
-
-    return hasApprovalStatusColumnCache;
 }
 
 async function hasSuperadminRequestsTable() {
-    if (hasSuperadminRequestsTableCache !== null) {
-        return hasSuperadminRequestsTableCache;
-    }
-
     try {
         const [rows] = await db.query("SHOW TABLES LIKE 'superadmin_access_requests'");
-        hasSuperadminRequestsTableCache = rows.length > 0;
+        return rows.length > 0;
     } catch (_err) {
-        hasSuperadminRequestsTableCache = false;
+        return false;
     }
-
-    return hasSuperadminRequestsTableCache;
 }
 
 async function isSuperadminWorkflowReady() {
@@ -133,18 +116,12 @@ async function isSuperadminWorkflowReady() {
 }
 
 async function hasLoginAuditEventsTable() {
-    if (hasLoginAuditEventsTableCache !== null) {
-        return hasLoginAuditEventsTableCache;
-    }
-
     try {
         const [rows] = await db.query("SHOW TABLES LIKE 'login_audit_events'");
-        hasLoginAuditEventsTableCache = rows.length > 0;
+        return rows.length > 0;
     } catch (_err) {
-        hasLoginAuditEventsTableCache = false;
+        return false;
     }
-
-    return hasLoginAuditEventsTableCache;
 }
 
 function resolveClientIp(req) {
@@ -240,19 +217,12 @@ async function writeLoginAuditEvent({ req, userRecord = null, email = null, role
     }
 }
 
-async function sendOtpEmail({ email, name, otpCode, subject, introText }) {
+async function sendOtpEmail({ email, name, otpCode, subject }) {
     await sendEmail({
         to: email,
         subject,
-        text: `Hello ${name || 'there'},\n\n${introText}: ${otpCode}\n\nThis code will expire in 10 minutes.`,
-    });
-}
-
-async function sendOtpEmailViaResend({ email, name, otpCode, subject }) {
-    await resend.sendEmail({
-        to: email,
-        subject,
         html: emailOTPtemplate(otpCode, name),
+        text: `Hello ${name || 'User'},\n\nYour verification code is: ${otpCode}\n\nThis code will expire in 10 minutes.`,
     });
 }
 
@@ -350,7 +320,7 @@ async function clearSignupOtp(scope, email) {
 
 // --- STEP 1: SEND OTP FOR SUPER ADMIN SIGN UP ---
 router.post('/signup/superadmin/send-otp', async (req, res) => {
-    const email = toEmail(  .body?.email);
+    const email = toEmail(req.body?.email);
 
     if (!email) {
         return res.status(400).json({ error: 'Email is required.' });
@@ -375,7 +345,7 @@ router.post('/signup/superadmin/send-otp', async (req, res) => {
 
         await saveSignupOtp('superadmin', email, otpCode, expiresAt);
 
-        await sendOtpEmailViaResend({
+        await sendOtpEmail({
             email,
             otpCode,
             subject: 'Verify your iDENTify Super Admin Registration',
@@ -494,7 +464,6 @@ router.post('/signup/dentist/send-otp', async (req, res) => {
             email,
             otpCode,
             subject: 'Verify your iDENTify Registration',
-            introText: 'Your registration verification code is',
         });
 
         res.status(200).json({ message: "Verification code sent to email." });
@@ -672,7 +641,6 @@ router.post('/login', async (req, res) => {
             name: userRecord.full_name,
             otpCode,
             subject: 'Your iDENTify Login Verification Code',
-            introText: 'Your login verification code is',
         });
 
         await writeLoginAuditEvent({

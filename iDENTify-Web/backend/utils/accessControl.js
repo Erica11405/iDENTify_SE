@@ -1,11 +1,5 @@
 const db = require('../db');
 
-let hasUsersApprovalStatusColumnCache = null;
-let hasUsersClinicColumnCache = null;
-let hasUsersBranchColumnCache = null;
-let hasClinicsStatusColumnCache = null;
-let hasClinicBranchesStatusColumnCache = null;
-
 function normalizeRole(value) {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'super_admin') return 'superadmin';
@@ -62,78 +56,48 @@ function actorUserId(req) {
 }
 
 async function hasUsersApprovalStatusColumn() {
-  if (hasUsersApprovalStatusColumnCache !== null) {
-    return hasUsersApprovalStatusColumnCache;
-  }
-
   try {
     const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'approval_status'");
-    hasUsersApprovalStatusColumnCache = rows.length > 0;
+    return rows.length > 0;
   } catch (_err) {
-    hasUsersApprovalStatusColumnCache = false;
+    return false;
   }
-
-  return hasUsersApprovalStatusColumnCache;
 }
 
 async function hasUsersClinicColumn() {
-  if (hasUsersClinicColumnCache !== null) {
-    return hasUsersClinicColumnCache;
-  }
-
   try {
     const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'clinic_id'");
-    hasUsersClinicColumnCache = rows.length > 0;
+    return rows.length > 0;
   } catch (_err) {
-    hasUsersClinicColumnCache = false;
+    return false;
   }
-
-  return hasUsersClinicColumnCache;
 }
 
 async function hasUsersBranchColumn() {
-  if (hasUsersBranchColumnCache !== null) {
-    return hasUsersBranchColumnCache;
-  }
-
   try {
     const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'branch_id'");
-    hasUsersBranchColumnCache = rows.length > 0;
+    return rows.length > 0;
   } catch (_err) {
-    hasUsersBranchColumnCache = false;
+    return false;
   }
-
-  return hasUsersBranchColumnCache;
 }
 
 async function hasClinicsStatusColumn() {
-  if (hasClinicsStatusColumnCache !== null) {
-    return hasClinicsStatusColumnCache;
-  }
-
   try {
     const [rows] = await db.query("SHOW COLUMNS FROM clinics LIKE 'status'");
-    hasClinicsStatusColumnCache = rows.length > 0;
+    return rows.length > 0;
   } catch (_err) {
-    hasClinicsStatusColumnCache = false;
+    return false;
   }
-
-  return hasClinicsStatusColumnCache;
 }
 
 async function hasClinicBranchesStatusColumn() {
-  if (hasClinicBranchesStatusColumnCache !== null) {
-    return hasClinicBranchesStatusColumnCache;
-  }
-
   try {
     const [rows] = await db.query("SHOW COLUMNS FROM clinic_branches LIKE 'status'");
-    hasClinicBranchesStatusColumnCache = rows.length > 0;
+    return rows.length > 0;
   } catch (_err) {
-    hasClinicBranchesStatusColumnCache = false;
+    return false;
   }
-
-  return hasClinicBranchesStatusColumnCache;
 }
 
 async function getUserTenantAssignment(userId) {

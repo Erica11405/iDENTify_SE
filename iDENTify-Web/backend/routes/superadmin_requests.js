@@ -8,11 +8,11 @@ const {
   getActorUserRow,
   enforceAdminAccess,
   hasUsersApprovalStatusColumn,
+  hasUsersClinicColumn,
+  hasUsersBranchColumn,
 } = require('../utils/accessControl');
 const { sendEmail } = require('../utils/mailer');
 
-let hasRequestsTableCache = null;
-let usersApprovalColumnsSupportCache = null;
 const WORKFLOW_NOT_CONFIGURED_CODE = 'SUPERADMIN_WORKFLOW_NOT_CONFIGURED';
 const WORKFLOW_NOT_CONFIGURED_MESSAGE = 'Superadmin approval workflow is not configured yet. Run latest migration first.';
 
@@ -65,25 +65,15 @@ function isWorkflowNotConfiguredError(error) {
 }
 
 async function hasRequestsTable() {
-  if (hasRequestsTableCache !== null) {
-    return hasRequestsTableCache;
-  }
-
   try {
     const [rows] = await db.query("SHOW TABLES LIKE 'superadmin_access_requests'");
-    hasRequestsTableCache = rows.length > 0;
+    return rows.length > 0;
   } catch (_err) {
-    hasRequestsTableCache = false;
+    return false;
   }
-
-  return hasRequestsTableCache;
 }
 
 async function getUsersApprovalColumnsSupport() {
-  if (usersApprovalColumnsSupportCache) {
-    return usersApprovalColumnsSupportCache;
-  }
-
   const support = {
     approval_status: false,
     approved_at: false,
@@ -111,7 +101,6 @@ async function getUsersApprovalColumnsSupport() {
     // Keep defaults.
   }
 
-  usersApprovalColumnsSupportCache = support;
   return support;
 }
 
@@ -189,17 +178,6 @@ function validateSubmissionPayload(body) {
   if (!payload.clinic_address) requiredMessages.push('Clinic address is required.');
   if (!payload.contact_phone) requiredMessages.push('Contact phone is required.');
   if (!payload.business_permit_or_license_number) requiredMessages.push('Business permit/license number is required.');
-  if (!payload.owner_valid_id_name) requiredMessages.push('Owner valid ID name is required.');
-  if (!payload.owner_valid_id_data) requiredMessages.push('Owner valid ID file is required.');
-  if (!payload.doh_lto_number) requiredMessages.push('DOH LTO number is required.');
-  if (!payload.doh_lto_doc_name) requiredMessages.push('DOH LTO document name is required.');
-  if (!payload.doh_lto_doc_data) requiredMessages.push('DOH LTO document file is required.');
-  if (!payload.sec_dti_number) requiredMessages.push('SEC/DTI number is required.');
-  if (!payload.sec_dti_doc_name) requiredMessages.push('SEC/DTI document name is required.');
-  if (!payload.sec_dti_doc_data) requiredMessages.push('SEC/DTI document file is required.');
-  if (!payload.bir_2303_number) requiredMessages.push('BIR Form 2303 number is required.');
-  if (!payload.bir_2303_doc_name) requiredMessages.push('BIR Form 2303 document name is required.');
-  if (!payload.bir_2303_doc_data) requiredMessages.push('BIR Form 2303 document file is required.');
 
   if (payload.branch_count > 500) {
     requiredMessages.push('Branch count is too high.');
@@ -722,6 +700,9 @@ router.patch('/review/:requestId/approve', async (req, res) => {
          r.id,
          r.user_id,
          r.status,
+         r.clinic_name,
+         r.branch_count,
+         r.clinic_address,
          u.email AS user_email,
          u.full_name AS user_name
        FROM superadmin_access_requests r
@@ -738,6 +719,36 @@ router.patch('/review/:requestId/approve', async (req, res) => {
 
     const requestRow = rows[0];
 
+    // 1) Provision Clinic
+    let newClinicId;
+    try {
+      const [clinicResult] = await connection.query(
+        'INSERT INTO clinics (name, is_active) VALUES (?, 1)',
+        [requestRow.clinic_name]
+      );
+      newClinicId = clinicResult.insertId;
+    } catch (err) {
+      if (err.code === 'ER_DUP_ENTRY') {
+        await connection.rollback();
+        return res.status(409).json({ message: `A clinic with the name "${requestRow.clinic_name}" already exists. Please ask the applicant to use a different name.` });
+      }
+      throw err;
+    }
+
+    // 2) Provision Branches
+    const branchCount = Math.max(1, Math.min(50, Number(requestRow.branch_count || 1)));
+    let firstBranchId = null;
+
+    for (let i = 1; i <= branchCount; i++) {
+      const branchName = i === 1 ? 'Main Branch' : `Branch ${i}`;
+      const [branchResult] = await connection.query(
+        'INSERT INTO clinic_branches (clinic_id, name, address, is_active) VALUES (?, ?, ?, 1)',
+        [newClinicId, branchName, i === 1 ? requestRow.clinic_address : null]
+      );
+      if (i === 1) firstBranchId = branchResult.insertId;
+    }
+
+    // 3) Update Request Status
     await connection.query(
       `UPDATE superadmin_access_requests
        SET status = 'approved',
@@ -750,9 +761,8 @@ router.patch('/review/:requestId/approve', async (req, res) => {
     );
 
     const support = await getUsersApprovalColumnsSupport();
-    if (!support.approval_status) {
-      throw new Error('Approval status column is not available on users table. Run latest migration first.');
-    }
+    const hasClinicColumn = await hasUsersClinicColumn();
+    const hasBranchColumn = await hasUsersBranchColumn();
 
     const userSets = ['approval_status = ?'];
     const userValues = ['approved'];
@@ -764,6 +774,16 @@ router.patch('/review/:requestId/approve', async (req, res) => {
     }
     if (support.declined_at) userSets.push('declined_at = NULL');
     if (support.decline_reason) userSets.push('decline_reason = NULL');
+
+    // Link user to provisioned tenant
+    if (hasClinicColumn) {
+      userSets.push('clinic_id = ?');
+      userValues.push(newClinicId);
+    }
+    if (hasBranchColumn) {
+      userSets.push('branch_id = ?');
+      userValues.push(firstBranchId);
+    }
 
     userValues.push(requestRow.user_id);
 
@@ -841,6 +861,9 @@ router.patch('/review/:requestId/decline', async (req, res) => {
          r.id,
          r.user_id,
          r.status,
+         r.clinic_name,
+         r.branch_count,
+         r.clinic_address,
          u.email AS user_email,
          u.full_name AS user_name
        FROM superadmin_access_requests r

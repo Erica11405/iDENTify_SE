@@ -7,6 +7,7 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "migrate": "node scripts/run-migrations.js",
+    "migrate:fresh": "node scripts/run-migrations.js --fresh",
     "migrate:status": "node scripts/run-migrations.js --status",
     "reports:access-check": "node scripts/reports-access-check.js",
     "reports:access-check:positive": "node scripts/reports-access-check.js --include-positive",
@@ -15,13 +16,13 @@
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.0.3",
     "express": "^4.22.1",
     "mysql2": "^3.4.0",
     "nodemailer": "^8.0.4",
     "resend": "^6.12.0"
   },
   "devDependencies": {
+    "dotenv": "^17.4.2",
     "nodemon": "^3.0.2"
   }
 }

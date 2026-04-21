@@ -27,20 +27,31 @@ const superadminRequestsRoutes = require("./routes/superadmin_requests");
 
 const app = express();
 
-const DEFAULT_PROD_ORIGIN = "https://identify-app-hth8t.ondigitalocean.app";
 const configuredOrigins = String(process.env.CORS_ORIGINS || "")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
 
-const allowedOrigins = configuredOrigins.length > 0 ? configuredOrigins : [DEFAULT_PROD_ORIGIN];
+const allowedOrigins = [...configuredOrigins];
+
 if (process.env.NODE_ENV !== "production") {
     allowedOrigins.push("http://localhost:5173");
 }
 
 // 2. CORS - Allow Production and Local Vite URLs
 app.use(cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        
+        const isAllowed = allowedOrigins.some(ao => origin.startsWith(ao)) || 
+                         origin.endsWith(".ondigitalocean.app");
+        
+        if (isAllowed) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-user-role", "x-user-id", "x-user-dentist-id"]
 }));

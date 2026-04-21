@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const args = new Set(process.argv.slice(2));
 const showStatusOnly = args.has('--status');
+const isFresh = args.has('--fresh');
 const DB_TIMEZONE = process.env.DB_TIMEZONE || '+08:00';
 
 function buildDbConfig() {
@@ -156,18 +157,36 @@ async function printStatus(sqlFiles, appliedMap) {
   }
 }
 
+async function dropAllTables(connection, databaseName) {
+  console.log(`\nFresh migration: Dropping all tables in "${databaseName}"...`);
+  
+  // Disable foreign key checks to allow dropping tables in any order
+  await connection.query('SET FOREIGN_KEY_CHECKS = 0');
+
+  const [tables] = await connection.query(
+    'SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = \'BASE TABLE\'',
+    [databaseName]
+  );
+
+  for (const table of tables) {
+    const tableName = table.table_name || table.TABLE_NAME;
+    console.log(`  - Dropping table: ${tableName}`);
+    await connection.query(`DROP TABLE \`${tableName}\``);
+  }
+
+  await connection.query('SET FOREIGN_KEY_CHECKS = 1');
+  console.log('All tables dropped.\n');
+}
+
 async function run() {
   const sqlDir = path.join(__dirname, '..', 'sql');
+  const databaseSqlPath = path.join(__dirname, '..', '..', 'database.sql');
+
   if (!fs.existsSync(sqlDir)) {
     throw new Error(`SQL directory not found: ${sqlDir}`);
   }
 
   const sqlFiles = getSqlFiles(sqlDir);
-  if (sqlFiles.length === 0) {
-    console.log('No SQL migration files found.');
-    return;
-  }
-
   const dbConfig = buildDbConfig();
   console.log(`Connecting to ${dbConfig.host}:${dbConfig.port}/${dbConfig.database} ...`);
 
@@ -175,8 +194,25 @@ async function run() {
 
   try {
     await connection.query('SET time_zone = ?', [DB_TIMEZONE]);
-    await ensureMigrationsTable(connection);
 
+    if (isFresh && !showStatusOnly) {
+      await dropAllTables(connection, dbConfig.database);
+
+      if (fs.existsSync(databaseSqlPath)) {
+        console.log(`\nRunning baseline from ${databaseSqlPath} ...`);
+        let databaseSql = fs.readFileSync(databaseSqlPath, 'utf8');
+        
+        // Strip CREATE DATABASE and USE statements to avoid permission issues on Managed DBs
+        databaseSql = databaseSql.replace(/CREATE DATABASE IF NOT EXISTS.*?;/gi, '-- $&');
+        databaseSql = databaseSql.replace(/USE `.*?`;/gi, '-- $&');
+        databaseSql = databaseSql.replace(/USE .*?;/gi, '-- $&');
+
+        await connection.query(databaseSql);
+        console.log('Baseline database structure applied.\n');
+      }
+    }
+
+    await ensureMigrationsTable(connection);
     const appliedMap = await getAppliedMigrations(connection);
 
     if (showStatusOnly) {
@@ -186,30 +222,51 @@ async function run() {
 
     let appliedCount = 0;
 
-    for (const filename of sqlFiles) {
-      const filePath = path.join(sqlDir, filename);
-      const sql = fs.readFileSync(filePath, 'utf8');
-      const checksum = sha256(sql);
-      const applied = appliedMap.get(filename);
+    // During a fresh migration, we skip executing the incremental files because database.sql 
+    // already contains the final state. We only execute them during normal migrations.
+    if (!isFresh) {
+      for (const filename of sqlFiles) {
+        const filePath = path.join(sqlDir, filename);
+        const sql = fs.readFileSync(filePath, 'utf8');
+        const checksum = sha256(sql);
+        const applied = appliedMap.get(filename);
 
-      if (applied) {
-        if (applied.checksum !== checksum) {
-          throw new Error(
-            `Migration file changed after apply: ${filename}. Create a new migration file instead.`
-          );
+        if (applied) {
+          if (applied.checksum !== checksum) {
+            throw new Error(
+              `Migration file changed after apply: ${filename}. Create a new migration file instead.`
+            );
+          }
+          console.log(`Skip ${filename} (already applied).`);
+          continue;
         }
-        console.log(`Skip ${filename} (already applied).`);
-        continue;
-      }
 
-      console.log(`Apply ${filename} ...`);
-      await connection.query(sql);
-      await connection.query(
-        'INSERT INTO schema_migrations (filename, checksum) VALUES (?, ?)',
-        [filename, checksum]
-      );
-      appliedCount += 1;
-      console.log(`Applied ${filename}.`);
+        console.log(`Apply ${filename} ...`);
+        await connection.query(sql);
+        await connection.query(
+          'INSERT INTO schema_migrations (filename, checksum) VALUES (?, ?)',
+          [filename, checksum]
+        );
+        appliedCount += 1;
+        console.log(`Applied ${filename}.`);
+      }
+    }
+
+    // If we just ran a fresh migration, ensure all current sql/ files are marked as applied
+    // so future incremental migrations start from the right place.
+    if (isFresh) {
+        console.log('Synchronizing migration history with fresh baseline...');
+        for (const filename of sqlFiles) {
+            const filePath = path.join(sqlDir, filename);
+            const sql = fs.readFileSync(filePath, 'utf8');
+            const checksum = sha256(sql);
+            
+            await connection.query(
+                'INSERT IGNORE INTO schema_migrations (filename, checksum) VALUES (?, ?)',
+                [filename, checksum]
+            );
+        }
+        console.log('Migration history synchronized.');
     }
 
     console.log(`\nDone. Newly applied migrations: ${appliedCount}`);
