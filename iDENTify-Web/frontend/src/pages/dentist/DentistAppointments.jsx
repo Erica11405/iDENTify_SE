@@ -3,14 +3,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
-import EditDentistModal from "../../components/EditDentistModal";
 import "../../styles/pages/dentist/DentistAppointments.css";
-
-const DAYS = [
-  { label: "S", value: 0 }, { label: "M", value: 1 }, { label: "T", value: 2 },
-  { label: "W", value: 3 }, { label: "T", value: 4 }, { label: "F", value: 5 },
-  { label: "S", value: 6 }
-];
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -46,36 +39,6 @@ function DentistAppointments() {
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' or 'patients'
   const [decisionLoadingId, setDecisionLoadingId] = useState(null);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [myDentistData, setMyDentistData] = useState(null);
-
-  useEffect(() => {
-    if (currentDentistId) {
-      const matched = dentists.find(d => Number(d.id) === Number(currentDentistId));
-      if (matched) setMyDentistData(matched);
-    }
-  }, [currentDentistId, dentists]);
-
-  const formatSchedule = (scheduleStr) => {
-    if (!scheduleStr) return "No schedule set";
-    try {
-      const schedule = typeof scheduleStr === 'string' ? JSON.parse(scheduleStr) : scheduleStr;
-      const activeDays = DAYS.filter(d => schedule[d.value]?.active);
-      if (activeDays.length === 0) return "No active days";
-      
-      return activeDays.map(d => {
-        const daySched = schedule[d.value];
-        return `${d.label}: ${daySched.start || '00:00'} - ${daySched.end || '00:00'}`;
-      }).join(" | ");
-    } catch (e) {
-      return "Invalid schedule format";
-    }
-  };
-
-  const handleUpdateSchedule = () => {
-    api.loadDentists();
-    setShowScheduleModal(false);
-  };
 
   useEffect(() => {
     api.loadAppointments();
@@ -372,39 +335,6 @@ function DentistAppointments() {
             </tbody>
           </table>
         </div>
-      )}
-
-      <div className="my-schedule-section" style={{ marginTop: '2rem', padding: '1.5rem', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>My Weekly Schedule</h2>
-            <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>Manage your weekly availability and working hours.</p>
-          </div>
-          <button 
-            className="btn-edit-schedule" 
-            onClick={() => setShowScheduleModal(true)}
-            style={{ padding: '0.6rem 1.2rem', background: '#3498db', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }}
-            onMouseOver={(e) => e.currentTarget.style.background = '#2980b9'}
-            onMouseOut={(e) => e.currentTarget.style.background = '#3498db'}
-          >
-            Edit My Schedule
-          </button>
-        </div>
-        
-        <div className="current-schedule-display" style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-          <p style={{ margin: 0, fontWeight: '500', color: '#475569', fontSize: '0.95rem' }}>
-            <strong>Current Hours:</strong> {myDentistData ? formatSchedule(myDentistData.schedule) : "Loading schedule..."}
-          </p>
-        </div>
-      </div>
-
-      {showScheduleModal && myDentistData && (
-        <EditDentistModal 
-          dentist={myDentistData}
-          onClose={() => setShowScheduleModal(false)}
-          onSuccess={handleUpdateSchedule}
-          actorContext={currentUser}
-        />
       )}
     </div>
   );
