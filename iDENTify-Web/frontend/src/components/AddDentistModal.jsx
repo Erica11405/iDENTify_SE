@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import '../styles/components/AddDentistModal.css';
-// We use the direct API client instead of the hook for 'POST' actions to be safe
 import api from '../api/apiClient';
 
 const DAYS = [
@@ -14,18 +13,16 @@ const DAYS = [
 ];
 
 const AddDentistModal = ({ onClose, onSuccess }) => {
-  // Local state for loading and errors
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Initialize state with default schedule values
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
     specialization: '',
     phone: '',
     email: '',
-    days: [1, 2, 3, 4, 5], // Default Mon-Fri
+    days: [1, 2, 3, 4, 5], 
     operatingHours: { start: "09:00", end: "17:00" },
     lunch: { start: "12:00", end: "13:00" },
     breaks: [],
@@ -91,7 +88,6 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
     }));
   };
 
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -113,10 +109,14 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
     };
 
     try {
-      // FIX: Changed api.post to api.createDentist
-      await api.createDentist(payload); 
-      
+      const response = await api.createDentist(payload); 
       console.log('Dentist added successfully');
+      
+      const tempPassword = response?.generated_password || response?.data?.generated_password;
+
+      if (tempPassword) {
+         alert(`SUCCESS: Dentist account created!\n\nEmail: ${formData.email}\nTemporary Password: ${tempPassword}\n\nPlease copy this password and give it to the dentist.`);
+      }
       
       if (onSuccess) {
         onSuccess();
@@ -128,12 +128,11 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
 
     } catch (err) {
       console.error("Add Dentist Error:", err);
-      setError("Failed to add dentist. Please try again.");
+      setError(err.message || "Failed to add dentist. Please try again.");
     } finally {
       setLoading(false);
     }
   };
-
 
   return (
     <div className="modal-overlay">

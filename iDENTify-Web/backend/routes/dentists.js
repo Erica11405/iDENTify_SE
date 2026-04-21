@@ -273,7 +273,6 @@ router.get('/', async (req, res) => {
       }
     }
     
-    // Server-side filtering logic
     if (type === 'dentist') {
       whereClauses.push("specialization != 'Dental Aide'");
     } else if (type === 'aide') {
@@ -348,16 +347,10 @@ router.post('/', async (req, res) => {
     let assignedBranchId = toPositiveInt(branch_id);
 
     if (actorScope.scoped) {
-      if (!assignedClinicId && actorScope.clinicId) {
-        assignedClinicId = actorScope.clinicId;
-      }
-
-      if (!assignedBranchId && actorScope.branchId) {
-        assignedBranchId = actorScope.branchId;
-      }
-    }
-
-    if (!assignedClinicId && assignedBranchId) {
+      // FORCE the assignment to the actor's scope to prevent mismatch errors
+      assignedClinicId = actorScope.clinicId;
+      assignedBranchId = actorScope.branchId;
+    } else if (!assignedClinicId && assignedBranchId) {
       assignedClinicId = await resolveClinicIdFromBranch(assignedBranchId);
     }
 

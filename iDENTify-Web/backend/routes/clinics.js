@@ -334,6 +334,8 @@ router.get('/summary', async (req, res) => {
 
 router.get('/', async (req, res) => {
   const includeInactive = toBoolean(req.query.includeInactive, false);
+  const userId = toOptionalPositiveInt(req.headers['x-user-id']);
+  const role = String(req.headers['x-user-role'] || '').trim().toLowerCase();
 
   try {
     const clinicSupport = await getClinicColumnSupport();
@@ -342,7 +344,29 @@ router.get('/', async (req, res) => {
     const clinicStatusExpr = buildStatusExpr('c', clinicSupport.status);
     const branchStatusExpr = buildStatusExpr('cb', branchSupport.status);
 
-    const whereSql = includeInactive ? '' : `WHERE ${clinicStatusExpr} = 'Active'`;
+    const whereClauses = [];
+    if (!includeInactive) {
+      whereClauses.push(`${clinicStatusExpr} = 'Active'`);
+    }
+
+    // NEW: Restrict clinics to the assigned one for Super Admins
+    if (['superadmin', 'dentist', 'aide'].includes(role) && userId) {
+        try {
+            const [colCheck] = await db.query("SHOW COLUMNS FROM users LIKE 'clinic_id'");
+            if (colCheck.length > 0) {
+                const [userRows] = await db.query('SELECT clinic_id FROM users WHERE id = ? LIMIT 1', [userId]);
+                if (userRows.length && userRows[0].clinic_id) {
+                    whereClauses.push(`c.id = ${Number(userRows[0].clinic_id)}`);
+                } else {
+                    whereClauses.push('1 = 0'); // No clinic assigned, show nothing
+                }
+            }
+        } catch (err) {
+            console.warn('Failed to apply tenant scope filter to clinics:', err);
+        }
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
     const selectColumns = ['c.id', 'c.name', 'c.code', 'c.is_active'];
     if (clinicSupport.status) selectColumns.push('c.status');
