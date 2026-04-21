@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import api from '../../api/apiClient';
 import WeeklyBarChart from '../../components/WeeklyBarChart';
 import ServicePopularityChartCard from '../../components/ServicePopularityChartCard';
+import ConfirmationModal from '../../components/ConfirmationModal';
+import useAppStore from '../../store/useAppStore';
 import '../../styles/pages/dentist/DentistSettings.css';
 
 function isArchived(user) {
@@ -39,25 +41,6 @@ function formatRangeLabel(start, end) {
     return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
 }
 
-function buildSummaryFromClinics(clinics) {
-    const rows = Array.isArray(clinics) ? clinics : [];
-
-    return {
-        totals: {
-            total_clinics: rows.length,
-            active_clinics: rows.filter((item) => Number(item?.is_active || 0) === 1 || item?.is_active === true).length,
-        },
-        branches_per_clinic: rows
-            .map((item) => ({
-                id: item.id,
-                name: item.name,
-                total_branches: Number(item.total_branches || 0),
-                active_branches: Number(item.active_branches || 0),
-            }))
-            .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))),
-    };
-}
-
 function normalizeBoolean(value) {
     if (value === true || value === false) return value;
     if (value === 1 || value === 0) return Boolean(value);
@@ -69,7 +52,7 @@ function resolveDashboardMessage(error, fallback = 'Failed to load dashboard dat
     const code = String(error?.body?.code || '').trim().toUpperCase();
 
     if (code === 'SUPERADMIN_NOT_APPROVED') {
-        return 'Your superadmin access is not approved yet. Complete your request and wait for approval.';
+        return 'Your clinic admin access is not approved yet. Complete your request and wait for approval.';
     }
 
     if (code === 'TENANT_ASSIGNMENT_REQUIRED') {
@@ -84,29 +67,33 @@ function resolveDashboardMessage(error, fallback = 'Failed to load dashboard dat
 }
 
 function SuperAdminDashboard() {
+    const user = useAppStore((state) => state.user);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [users, setUsers] = useState([]);
     const [dentists, setDentists] = useState([]);
     const [appointments, setAppointments] = useState([]);
     const [clinics, setClinics] = useState([]);
-    const [clinicSummary, setClinicSummary] = useState({ totals: { total_clinics: 0, active_clinics: 0 }, branches_per_clinic: [] });
-    const [clinicSummaryNotice, setClinicSummaryNotice] = useState('');
     const [clinicBranchesByClinic, setClinicBranchesByClinic] = useState({});
     const [branchesLoading, setBranchesLoading] = useState(false);
 
-    const [clinicForm, setClinicForm] = useState({ name: '', code: '' });
     const [branchForm, setBranchForm] = useState({ clinicId: '', name: '', code: '', address: '' });
-    const [creatingClinic, setCreatingClinic] = useState(false);
     const [creatingBranch, setCreatingBranch] = useState(false);
     const [clinicActionNotice, setClinicActionNotice] = useState({ type: '', message: '' });
     const [selectedClinicId, setSelectedClinicId] = useState('');
+
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmModalConfig, setConfirmModalConfig] = useState({ message: '', onConfirm: () => {} });
+
+    const openConfirm = (message, onConfirm) => {
+        setConfirmModalConfig({ message, onConfirm });
+        setShowConfirmModal(true);
+    };
 
     useEffect(() => {
         const loadDashboardData = async () => {
             setLoading(true);
             setError('');
-            setClinicSummaryNotice('');
 
             try {
                 const [
@@ -114,13 +101,11 @@ function SuperAdminDashboard() {
                     dentistsResult,
                     appointmentsResult,
                     clinicsResult,
-                    clinicSummaryResult,
                 ] = await Promise.allSettled([
                     api.getAdminUsers({ role: 'all', archived: 'all' }),
                     api.getDentists(),
                     api.getAppointments(),
                     api.getClinics({ includeInactive: true }),
-                    api.getClinicSummary(),
                 ]);
 
                 if (usersResult.status === 'fulfilled') {
@@ -141,24 +126,15 @@ function SuperAdminDashboard() {
                     throw appointmentsResult.reason;
                 }
 
-                const clinicsData = clinicsResult.status === 'fulfilled' && Array.isArray(clinicsResult.value)
+                let clinicsData = clinicsResult.status === 'fulfilled' && Array.isArray(clinicsResult.value)
                     ? clinicsResult.value
                     : [];
-                setClinics(clinicsData);
-
-                if (clinicSummaryResult.status === 'fulfilled' && clinicSummaryResult.value) {
-                    setClinicSummary(clinicSummaryResult.value);
-                } else {
-                    setClinicSummary(buildSummaryFromClinics(clinicsData));
-                    if (clinicSummaryResult.status === 'rejected') {
-                        const summaryError = clinicSummaryResult.reason;
-                        if (summaryError?.status === 403) {
-                            setClinicSummaryNotice(resolveDashboardMessage(summaryError, 'Clinic summary is showing fallback values because your current account cannot access summary endpoint data.'));
-                        } else {
-                            setClinicSummaryNotice('Clinic summary endpoint is currently unavailable. Showing fallback values from clinic list.');
-                        }
-                    }
+                
+                if (user?.clinic_id) {
+                    clinicsData = clinicsData.filter(c => String(c.id) === String(user.clinic_id));
                 }
+
+                setClinics(clinicsData);
             } catch (err) {
                 setError(resolveDashboardMessage(err, 'Failed to load dashboard data.'));
             } finally {
@@ -167,7 +143,7 @@ function SuperAdminDashboard() {
         };
 
         loadDashboardData();
-    }, []);
+    }, [user?.clinic_id]);
 
     useEffect(() => {
         if (clinics.length === 0) {
@@ -285,98 +261,11 @@ function SuperAdminDashboard() {
         };
     }, [dentists, appointments]);
 
-    const clinicBranchChartData = useMemo(() => {
-        const rows = Array.isArray(clinicSummary?.branches_per_clinic) ? clinicSummary.branches_per_clinic : [];
-
-        return {
-            labels: rows.map((item) => String(item.name || `Clinic #${item.id || ''}`)),
-            appointments: rows.map((item) => Number(item.total_branches || 0)),
-            appointmentsLabel: 'Branches',
-            singleSeries: true,
-            xTickFontSize: 11,
-            yTickFontSize: 12,
-            xTickMaxRotation: 45,
-            xTickMinRotation: 0,
-        };
-    }, [clinicSummary]);
-
-    const clinicMetrics = useMemo(() => {
-        const totals = clinicSummary?.totals || {};
-        const rows = Array.isArray(clinicSummary?.branches_per_clinic) ? clinicSummary.branches_per_clinic : [];
-
-        const totalBranches = rows.reduce((sum, item) => sum + Number(item.total_branches || 0), 0);
-        const activeBranches = rows.reduce((sum, item) => sum + Number(item.active_branches || 0), 0);
-
-        return {
-            totalClinics: Number(totals.total_clinics || 0),
-            activeClinics: Number(totals.active_clinics || 0),
-            totalBranches,
-            activeBranches,
-        };
-    }, [clinicSummary]);
-
     const selectedClinicBranches = selectedClinicId
         ? (clinicBranchesByClinic[selectedClinicId] || [])
         : [];
 
     const selectedClinicName = clinics.find((item) => String(item.id) === String(selectedClinicId))?.name || 'Selected Clinic';
-
-    const handleCreateClinic = async (event) => {
-        event.preventDefault();
-        const name = String(clinicForm.name || '').trim();
-        const code = String(clinicForm.code || '').trim();
-
-        if (!name) {
-            setClinicActionNotice({ type: 'error', message: 'Clinic name is required.' });
-            return;
-        }
-
-        setCreatingClinic(true);
-        setClinicActionNotice({ type: '', message: '' });
-
-        try {
-            const created = await api.createClinic({ name, code: code || undefined });
-            const normalizedCreated = {
-                ...created,
-                is_active: normalizeBoolean(created?.is_active),
-                total_branches: Number(created?.total_branches || 0),
-                active_branches: Number(created?.active_branches || 0),
-            };
-
-            setClinics((prev) => {
-                const next = [...prev, normalizedCreated];
-                next.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-                return next;
-            });
-
-            setClinicSummary((prev) => {
-                const previousRows = Array.isArray(prev?.branches_per_clinic) ? prev.branches_per_clinic : [];
-                const nextRows = [...previousRows, {
-                    id: normalizedCreated.id,
-                    name: normalizedCreated.name,
-                    total_branches: 0,
-                    active_branches: 0,
-                }].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-
-                return {
-                    totals: {
-                        total_clinics: Number(prev?.totals?.total_clinics || 0) + 1,
-                        active_clinics: Number(prev?.totals?.active_clinics || 0) + 1,
-                    },
-                    branches_per_clinic: nextRows,
-                };
-            });
-
-            setClinicForm({ name: '', code: '' });
-            setSelectedClinicId(String(normalizedCreated.id));
-            setBranchForm((prev) => ({ ...prev, clinicId: String(normalizedCreated.id) }));
-            setClinicActionNotice({ type: 'success', message: 'Clinic created successfully.' });
-        } catch (err) {
-            setClinicActionNotice({ type: 'error', message: err?.message || 'Failed to create clinic.' });
-        } finally {
-            setCreatingClinic(false);
-        }
-    };
 
     const handleCreateBranch = async (event) => {
         event.preventDefault();
@@ -415,27 +304,6 @@ function SuperAdminDashboard() {
                 };
             });
 
-            setClinics((prev) => prev.map((item) => {
-                if (String(item.id) !== targetClinicId) return item;
-                return {
-                    ...item,
-                    total_branches: Number(item.total_branches || 0) + 1,
-                    active_branches: Number(item.active_branches || 0) + (normalizeBoolean(created?.is_active) ? 1 : 0),
-                };
-            }));
-
-            setClinicSummary((prev) => ({
-                ...prev,
-                branches_per_clinic: (Array.isArray(prev?.branches_per_clinic) ? prev.branches_per_clinic : []).map((row) => {
-                    if (String(row.id) !== targetClinicId) return row;
-                    return {
-                        ...row,
-                        total_branches: Number(row.total_branches || 0) + 1,
-                        active_branches: Number(row.active_branches || 0) + (normalizeBoolean(created?.is_active) ? 1 : 0),
-                    };
-                }),
-            }));
-
             setSelectedClinicId(targetClinicId);
             setBranchForm((prev) => ({
                 ...prev,
@@ -452,10 +320,54 @@ function SuperAdminDashboard() {
         }
     };
 
+    const executeArchiveBranch = async (branch) => {
+        const clinicId = selectedClinicId;
+        try {
+            await api.archiveClinicBranch(clinicId, branch.id);
+            setClinicActionNotice({ type: 'success', message: 'Branch archived.' });
+            setClinicBranchesByClinic((prev) => {
+                const current = prev[clinicId] || [];
+                return {
+                    ...prev,
+                    [clinicId]: current.map(b => b.id === branch.id ? { ...b, is_active: 0 } : b),
+                };
+            });
+        } catch (err) {
+            setClinicActionNotice({ type: 'error', message: err?.message || 'Failed to archive branch.' });
+        } finally {
+            setShowConfirmModal(false);
+        }
+    };
+
+    const handleArchiveBranch = (branch) => {
+        const clinicId = selectedClinicId;
+        if (!clinicId || !branch?.id) return;
+        openConfirm(`Archive branch "${branch.name}"?`, () => executeArchiveBranch(branch));
+    };
+
+    const handleRestoreBranch = async (branch) => {
+        const clinicId = selectedClinicId;
+        if (!clinicId || !branch?.id) return;
+
+        try {
+            await api.restoreClinicBranch(clinicId, branch.id);
+            setClinicActionNotice({ type: 'success', message: 'Branch restored.' });
+            setClinicBranchesByClinic((prev) => {
+                const current = prev[clinicId] || [];
+                return {
+                    ...prev,
+                    [clinicId]: current.map(b => b.id === branch.id ? { ...b, is_active: 1 } : b),
+                };
+            });
+        } catch (err) {
+            setClinicActionNotice({ type: 'error', message: err?.message || 'Failed to restore branch.' });
+        }
+    };
+
     return (
         <section className="settings-dashboard-container">
             <div className="settings-header-section">
-                <h2>Super Admin Dashboard</h2>
+                <h2>Clinic Admin Dashboard</h2>
                 <p>System-level overview for users, clinics, and booking operations.</p>
             </div>
 
@@ -471,66 +383,12 @@ function SuperAdminDashboard() {
                         <StatCard label="Archived Accounts" value={metrics.archivedAccounts} />
                     </div>
 
-                    <div className="superadmin-stats-grid dashboard-top-spacing-sm">
-                        <StatCard label="Clinics" value={clinicMetrics.totalClinics} />
-                        <StatCard label="Active Clinics" value={clinicMetrics.activeClinics} />
-                        <StatCard label="Branches" value={clinicMetrics.totalBranches} />
-                        <StatCard label="Active Branches" value={clinicMetrics.activeBranches} />
-                    </div>
-
-                    {clinicSummaryNotice ? (
-                        <p className="dashboard-notice">{clinicSummaryNotice}</p>
-                    ) : null}
-
                     <div className="settings-form-card dashboard-top-spacing-md">
                         <h3>Appointments Per Dentist</h3>
                         <p className="dashboard-muted-text">
                             Current week: {chartData.rangeLabel}
                         </p>
                         <WeeklyBarChart chartData={chartData} />
-                    </div>
-
-                    <div className="settings-form-card dashboard-top-spacing-md">
-                        <h3>Branches Per Clinic</h3>
-                        <p className="dashboard-muted-text">
-                            Clinic footprint based on current branch assignments.
-                        </p>
-                        <WeeklyBarChart chartData={clinicBranchChartData} />
-                    </div>
-
-                    <div className="settings-form-card dashboard-top-spacing-md dashboard-management-card">
-                        <h3>Create Clinic</h3>
-                        <p className="dashboard-muted-text">Add a clinic to start organizing branches and staff ownership.</p>
-                        <form onSubmit={handleCreateClinic}>
-                            <div className="form-row">
-                                <div className="form-group flex-2">
-                                    <label htmlFor="clinic-name">Clinic Name</label>
-                                    <input
-                                        id="clinic-name"
-                                        type="text"
-                                        value={clinicForm.name}
-                                        onChange={(event) => setClinicForm((prev) => ({ ...prev, name: event.target.value }))}
-                                        placeholder="Enter clinic name"
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label htmlFor="clinic-code">Clinic Code (Optional)</label>
-                                    <input
-                                        id="clinic-code"
-                                        type="text"
-                                        value={clinicForm.code}
-                                        onChange={(event) => setClinicForm((prev) => ({ ...prev, code: event.target.value }))}
-                                        placeholder="e.g. CLINIC-A"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="settings-inline-actions">
-                                <button className="btn-primary-action" type="submit" disabled={creatingClinic}>
-                                    {creatingClinic ? 'Creating Clinic...' : 'Create Clinic'}
-                                </button>
-                            </div>
-                        </form>
                     </div>
 
                     <div className="settings-form-card dashboard-top-spacing-md dashboard-management-card">
@@ -548,6 +406,7 @@ function SuperAdminDashboard() {
                                             setBranchForm((prev) => ({ ...prev, clinicId: value }));
                                             setSelectedClinicId(value);
                                         }}
+                                        disabled={clinics.length <= 1}
                                     >
                                         {clinics.length === 0 ? <option value="">No clinics available</option> : null}
                                         {clinics.map((clinic) => (
@@ -610,53 +469,8 @@ function SuperAdminDashboard() {
                     ) : null}
 
                     <div className="settings-form-card dashboard-top-spacing-md">
-                        <h3>Clinic Directory</h3>
-                        <div className="table-container">
-                            <table className="settings-table">
-                                <thead>
-                                    <tr>
-                                        <th>Clinic</th>
-                                        <th>Code</th>
-                                        <th>Total Branches</th>
-                                        <th>Active Branches</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {clinics.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="empty-state">No clinics found.</td>
-                                        </tr>
-                                    ) : (
-                                        clinics.map((clinic) => {
-                                            const active = normalizeBoolean(clinic.is_active);
-                                            return (
-                                                <tr
-                                                    key={clinic.id}
-                                                    className={`dashboard-clickable-row ${String(clinic.id) === String(selectedClinicId) ? 'row-highlight' : ''}`}
-                                                    onClick={() => setSelectedClinicId(String(clinic.id))}
-                                                >
-                                                    <td className="font-semibold">{clinic.name}</td>
-                                                    <td>{clinic.code || '-'}</td>
-                                                    <td>{Number(clinic.total_branches || 0)}</td>
-                                                    <td>{Number(clinic.active_branches || 0)}</td>
-                                                    <td>
-                                                        <span className={`status-pill ${active ? 'active' : 'archived'}`}>
-                                                            {active ? 'Active' : 'Inactive'}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div className="settings-form-card dashboard-top-spacing-md">
                         <h3>{selectedClinicName} Branches</h3>
-                        <p className="dashboard-muted-text">Showing branches linked to the selected clinic from the directory table.</p>
+                        <p className="dashboard-muted-text">Showing branches linked to your clinic.</p>
                         {branchesLoading ? <p className="dashboard-inline-loading">Loading branches...</p> : null}
                         {!branchesLoading ? (
                             <div className="table-container">
@@ -667,12 +481,13 @@ function SuperAdminDashboard() {
                                             <th>Code</th>
                                             <th>Address</th>
                                             <th>Status</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {selectedClinicBranches.length === 0 ? (
                                             <tr>
-                                                <td colSpan={4} className="empty-state">No branches found for this clinic.</td>
+                                                <td colSpan={5} className="empty-state">No branches found for this clinic.</td>
                                             </tr>
                                         ) : (
                                             selectedClinicBranches.map((branch) => {
@@ -684,8 +499,29 @@ function SuperAdminDashboard() {
                                                         <td>{branch.address || '-'}</td>
                                                         <td>
                                                             <span className={`status-pill ${active ? 'active' : 'archived'}`}>
-                                                                {active ? 'Active' : 'Inactive'}
+                                                                {active ? 'Active' : 'Archived'}
                                                             </span>
+                                                        </td>
+                                                        <td>
+                                                            <div className="action-buttons">
+                                                                {active ? (
+                                                                    <button 
+                                                                        type="button" 
+                                                                        className="btn-delete"
+                                                                        onClick={() => handleArchiveBranch(branch)}
+                                                                    >
+                                                                        Archive
+                                                                    </button>
+                                                                ) : (
+                                                                    <button 
+                                                                        type="button" 
+                                                                        className="btn-edit"
+                                                                        onClick={() => handleRestoreBranch(branch)}
+                                                                    >
+                                                                        Restore
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
@@ -702,6 +538,13 @@ function SuperAdminDashboard() {
                     </div>
                 </>
             ) : null}
+
+            <ConfirmationModal
+                isOpen={showConfirmModal}
+                onClose={() => setShowConfirmModal(false)}
+                onConfirm={confirmModalConfig.onConfirm}
+                message={confirmModalConfig.message}
+            />
         </section>
     );
 }

@@ -90,18 +90,22 @@ async function hasPasswordChangeRequiredColumn() {
 
 async function hasApprovalStatusColumn() {
     try {
-        const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'approval_status'");
-        return rows.length > 0;
-    } catch (_err) {
+        // More reliable check: actually try to select the column
+        await db.query("SELECT approval_status FROM users LIMIT 0");
+        return true;
+    } catch (err) {
+        console.error('Check for approval_status column failed:', err.message);
         return false;
     }
 }
 
 async function hasSuperadminRequestsTable() {
     try {
-        const [rows] = await db.query("SHOW TABLES LIKE 'superadmin_access_requests'");
-        return rows.length > 0;
-    } catch (_err) {
+        // More reliable check: actually try to select from the table
+        await db.query("SELECT 1 FROM superadmin_access_requests LIMIT 0");
+        return true;
+    } catch (err) {
+        console.error('Check for superadmin_access_requests table failed:', err.message);
         return false;
     }
 }
@@ -117,8 +121,8 @@ async function isSuperadminWorkflowReady() {
 
 async function hasLoginAuditEventsTable() {
     try {
-        const [rows] = await db.query("SHOW TABLES LIKE 'login_audit_events'");
-        return rows.length > 0;
+        await db.query("SELECT 1 FROM login_audit_events LIMIT 0");
+        return true;
     } catch (_err) {
         return false;
     }
@@ -793,12 +797,11 @@ router.post('/verify-otp', async (req, res) => {
 
 router.post('/change-password', async (req, res) => {
     const email = toEmail(req.body?.email);
-    const currentPassword = String(req.body?.currentPassword || '');
     const newPassword = String(req.body?.newPassword || '');
     const confirmPassword = String(req.body?.confirmPassword || '');
 
-    if (!email || !currentPassword || !newPassword) {
-        return res.status(400).json({ error: 'Email, current password, and new password are required.' });
+    if (!email || !newPassword) {
+        return res.status(400).json({ error: 'Email and new password are required.' });
     }
 
     if (newPassword.length < 8) {
@@ -818,11 +821,6 @@ router.post('/change-password', async (req, res) => {
         const userRecord = users[0];
         if (Number(userRecord.is_archived) === 1) {
             return res.status(403).json({ error: 'This account has been archived. Please contact the super admin.' });
-        }
-
-        const passwordMatches = await bcrypt.compare(currentPassword, userRecord.password_hash);
-        if (!passwordMatches) {
-            return res.status(401).json({ error: 'Current password is incorrect.' });
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);

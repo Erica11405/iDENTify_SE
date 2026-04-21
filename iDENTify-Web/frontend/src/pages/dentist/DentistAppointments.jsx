@@ -1,34 +1,87 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
+import EditDentistModal from "../../components/EditDentistModal";
 import "../../styles/pages/dentist/DentistAppointments.css";
+
+const DAYS = [
+  { label: "S", value: 0 }, { label: "M", value: 1 }, { label: "T", value: 2 },
+  { label: "W", value: 3 }, { label: "T", value: 4 }, { label: "F", value: 5 },
+  { label: "S", value: 6 }
+];
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function resolveDentistId(user, dentists) {
+  if (!user) return null;
+  if (user.dentist_id) return Number(user.dentist_id);
+
+  const matched = (dentists || []).find((dentist) => {
+    if (String(dentist.user_id || "") === String(user.id || "")) return true;
+    if (normalizeEmail(dentist.email) && normalizeEmail(dentist.email) === normalizeEmail(user.email)) return true;
+    if (dentist.name && user.name && String(dentist.name).trim() === String(user.name).trim()) return true;
+    return false;
+  });
+
+  if (matched?.id) return Number(matched.id);
+  return Number(user.id || 0) || null;
+}
 
 function DentistAppointments() {
   const navigate = useNavigate();
   const api = useApi();
   
-  // 1. Fetch real appointments and patients from the global store
   const allAppointments = useAppStore((state) => state.appointments || []);
   const patients = useAppStore((state) => state.patients || []);
   const queue = useAppStore((state) => state.queue || []);
-
-  // 2. Get dynamically logged-in user
+  const dentists = useAppStore((state) => state.dentists || []);
   const currentUser = useAppStore((state) => state.user); 
-  
-  // CRITICAL FIX: Use the 'dentist_id' from the auth response, not the user 'id'
-  const currentDentistId = currentUser?.dentist_id || currentUser?.id || 1; 
 
-  // 3. Set up the Calendar State (Defaults to Today in YYYY-MM-DD format)
+  const currentDentistId = useMemo(() => resolveDentistId(currentUser, dentists), [currentUser, dentists]);
+
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' or 'patients'
   const [decisionLoadingId, setDecisionLoadingId] = useState(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [myDentistData, setMyDentistData] = useState(null);
 
   useEffect(() => {
-    // Load data when page mounts
+    if (currentDentistId) {
+      const matched = dentists.find(d => Number(d.id) === Number(currentDentistId));
+      if (matched) setMyDentistData(matched);
+    }
+  }, [currentDentistId, dentists]);
+
+  const formatSchedule = (scheduleStr) => {
+    if (!scheduleStr) return "No schedule set";
+    try {
+      const schedule = typeof scheduleStr === 'string' ? JSON.parse(scheduleStr) : scheduleStr;
+      const activeDays = DAYS.filter(d => schedule[d.value]?.active);
+      if (activeDays.length === 0) return "No active days";
+      
+      return activeDays.map(d => {
+        const daySched = schedule[d.value];
+        return `${d.label}: ${daySched.start || '00:00'} - ${daySched.end || '00:00'}`;
+      }).join(" | ");
+    } catch (e) {
+      return "Invalid schedule format";
+    }
+  };
+
+  const handleUpdateSchedule = () => {
+    api.loadDentists();
+    setShowScheduleModal(false);
+  };
+
+  useEffect(() => {
     api.loadAppointments();
     api.loadPatients();
     api.loadQueue();
+    api.loadDentists();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toDateKey = (value) => {
@@ -40,40 +93,45 @@ function DentistAppointments() {
     return parsed.toLocaleDateString('en-CA');
   };
 
-  // 4. Filter appointments by BOTH Dentist ID and the Selected Date
-  const myAppointments = allAppointments.filter(appt => {
-    // Match the dentist (using Number() to ensure it matches string or int)
-    const isMyPatient = Number(appt.dentist_id) === Number(currentDentistId);
-    
-    // Match the date
-    // Extract just the 'YYYY-MM-DD' part from the database datetime string
-    const apptDateStr = toDateKey(appt.appointment_datetime);
-    const isSelectedDate = apptDateStr === selectedDate;
+  const myAppointments = useMemo(() => {
+    return allAppointments.filter(appt => {
+      const isMyPatient = Number(appt.dentist_id) === Number(currentDentistId);
+      const apptDateStr = toDateKey(appt.appointment_datetime);
+      const isSelectedDate = apptDateStr === selectedDate;
+      return isMyPatient && isSelectedDate;
+    });
+  }, [allAppointments, currentDentistId, selectedDate]);
 
-    return isMyPatient && isSelectedDate;
-  });
-
-  const walkInPatients = queue.filter((entry) => {
-    const isWalkIn = String(entry.source || '').trim().toLowerCase() === 'walk-in';
-    const isMyPatient = Number(entry.dentist_id) === Number(currentDentistId);
-    const queueDateStr = toDateKey(entry.time_added || entry.checkedInTime);
-    const isSelectedDate = queueDateStr === selectedDate;
-    return isWalkIn && isMyPatient && isSelectedDate;
-  });
+  const walkInPatients = useMemo(() => {
+    return queue.filter((entry) => {
+      const isWalkIn = String(entry.source || '').trim().toLowerCase() === 'walk-in' || !entry.appointment_id;
+      const isMyPatient = Number(entry.dentist_id) === Number(currentDentistId);
+      const queueDateStr = toDateKey(entry.time_added || entry.checkedInTime);
+      const isSelectedDate = queueDateStr === selectedDate;
+      return isWalkIn && isMyPatient && isSelectedDate;
+    });
+  }, [queue, currentDentistId, selectedDate]);
 
   const canDecideAppointment = (appointment) => {
-    const status = String(appointment?.status || '').trim().toLowerCase();
-    return !['done', 'cancelled', 'declined', 'no-show'].includes(status);
+    if (!appointment) return false;
+    const status = String(appointment.status || '').trim().toLowerCase();
+    const decisionStatus = String(appointment.decision_status || '').trim().toLowerCase();
+    
+    // If already approved/declined via the decision workflow, hide buttons
+    if (decisionStatus === 'approved' || decisionStatus === 'declined') return false;
+    
+    // Also hide if the general status is final
+    return !['done', 'cancelled', 'declined', 'no-show', 'completed'].includes(status);
   };
 
   const isDecisionBusy = (appointmentId, action) => decisionLoadingId === `${action}-${appointmentId}`;
 
-  const handleApprove = async (appointment) => {
-    if (!appointment?.id) return;
+  const handleApprove = async (appointmentId) => {
+    if (!appointmentId) return;
 
     try {
-      setDecisionLoadingId(`approve-${appointment.id}`);
-      await api.approveAppointment(appointment.id, {});
+      setDecisionLoadingId(`approve-${appointmentId}`);
+      await api.approveAppointment(appointmentId, {});
       toast.success('Appointment approved.');
       await Promise.all([api.loadAppointments(), api.loadQueue()]);
     } catch (error) {
@@ -83,8 +141,8 @@ function DentistAppointments() {
     }
   };
 
-  const handleDecline = async (appointment) => {
-    if (!appointment?.id) return;
+  const handleDecline = async (appointmentId) => {
+    if (!appointmentId) return;
 
     const input = window.prompt('Please provide a reason for declining this appointment:');
     if (input === null) return;
@@ -96,8 +154,8 @@ function DentistAppointments() {
     }
 
     try {
-      setDecisionLoadingId(`decline-${appointment.id}`);
-      await api.declineAppointment(appointment.id, { reason });
+      setDecisionLoadingId(`decline-${appointmentId}`);
+      await api.declineAppointment(appointmentId, { reason });
       toast.success('Appointment declined.');
       await Promise.all([api.loadAppointments(), api.loadQueue()]);
     } catch (error) {
@@ -109,10 +167,9 @@ function DentistAppointments() {
 
   return (
     <div className="appointments-container">
-      <div className="appointments-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 className="appointments-title">My Appointments</h1>
+      <div className="appointments-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1 className="appointments-title">Dentist Management</h1>
         
-        {/* Calendar Date Picker */}
         <div className="date-picker-container" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <label htmlFor="date-picker" style={{ fontWeight: 'bold' }}>Select Date:</label>
           <input 
@@ -126,136 +183,229 @@ function DentistAppointments() {
         </div>
       </div>
 
-      <div className="appointments-card" style={{ marginTop: '20px' }}>
-        <table className="appointments-table">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Patient Name</th>
-              <th>Procedure</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {myAppointments.length === 0 ? (
-               <tr>
-                 <td colSpan="5" style={{textAlign:"center", padding: "2rem"}}>
-                   No appointments found for {new Date(selectedDate).toLocaleDateString()}.
-                 </td>
-               </tr>
-            ) : (
-              myAppointments.map((appt) => {
-                // Find patient name from the patients list
-                const patientName = patients.find(p => p.id === appt.patient_id)?.name || appt.full_name || "Unknown Patient";
-                
-                // Format time properly just in case timeStart is missing from the API response
-                const formattedTime = appt.timeStart || (appt.appointment_datetime 
-                  ? new Date(appt.appointment_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-                  : "N/A");
-
-                return (
-                  <tr key={appt.id}>
-                    <td style={{ fontWeight: 'bold' }}>{formattedTime}</td>
-                    <td className="patient-name-cell">{patientName}</td>
-                    <td>{appt.procedure || appt.reason}</td>
-                    <td>
-                      <span className={`appt-status-badge ${appt.status?.toLowerCase() || 'scheduled'}`}>
-                        {appt.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="appt-action-group">
-                        {canDecideAppointment(appt) ? (
-                          <>
-                            <button
-                              className="decision-btn approve-btn"
-                              onClick={() => handleApprove(appt)}
-                              disabled={isDecisionBusy(appt.id, 'approve') || isDecisionBusy(appt.id, 'decline')}
-                            >
-                              {isDecisionBusy(appt.id, 'approve') ? 'Approving...' : 'Approve'}
-                            </button>
-                            <button
-                              className="decision-btn decline-btn"
-                              onClick={() => handleDecline(appt)}
-                              disabled={isDecisionBusy(appt.id, 'approve') || isDecisionBusy(appt.id, 'decline')}
-                            >
-                              {isDecisionBusy(appt.id, 'decline') ? 'Declining...' : 'Decline'}
-                            </button>
-                          </>
-                        ) : null}
-                        <button
-                          className="review-chart-btn"
-                          onClick={() => navigate(`/patients/${appt.patient_id}`)}
-                        >
-                          Review Form
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+      <div className="appointments-tabs" style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+        <button 
+          className={`tab-btn ${activeTab === 'appointments' ? 'active' : ''}`}
+          onClick={() => setActiveTab('appointments')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '5px',
+            border: 'none',
+            backgroundColor: activeTab === 'appointments' ? '#3498db' : '#f0f0f0',
+            color: activeTab === 'appointments' ? '#fff' : '#333',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          Appointments
+        </button>
+        <button 
+          className={`tab-btn ${activeTab === 'patients' ? 'active' : ''}`}
+          onClick={() => setActiveTab('patients')}
+          style={{
+            padding: '10px 20px',
+            borderRadius: '5px',
+            border: 'none',
+            backgroundColor: activeTab === 'patients' ? '#3498db' : '#f0f0f0',
+            color: activeTab === 'patients' ? '#fff' : '#333',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          Patients
+        </button>
       </div>
 
-      <div className="appointments-card" style={{ marginTop: '20px' }}>
-        <h2 className="appointments-title" style={{ fontSize: '1.2rem', marginBottom: '0.85rem' }}>Walk-In Patients</h2>
-        <table className="appointments-table">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Patient Name</th>
-              <th>Concern / Notes</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {walkInPatients.length === 0 ? (
+      {activeTab === 'appointments' && (
+        <div className="appointments-card animation-fade-in">
+          <h2 className="appointments-title" style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Scheduled Appointments</h2>
+          <table className="appointments-table">
+            <thead>
               <tr>
-                <td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>
-                  No walk-in patients found for {new Date(selectedDate).toLocaleDateString()}.
-                </td>
+                <th>Time</th>
+                <th>Patient Name</th>
+                <th>Procedure</th>
+                <th>Status</th>
+                <th>Action</th>
               </tr>
-            ) : (
-              walkInPatients.map((entry) => {
-                const patientName = patients.find((p) => Number(p.id) === Number(entry.patient_id))?.name
-                  || patients.find((p) => Number(p.id) === Number(entry.patient_id))?.full_name
-                  || entry.full_name
-                  || 'Unknown Patient';
+            </thead>
+            <tbody>
+              {myAppointments.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: "center", padding: "2rem" }}>
+                    No appointments found for {new Date(selectedDate).toLocaleDateString()}.
+                  </td>
+                </tr>
+              ) : (
+                myAppointments.map((appt) => {
+                  const patientName = patients.find(p => p.id === appt.patient_id)?.name || appt.full_name || "Unknown Patient";
+                  const formattedTime = appt.timeStart || (appt.appointment_datetime 
+                    ? new Date(appt.appointment_datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                    : "N/A");
 
-                const queueTime = entry.time_added || entry.checkedInTime;
-                const formattedTime = queueTime
-                  ? new Date(String(queueTime).replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                  : 'N/A';
+                  const canDecide = canDecideAppointment(appt);
 
-                return (
-                  <tr key={entry.id}>
-                    <td style={{ fontWeight: 'bold' }}>{formattedTime}</td>
-                    <td className="patient-name-cell">{patientName}</td>
-                    <td>{entry.notes || 'Walk-in consultation'}</td>
-                    <td>
-                      <span className={`appt-status-badge ${entry.status?.toLowerCase() || 'scheduled'}`}>
-                        {entry.status || 'Waiting'}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        className="review-chart-btn"
-                        onClick={() => navigate(`/patients/${entry.patient_id}`)}
-                      >
-                        Review Form
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                  return (
+                    <tr key={appt.id}>
+                      <td style={{ fontWeight: 'bold' }}>{formattedTime}</td>
+                      <td className="patient-name-cell">{patientName}</td>
+                      <td>{appt.procedure || appt.reason}</td>
+                      <td>
+                        <span className={`appt-status-badge ${appt.status?.toLowerCase() || 'scheduled'}`}>
+                          {appt.status}
+                          {appt.decision_status === 'approved' && ' (Approved)'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="appt-action-group">
+                          {canDecide ? (
+                            <>
+                              <button
+                                className="decision-btn approve-btn"
+                                onClick={() => handleApprove(appt.id)}
+                                disabled={isDecisionBusy(appt.id, 'approve') || isDecisionBusy(appt.id, 'decline')}
+                                style={{ backgroundColor: '#2ecc71', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}
+                              >
+                                {isDecisionBusy(appt.id, 'approve') ? 'Approving...' : 'Approve'}
+                              </button>
+                              <button
+                                className="decision-btn decline-btn"
+                                onClick={() => handleDecline(appt.id)}
+                                disabled={isDecisionBusy(appt.id, 'approve') || isDecisionBusy(appt.id, 'decline')}
+                                style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}
+                              >
+                                {isDecisionBusy(appt.id, 'decline') ? 'Declining...' : 'Decline'}
+                              </button>
+                            </>
+                          ) : null}
+                          <button
+                            className="review-chart-btn"
+                            onClick={() => navigate(`/patients/${appt.patient_id}`)}
+                            style={{ backgroundColor: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
+                          >
+                            Review Chart
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeTab === 'patients' && (
+        <div className="appointments-card animation-fade-in">
+          <h2 className="appointments-title" style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Walk-In Patients</h2>
+          <table className="appointments-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Patient Name</th>
+                <th>Concern / Notes</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {walkInPatients.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>
+                    No walk-in patients found for {new Date(selectedDate).toLocaleDateString()}.
+                  </td>
+                </tr>
+              ) : (
+                walkInPatients.map((entry) => {
+                  const patientName = patients.find((p) => Number(p.id) === Number(entry.patient_id))?.name
+                    || patients.find((p) => Number(p.id) === Number(entry.patient_id))?.full_name
+                    || entry.full_name
+                    || 'Unknown Patient';
+
+                  const queueTime = entry.time_added || entry.checkedInTime;
+                  const formattedTime = queueTime
+                    ? new Date(String(queueTime).replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : 'N/A';
+
+                  // If this walk-in has an appointment_id, we can potentially approve it
+                  const linkedAppt = entry.appointment_id ? allAppointments.find(a => a.id === entry.appointment_id) : null;
+                  const canDecide = linkedAppt && canDecideAppointment(linkedAppt);
+
+                  return (
+                    <tr key={entry.id}>
+                      <td style={{ fontWeight: 'bold' }}>{formattedTime}</td>
+                      <td className="patient-name-cell">{patientName}</td>
+                      <td>{entry.notes || 'Walk-in consultation'}</td>
+                      <td>
+                        <span className={`appt-status-badge ${entry.status?.toLowerCase() || 'scheduled'}`}>
+                          {entry.status || 'Waiting'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="appt-action-group">
+                          {canDecide ? (
+                            <>
+                              <button
+                                className="decision-btn approve-btn"
+                                onClick={() => handleApprove(linkedAppt.id)}
+                                disabled={isDecisionBusy(linkedAppt.id, 'approve') || isDecisionBusy(linkedAppt.id, 'decline')}
+                                style={{ backgroundColor: '#2ecc71', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}
+                              >
+                                {isDecisionBusy(linkedAppt.id, 'approve') ? 'Approving...' : 'Approve'}
+                              </button>
+                            </>
+                          ) : null}
+                          <button
+                            className="review-chart-btn"
+                            onClick={() => navigate(`/patients/${entry.patient_id}`)}
+                            style={{ backgroundColor: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
+                          >
+                            Review Chart
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="my-schedule-section" style={{ marginTop: '2rem', padding: '1.5rem', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>My Weekly Schedule</h2>
+            <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>Manage your weekly availability and working hours.</p>
+          </div>
+          <button 
+            className="btn-edit-schedule" 
+            onClick={() => setShowScheduleModal(true)}
+            style={{ padding: '0.6rem 1.2rem', background: '#3498db', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }}
+            onMouseOver={(e) => e.currentTarget.style.background = '#2980b9'}
+            onMouseOut={(e) => e.currentTarget.style.background = '#3498db'}
+          >
+            Edit My Schedule
+          </button>
+        </div>
+        
+        <div className="current-schedule-display" style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+          <p style={{ margin: 0, fontWeight: '500', color: '#475569', fontSize: '0.95rem' }}>
+            <strong>Current Hours:</strong> {myDentistData ? formatSchedule(myDentistData.schedule) : "Loading schedule..."}
+          </p>
+        </div>
       </div>
+
+      {showScheduleModal && myDentistData && (
+        <EditDentistModal 
+          dentist={myDentistData}
+          onClose={() => setShowScheduleModal(false)}
+          onSuccess={handleUpdateSchedule}
+          actorContext={currentUser}
+        />
+      )}
     </div>
   );
 }

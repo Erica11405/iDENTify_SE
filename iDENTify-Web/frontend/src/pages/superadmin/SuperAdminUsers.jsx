@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../api/apiClient';
+import useAppStore from '../../store/useAppStore';
 import EditDentistModal from '../../components/EditDentistModal';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import '../../styles/pages/dentist/DentistSettings.css';
@@ -62,7 +63,6 @@ function initialDentistForm(defaultSpecialization = 'General Dentist') {
         middleName: '',
         lastName: '',
         email: '',
-        password: '',
         specialization: defaultSpecialization,
         phone: '',
         days: [1, 2, 3, 4, 5],
@@ -78,7 +78,6 @@ function initialAideForm() {
         middleName: '',
         lastName: '',
         email: '',
-        password: '',
         contactNumber: '',
     };
 }
@@ -130,6 +129,7 @@ function formatScheduleSummary(staff) {
 }
 
 function SuperAdminUsers() {
+    const user = useAppStore((state) => state.user);
     const navigate = useNavigate();
     const initialArchiveDialog = {
         isOpen: false,
@@ -157,6 +157,7 @@ function SuperAdminUsers() {
     const [selectedBranchId, setSelectedBranchId] = useState('');
     const [pageNotice, setPageNotice] = useState('');
     const [clinicNotice, setClinicNotice] = useState('');
+    const [successModal, setSuccessModal] = useState({ isOpen: false, email: '' });
 
     const [dentistForm, setDentistForm] = useState(initialDentistForm);
     const [aideForm, setAideForm] = useState(initialAideForm);
@@ -196,8 +197,8 @@ function SuperAdminUsers() {
 
             const activeDentistIds = new Set(
                 (usersList || [])
-                    .filter((user) => !isArchived(user) && user?.dentist_id)
-                    .map((user) => String(user.dentist_id))
+                    .filter((u) => !isArchived(u) && u?.dentist_id)
+                    .map((u) => String(u.dentist_id))
             );
 
             const visibleStaff = (staffList || []).filter((staff) => activeDentistIds.has(String(staff.id)));
@@ -213,7 +214,11 @@ function SuperAdminUsers() {
             setUsers(usersList || []);
             setDentistTypeOptions(nextTypeOptions);
 
-            const normalizedClinics = (clinicsList || []).filter((clinic) => toPositiveInt(clinic?.id));
+            let normalizedClinics = (clinicsList || []).filter((clinic) => toPositiveInt(clinic?.id));
+            if (user?.clinic_id) {
+                normalizedClinics = normalizedClinics.filter((clinic) => String(clinic.id) === String(user.clinic_id));
+            }
+            
             setClinicOptions(normalizedClinics);
             setSelectedClinicId((prev) => {
                 if (prev && normalizedClinics.some((clinic) => String(clinic.id) === String(prev))) {
@@ -232,7 +237,7 @@ function SuperAdminUsers() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [user?.clinic_id]);
 
     useEffect(() => {
         loadData();
@@ -401,11 +406,7 @@ function SuperAdminUsers() {
                 leaveDays: dentistForm.leaveDays,
             });
 
-            if (createdDentist?.generated_password) {
-                toast.success(`Dentist added. Temporary password: ${createdDentist.generated_password}`);
-            } else {
-                toast.success('Dentist added successfully.');
-            }
+            setSuccessModal({ isOpen: true, email: normalizeText(dentistForm.email) });
             setDentistForm(initialDentistForm(dentistTypeOptions[0] || 'General Dentist'));
             setLeaveDraft('');
             await loadData();
@@ -473,17 +474,12 @@ function SuperAdminUsers() {
                 await api.updateDentist(editingAideId, payload);
                 toast.success('Dental aide updated successfully.');
             } else {
-                const createdAide = await api.createDentist({
+                await api.createDentist({
                     ...payload,
-                    password: aideForm.password,
                     clinic_id: clinicId,
                     branch_id: branchId,
                 });
-                if (createdAide?.generated_password) {
-                    toast.success(`Dental aide added. Temporary password: ${createdAide.generated_password}`);
-                } else {
-                    toast.success('Dental aide added successfully.');
-                }
+                setSuccessModal({ isOpen: true, email: normalizeText(aideForm.email) });
             }
 
             resetAideForm();
@@ -625,10 +621,6 @@ function SuperAdminUsers() {
                                     <div className="form-group flex-2">
                                         <label>Email Address *</label>
                                         <input type="email" value={dentistForm.email} onChange={(e) => setDentistForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="dentist@clinic.com" />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Password *</label>
-                                        <input type="password" value={dentistForm.password} onChange={(e) => setDentistForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="At least 8 characters" />
                                     </div>
                                 </div>
 
@@ -820,12 +812,6 @@ function SuperAdminUsers() {
                                         <label>Contact Number *</label>
                                         <input type="text" value={aideForm.contactNumber} onChange={(e) => setAideForm((prev) => ({ ...prev, contactNumber: e.target.value }))} placeholder="09xxxxxxxxx" />
                                     </div>
-                                    {!editingAideId ? (
-                                        <div className="form-group">
-                                            <label>Password *</label>
-                                            <input type="password" value={aideForm.password} onChange={(e) => setAideForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="At least 8 characters" />
-                                        </div>
-                                    ) : null}
                                 </div>
 
                                 <div className="form-row">
@@ -943,6 +929,27 @@ function SuperAdminUsers() {
                 onConfirm={handleConfirmArchiveToggle}
                 message={archiveDialog.message}
             />
+
+            {successModal.isOpen ? (
+                <div className="modal-overlay">
+                    <div className="modal-content text-center" style={{ maxWidth: '400px', textAlign: 'center', padding: '40px 20px' }}>
+                        <div className="success-icon" style={{ fontSize: '50px', color: '#2ecc71', marginBottom: '20px' }}>
+                            <i className="fas fa-check-circle"></i>
+                        </div>
+                        <h2 style={{ marginBottom: '15px' }}>Credentials Sent!</h2>
+                        <p style={{ color: '#666', marginBottom: '25px', lineHeight: '1.5' }}>
+                            Account has been created successfully. Login credentials have been sent to <strong>{successModal.email}</strong>.
+                        </p>
+                        <button 
+                            className="btn-primary-action" 
+                            onClick={() => setSuccessModal({ isOpen: false, email: '' })}
+                            style={{ width: '100%', padding: '12px' }}
+                        >
+                            Got it
+                        </button>
+                    </div>
+                </div>
+            ) : null}
         </section>
     );
 }

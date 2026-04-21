@@ -32,7 +32,7 @@ function toPositiveInt(value, fallback = null) {
   return parsed;
 }
 
-function sanitizeDocumentData(value, maxChars = 2_500_000) {
+function sanitizeDocumentData(value, maxChars = 15_000_000) {
   const text = String(value || '').trim();
   if (!text) return '';
   if (text.length > maxChars) return '';
@@ -66,8 +66,8 @@ function isWorkflowNotConfiguredError(error) {
 
 async function hasRequestsTable() {
   try {
-    const [rows] = await db.query("SHOW TABLES LIKE 'superadmin_access_requests'");
-    return rows.length > 0;
+    await db.query("SELECT 1 FROM superadmin_access_requests LIMIT 0");
+    return true;
   } catch (_err) {
     return false;
   }
@@ -82,24 +82,28 @@ async function getUsersApprovalColumnsSupport() {
     decline_reason: false,
   };
 
-  try {
-    const [rows] = await db.query(
-      `SELECT column_name
-       FROM information_schema.columns
-       WHERE table_schema = DATABASE()
-         AND table_name = 'users'
-         AND column_name IN ('approval_status', 'approved_at', 'approved_by_user_id', 'declined_at', 'decline_reason')`
-    );
+  const checkColumn = async (col) => {
+    try {
+      await db.query(`SELECT ${col} FROM users LIMIT 0`);
+      return true;
+    } catch (_err) {
+      return false;
+    }
+  };
 
-    rows.forEach((row) => {
-      const key = String(row.column_name || '').trim().toLowerCase();
-      if (Object.prototype.hasOwnProperty.call(support, key)) {
-        support[key] = true;
-      }
-    });
-  } catch (_err) {
-    // Keep defaults.
-  }
+  const results = await Promise.all([
+    checkColumn('approval_status'),
+    checkColumn('approved_at'),
+    checkColumn('approved_by_user_id'),
+    checkColumn('declined_at'),
+    checkColumn('decline_reason'),
+  ]);
+
+  support.approval_status = results[0];
+  support.approved_at = results[1];
+  support.approved_by_user_id = results[2];
+  support.declined_at = results[3];
+  support.decline_reason = results[4];
 
   return support;
 }
@@ -543,21 +547,20 @@ router.post('/me/submit', async (req, res) => {
       approval_status: 'pending_review',
     });
   } catch (error) {
-    if (isWorkflowNotConfiguredError(error)) {
-      return sendWorkflowNotConfigured(res);
+  console.error('CRITICAL ERROR in superadmin_requests route:', error);
+  if (isWorkflowNotConfiguredError(error)) {
+    return sendWorkflowNotConfigured(res);
+  }
+  if (connection) {
+    try {
+      await connection.rollback();
+    } catch (_rollbackErr) {
+      // Ignore rollback errors and return original failure.
     }
-
-    if (connection) {
-      try {
-        await connection.rollback();
-      } catch (_rollbackErr) {
-        // Ignore rollback errors and return original failure.
-      }
-    }
-    console.error('Failed to submit superadmin request:', error);
-    return res.status(500).json({ message: 'Failed to submit request.' });
-  } finally {
-    if (connection) {
+  }
+  console.error('Failed to submit superadmin request:', error);
+  return res.status(500).json({ message: 'Failed to submit request: ' + (error.message || 'Unknown error') });
+  } finally {    if (connection) {
       connection.release();
     }
   }
@@ -808,10 +811,10 @@ router.patch('/review/:requestId/approve', async (req, res) => {
       approval_status: 'approved',
     });
   } catch (error) {
-    if (isWorkflowNotConfiguredError(error)) {
-      return sendWorkflowNotConfigured(res);
-    }
-
+  console.error('CRITICAL ERROR in superadmin_requests route:', error);
+  if (isWorkflowNotConfiguredError(error)) {
+    return sendWorkflowNotConfigured(res);
+  }
     if (connection) {
       try {
         await connection.rollback();
@@ -930,10 +933,10 @@ router.patch('/review/:requestId/decline', async (req, res) => {
       approval_status: 'declined',
     });
   } catch (error) {
-    if (isWorkflowNotConfiguredError(error)) {
-      return sendWorkflowNotConfigured(res);
-    }
-
+  console.error('CRITICAL ERROR in superadmin_requests route:', error);
+  if (isWorkflowNotConfiguredError(error)) {
+    return sendWorkflowNotConfigured(res);
+  }
     if (connection) {
       try {
         await connection.rollback();

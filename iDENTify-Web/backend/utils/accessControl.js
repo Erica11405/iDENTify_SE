@@ -57,8 +57,8 @@ function actorUserId(req) {
 
 async function hasUsersApprovalStatusColumn() {
   try {
-    const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'approval_status'");
-    return rows.length > 0;
+    await db.query("SELECT approval_status FROM users LIMIT 0");
+    return true;
   } catch (_err) {
     return false;
   }
@@ -66,8 +66,8 @@ async function hasUsersApprovalStatusColumn() {
 
 async function hasUsersClinicColumn() {
   try {
-    const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'clinic_id'");
-    return rows.length > 0;
+    await db.query("SELECT clinic_id FROM users LIMIT 0");
+    return true;
   } catch (_err) {
     return false;
   }
@@ -75,8 +75,8 @@ async function hasUsersClinicColumn() {
 
 async function hasUsersBranchColumn() {
   try {
-    const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'branch_id'");
-    return rows.length > 0;
+    await db.query("SELECT branch_id FROM users LIMIT 0");
+    return true;
   } catch (_err) {
     return false;
   }
@@ -84,8 +84,8 @@ async function hasUsersBranchColumn() {
 
 async function hasClinicsStatusColumn() {
   try {
-    const [rows] = await db.query("SHOW COLUMNS FROM clinics LIKE 'status'");
-    return rows.length > 0;
+    await db.query("SELECT status FROM clinics LIMIT 0");
+    return true;
   } catch (_err) {
     return false;
   }
@@ -93,8 +93,8 @@ async function hasClinicsStatusColumn() {
 
 async function hasClinicBranchesStatusColumn() {
   try {
-    const [rows] = await db.query("SHOW COLUMNS FROM clinic_branches LIKE 'status'");
-    return rows.length > 0;
+    await db.query("SELECT status FROM clinic_branches LIMIT 0");
+    return true;
   } catch (_err) {
     return false;
   }

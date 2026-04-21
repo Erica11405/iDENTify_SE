@@ -753,6 +753,13 @@ router.get("/", async (req, res) => {
 
     const { start, end } = dateRange;
     const actorScope = await getActorTenantScope(req);
+    
+    // Narrow scope if branch_id is provided in query
+    if (req.query.branch_id) {
+        actorScope.branchId = toPositiveInt(req.query.branch_id);
+        actorScope.scoped = true;
+    }
+    
     const tenantScopeAccess = assertResolvedTenantScope(actorScope);
     if (!tenantScopeAccess.allowed) {
       return res.status(tenantScopeAccess.status).json({

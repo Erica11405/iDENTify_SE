@@ -17,6 +17,10 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
   const [endDate, setEndDate] = useState(new Date());
   const [rangeType, setRangeType] = useState('daily'); // daily, weekly, monthly, yearly, custom
 
+  const user = useAppStore((state) => state.user);
+  const [branches, setBranches] = useState([]);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
+
   // Modal and Patient Data States
   const [patientsModalOpen, setPatientsModalOpen] = useState(false);
   const [selectedDentist, setSelectedDentist] = useState(null);
@@ -31,6 +35,14 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
     newPatients: dailySummary?.newPatients || 0,
     avgTreatmentDuration: dailySummary?.avgTreatmentDuration || "0 min",
   };
+
+  useEffect(() => {
+    if (user?.clinic_id) {
+      apiClient.getClinicBranches(user.clinic_id)
+        .then(data => setBranches(Array.isArray(data) ? data : []))
+        .catch(err => console.error('Failed to load branches', err));
+    }
+  }, [user?.clinic_id]);
 
   const handleRangeChange = (type) => {
     setRangeType(type);
@@ -55,7 +67,11 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
 
     const fetchReports = async () => {
       try {
-        await api.loadReports({ startDate: startStr, endDate: endStr });
+        const params = { startDate: startStr, endDate: endStr };
+        if (selectedBranchId) {
+          params.branch_id = selectedBranchId;
+        }
+        await api.loadReports(params);
       } catch (err) {
         console.error("Load reports failed", err);
       }
@@ -63,7 +79,7 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
     
     fetchReports();
     api.loadDentists().catch(err => console.error("Load dentists failed", err));
-  }, [startDate, endDate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, selectedBranchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatApptTime = (value) => {
     if (!value) return "-";
@@ -296,6 +312,22 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
         </div>
 
         <div className="reports-controls">
+          {branches.length > 0 && (
+            <div className="date-picker-container">
+              <span className="small-label">Branch</span>
+              <select
+                className="datepicker-input"
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                style={{ padding: '0.4rem', border: '1px solid #ccc', borderRadius: '4px', background: '#fff', cursor: 'pointer' }}
+              >
+                <option value="">All Branches</option>
+                {branches.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="date-picker-container">
             <span className="small-label">Start Date</span>
             <DatePicker

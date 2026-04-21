@@ -45,13 +45,25 @@ export default function SelectClinicScreen() {
   }, [clinics]);
 
   const handleSelectClinic = (clinic) => {
-    router.push({
-      pathname: '/appointments/select-branch',
-      params: {
-        clinicId: String(clinic.id),
-        clinicName: String(clinic.name || ''),
-      },
-    });
+    const branches = Array.isArray(clinic?.branches) ? clinic.branches : [];
+    
+    if (branches.length === 0) {
+      router.push({
+        pathname: '/appointments/select-service',
+        params: {
+          clinicId: String(clinic.id),
+          clinicName: String(clinic.name || ''),
+        },
+      });
+    } else {
+      router.push({
+        pathname: '/appointments/select-branch',
+        params: {
+          clinicId: String(clinic.id),
+          clinicName: String(clinic.name || ''),
+        },
+      });
+    }
   };
 
   return (

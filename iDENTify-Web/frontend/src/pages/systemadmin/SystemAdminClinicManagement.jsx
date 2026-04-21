@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../api/apiClient';
+import ConfirmationModal from '../../components/ConfirmationModal';
 import '../../styles/pages/systemadmin/SystemAdminClinicManagement.css';
 
 const STATUS_OPTIONS = ['Active', 'Suspended', 'Deactivated'];
@@ -37,6 +38,14 @@ function SystemAdminClinicManagement() {
 
 	const [newClinic, setNewClinic] = useState({ name: '', code: '' });
 	const [newBranch, setNewBranch] = useState({ clinicId: '', name: '', code: '', address: '' });
+
+	const [showConfirmModal, setShowConfirmModal] = useState(false);
+	const [confirmModalConfig, setConfirmModalConfig] = useState({ message: '', onConfirm: () => {} });
+
+	const openConfirm = (message, onConfirm) => {
+		setConfirmModalConfig({ message, onConfirm });
+		setShowConfirmModal(true);
+	};
 
 	const loadClinics = useCallback(async () => {
 		const rows = await api.getClinics({ includeInactive: true });
@@ -133,63 +142,6 @@ function SystemAdminClinicManagement() {
 
 	const setBusy = (value) => setBusyAction(String(value || ''));
 
-	const handleCreateClinic = async (event) => {
-		event.preventDefault();
-		const name = String(newClinic.name || '').trim();
-		const code = String(newClinic.code || '').trim();
-
-		if (!name) {
-			toast.error('Clinic name is required.');
-			return;
-		}
-
-		try {
-			setBusy('create-clinic');
-			await api.createClinic({ name, code: code || undefined });
-			toast.success('Clinic created successfully.');
-			setNewClinic({ name: '', code: '' });
-			await loadClinics();
-		} catch (error) {
-			toast.error(error?.message || 'Failed to create clinic.');
-		} finally {
-			setBusy('');
-		}
-	};
-
-	const handleCreateBranch = async (event) => {
-		event.preventDefault();
-		const clinicId = String(newBranch.clinicId || '').trim();
-		const name = String(newBranch.name || '').trim();
-		const code = String(newBranch.code || '').trim();
-		const address = String(newBranch.address || '').trim();
-
-		if (!clinicId) {
-			toast.error('Select a clinic before adding a branch.');
-			return;
-		}
-		if (!name) {
-			toast.error('Branch name is required.');
-			return;
-		}
-
-		try {
-			setBusy('create-branch');
-			await api.createClinicBranch(clinicId, {
-				name,
-				code: code || undefined,
-				address: address || undefined,
-			});
-			toast.success('Branch created successfully.');
-			setNewBranch((prev) => ({ ...prev, name: '', code: '', address: '' }));
-			await Promise.all([loadClinics(), loadBranches(clinicId)]);
-			setSelectedClinicId(clinicId);
-		} catch (error) {
-			toast.error(error?.message || 'Failed to create branch.');
-		} finally {
-			setBusy('');
-		}
-	};
-
 	const handleApplyClinicStatus = async (clinic) => {
 		const clinicId = clinic?.id;
 		if (!clinicId) return;
@@ -209,11 +161,7 @@ function SystemAdminClinicManagement() {
 		}
 	};
 
-	const handleArchiveClinic = async (clinic) => {
-		if (!clinic?.id) return;
-		const confirmed = window.confirm(`Archive clinic "${clinic.name}"?`);
-		if (!confirmed) return;
-
+	const executeArchiveClinic = async (clinic) => {
 		try {
 			setBusy(`clinic-archive-${clinic.id}`);
 			await api.archiveClinic(clinic.id);
@@ -224,7 +172,13 @@ function SystemAdminClinicManagement() {
 			toast.error(error?.message || 'Failed to archive clinic.');
 		} finally {
 			setBusy('');
+			setShowConfirmModal(false);
 		}
+	};
+
+	const handleArchiveClinic = (clinic) => {
+		if (!clinic?.id) return;
+		openConfirm(`Archive clinic "${clinic.name}"?`, () => executeArchiveClinic(clinic));
 	};
 
 	const handleRestoreClinic = async (clinic) => {
@@ -243,64 +197,11 @@ function SystemAdminClinicManagement() {
 		}
 	};
 
-	const handleApplyBranchStatus = async (branch) => {
-		const clinicId = selectedClinic?.id;
-		const branchId = branch?.id;
-		if (!clinicId || !branchId) return;
-
-		const draft = branchStatusDrafts[branchId] || normalizeStatus(branch.status);
-
-		try {
-			setBusy(`branch-status-${branchId}`);
-			await api.updateClinicBranchStatus(clinicId, branchId, { status: draft });
-			toast.success('Branch status updated.');
-			await Promise.all([loadClinics(), loadBranches(String(clinicId))]);
-		} catch (error) {
-			toast.error(error?.message || 'Failed to update branch status.');
-		} finally {
-			setBusy('');
-		}
-	};
-
-	const handleArchiveBranch = async (branch) => {
-		const clinicId = selectedClinic?.id;
-		if (!clinicId || !branch?.id) return;
-		const confirmed = window.confirm(`Archive branch "${branch.name}"?`);
-		if (!confirmed) return;
-
-		try {
-			setBusy(`branch-archive-${branch.id}`);
-			await api.archiveClinicBranch(clinicId, branch.id);
-			toast.success('Branch archived.');
-			await Promise.all([loadClinics(), loadBranches(String(clinicId))]);
-		} catch (error) {
-			toast.error(error?.message || 'Failed to archive branch.');
-		} finally {
-			setBusy('');
-		}
-	};
-
-	const handleRestoreBranch = async (branch) => {
-		const clinicId = selectedClinic?.id;
-		if (!clinicId || !branch?.id) return;
-
-		try {
-			setBusy(`branch-restore-${branch.id}`);
-			await api.restoreClinicBranch(clinicId, branch.id);
-			toast.success('Branch restored.');
-			await Promise.all([loadClinics(), loadBranches(String(clinicId))]);
-		} catch (error) {
-			toast.error(error?.message || 'Failed to restore branch.');
-		} finally {
-			setBusy('');
-		}
-	};
-
 	return (
 		<section className="systemadmin-page">
 			<div className="systemadmin-header">
 				<h2>Clinic Management</h2>
-				<p>Manage clinic and branch lifecycle, plus create new clinic structures.</p>
+				<p>Manage clinic and branch lifecycle.</p>
 			</div>
 
 			{loading ? <p className="systemadmin-loading">Loading clinic records...</p> : null}
@@ -313,92 +214,6 @@ function SystemAdminClinicManagement() {
 						<StatCard label="Suspended" value={summary.suspended} />
 						<StatCard label="Deactivated" value={summary.deactivated} />
 						<StatCard label="Archived" value={summary.archived} />
-					</div>
-
-					<div className="systemadmin-card-grid">
-						<div className="systemadmin-card">
-							<h3>Create Clinic</h3>
-							<form onSubmit={handleCreateClinic}>
-								<div className="systemadmin-field-row">
-									<div className="systemadmin-field">
-										<label htmlFor="new-clinic-name">Clinic Name</label>
-										<input
-											id="new-clinic-name"
-											type="text"
-											value={newClinic.name}
-											onChange={(event) => setNewClinic((prev) => ({ ...prev, name: event.target.value }))}
-											placeholder="Clinic name"
-										/>
-									</div>
-									<div className="systemadmin-field">
-										<label htmlFor="new-clinic-code">Clinic Code (Optional)</label>
-										<input
-											id="new-clinic-code"
-											type="text"
-											value={newClinic.code}
-											onChange={(event) => setNewClinic((prev) => ({ ...prev, code: event.target.value }))}
-											placeholder="Code"
-										/>
-									</div>
-								</div>
-								<button type="submit" disabled={busyAction === 'create-clinic'}>
-									{busyAction === 'create-clinic' ? 'Creating...' : 'Create Clinic'}
-								</button>
-							</form>
-						</div>
-
-						<div className="systemadmin-card">
-							<h3>Create Branch</h3>
-							<form onSubmit={handleCreateBranch}>
-								<div className="systemadmin-field-row">
-									<div className="systemadmin-field">
-										<label htmlFor="new-branch-clinic">Clinic</label>
-										<select
-											id="new-branch-clinic"
-											value={newBranch.clinicId}
-											onChange={(event) => setNewBranch((prev) => ({ ...prev, clinicId: event.target.value }))}
-										>
-											{clinics.map((clinic) => (
-												<option key={clinic.id} value={clinic.id}>{clinic.name}</option>
-											))}
-										</select>
-									</div>
-									<div className="systemadmin-field">
-										<label htmlFor="new-branch-name">Branch Name</label>
-										<input
-											id="new-branch-name"
-											type="text"
-											value={newBranch.name}
-											onChange={(event) => setNewBranch((prev) => ({ ...prev, name: event.target.value }))}
-											placeholder="Branch name"
-										/>
-									</div>
-									<div className="systemadmin-field">
-										<label htmlFor="new-branch-code">Branch Code (Optional)</label>
-										<input
-											id="new-branch-code"
-											type="text"
-											value={newBranch.code}
-											onChange={(event) => setNewBranch((prev) => ({ ...prev, code: event.target.value }))}
-											placeholder="Code"
-										/>
-									</div>
-									<div className="systemadmin-field">
-										<label htmlFor="new-branch-address">Branch Address (Optional)</label>
-										<input
-											id="new-branch-address"
-											type="text"
-											value={newBranch.address}
-											onChange={(event) => setNewBranch((prev) => ({ ...prev, address: event.target.value }))}
-											placeholder="Address"
-										/>
-									</div>
-								</div>
-								<button type="submit" disabled={busyAction === 'create-branch'}>
-									{busyAction === 'create-branch' ? 'Creating...' : 'Create Branch'}
-								</button>
-							</form>
-						</div>
 					</div>
 
 					<div className="systemadmin-card">
@@ -517,13 +332,11 @@ function SystemAdminClinicManagement() {
 											<th>Address</th>
 											<th>Status</th>
 											<th>Archived At</th>
-											<th>Actions</th>
 										</tr>
 									</thead>
 									<tbody>
 										{selectedClinicBranches.map((branch) => {
 											const branchStatus = normalizeStatus(branch.status);
-											const draftStatus = branchStatusDrafts[branch.id] || branchStatus;
 											const isArchived = hasArchivedTimestamp(branch);
 
 											return (
@@ -531,51 +344,8 @@ function SystemAdminClinicManagement() {
 													<td>{branch.name}</td>
 													<td>{branch.code || '-'}</td>
 													<td>{branch.address || '-'}</td>
-													<td>
-														<select
-															value={draftStatus}
-															onChange={(event) => setBranchStatusDrafts((prev) => ({
-																...prev,
-																[branch.id]: event.target.value,
-															}))}
-														>
-															{STATUS_OPTIONS.map((option) => (
-																<option key={option} value={option}>{option}</option>
-															))}
-														</select>
-													</td>
+													<td>{branchStatus}</td>
 													<td>{formatDateTime(branch.archived_at)}</td>
-													<td>
-														<div className="systemadmin-actions-inline">
-															<button
-																type="button"
-																onClick={() => handleApplyBranchStatus(branch)}
-																disabled={busyAction === `branch-status-${branch.id}`}
-															>
-																{busyAction === `branch-status-${branch.id}` ? 'Saving...' : 'Apply'}
-															</button>
-
-															{!isArchived ? (
-																<button
-																	type="button"
-																	className="danger"
-																	onClick={() => handleArchiveBranch(branch)}
-																	disabled={busyAction === `branch-archive-${branch.id}`}
-																>
-																	{busyAction === `branch-archive-${branch.id}` ? 'Archiving...' : 'Archive'}
-																</button>
-															) : (
-																<button
-																	type="button"
-																	className="secondary"
-																	onClick={() => handleRestoreBranch(branch)}
-																	disabled={busyAction === `branch-restore-${branch.id}`}
-																>
-																	{busyAction === `branch-restore-${branch.id}` ? 'Restoring...' : 'Restore'}
-																</button>
-															)}
-														</div>
-													</td>
 												</tr>
 											);
 										})}
@@ -586,6 +356,13 @@ function SystemAdminClinicManagement() {
 					</div>
 				</>
 			) : null}
+
+			<ConfirmationModal
+				isOpen={showConfirmModal}
+				onClose={() => setShowConfirmModal(false)}
+				onConfirm={confirmModalConfig.onConfirm}
+				message={confirmModalConfig.message}
+			/>
 		</section>
 	);
 }

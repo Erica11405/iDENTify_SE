@@ -15,6 +15,8 @@ const DAYS = [
 const AddDentistModal = ({ onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [sentEmail, setSentEmail] = useState('');
   
   const [formData, setFormData] = useState({
     first_name: '',
@@ -109,22 +111,13 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
     };
 
     try {
-      const response = await api.createDentist(payload); 
-      console.log('Dentist added successfully');
-      
-      const tempPassword = response?.generated_password || response?.data?.generated_password;
-
-      if (tempPassword) {
-         alert(`SUCCESS: Dentist account created!\n\nEmail: ${formData.email}\nTemporary Password: ${tempPassword}\n\nPlease copy this password and give it to the dentist.`);
-      }
+      await api.createDentist(payload); 
+      setSentEmail(formData.email);
+      setSuccess(true);
       
       if (onSuccess) {
         onSuccess();
-      } else {
-        window.location.reload();
       }
-      
-      if (onClose) onClose();
 
     } catch (err) {
       console.error("Add Dentist Error:", err);
@@ -133,6 +126,29 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
       setLoading(false);
     }
   };
+
+  if (success) {
+    return (
+      <div className="modal-overlay">
+        <div className="modal-content text-center" style={{ maxWidth: '400px', textAlign: 'center', padding: '40px 20px' }}>
+          <div className="success-icon" style={{ fontSize: '50px', color: '#2ecc71', marginBottom: '20px' }}>
+            <i className="fas fa-check-circle"></i>
+          </div>
+          <h2 style={{ marginBottom: '15px' }}>Credentials Sent!</h2>
+          <p style={{ color: '#666', marginBottom: '25px', lineHeight: '1.5' }}>
+            Account has been created successfully. Login credentials have been sent to <strong>{sentEmail}</strong>.
+          </p>
+          <button 
+            className="btn-submit" 
+            onClick={onClose}
+            style={{ width: '100%', padding: '12px' }}
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-overlay">

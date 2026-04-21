@@ -6,6 +6,7 @@ import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
 import toast from "react-hot-toast";
 import EditDentistModal from "../../components/EditDentistModal";
+import ConfirmationModal from "../../components/ConfirmationModal";
 
 const DAYS = [
   { label: "S", value: 0 },
@@ -30,6 +31,14 @@ function Dentists() {
     assigned: "All",
   });
 
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalConfig, setConfirmModalConfig] = useState({ message: '', onConfirm: () => {} });
+
+  const openConfirm = (message, onConfirm) => {
+    setConfirmModalConfig({ message, onConfirm });
+    setShowConfirmModal(true);
+  };
+
   const dayIndex = selectedDate.getDay();
   const selectedDateStr = selectedDate.toISOString().split("T")[0];
 
@@ -37,16 +46,20 @@ function Dentists() {
     api.loadDentists();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleDeleteDentist = async (id, name) => {
-    if (window.confirm(`Are you sure you want to delete Dr. ${name}?`)) {
-      try {
-        await api.deleteDentist(id);
-        toast.success("Dentist removed");
-        api.loadDentists(); // Refresh the list
-      } catch {
-        toast.error("Failed to delete dentist");
-      }
+  const executeDeleteDentist = async (id) => {
+    try {
+      await api.deleteDentist(id);
+      toast.success("Dentist removed");
+      api.loadDentists(); // Refresh the list
+    } catch {
+      toast.error("Failed to delete dentist");
+    } finally {
+      setShowConfirmModal(false);
     }
+  };
+
+  const handleDeleteDentist = (id, name) => {
+    openConfirm(`Are you sure you want to delete Dr. ${name}?`, () => executeDeleteDentist(id));
   };
 
   const calculateAvailability = (dentist) => {
@@ -206,6 +219,13 @@ function Dentists() {
           }}
         />
       )}
+
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={confirmModalConfig.onConfirm}
+        message={confirmModalConfig.message}
+      />
     </div>
   );
 }

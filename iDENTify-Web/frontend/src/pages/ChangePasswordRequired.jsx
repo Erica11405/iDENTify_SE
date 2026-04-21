@@ -15,11 +15,9 @@ export default function ChangePasswordRequired() {
     const navigate = useNavigate();
     const { user, setUser, resetStore } = useAppStore();
 
-    const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [submitting, setSubmitting] = useState(false);
-    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [errors, setErrors] = useState({});
@@ -50,7 +48,6 @@ export default function ChangePasswordRequired() {
         event.preventDefault();
 
         const nextErrors = {};
-        if (!currentPassword.trim()) nextErrors.currentPassword = "Current password is required.";
         if (!newPassword.trim()) nextErrors.newPassword = "New password is required.";
         if (newPassword.trim() && newPassword.trim().length < 8) {
             nextErrors.newPassword = "New password must be at least 8 characters long.";
@@ -71,7 +68,6 @@ export default function ChangePasswordRequired() {
         try {
             const response = await api.changePassword({
                 email: userEmail,
-                currentPassword,
                 newPassword,
                 confirmPassword,
             });
@@ -121,33 +117,6 @@ export default function ChangePasswordRequired() {
                     {errors.form ? (
                         <div className="error-banner">{errors.form}</div>
                     ) : null}
-
-                    <div className="login-form__group">
-                        <label htmlFor="currentPassword">Current Password</label>
-                        <div className="password-input-wrapper">
-                            <input
-                                id="currentPassword"
-                                type={showCurrentPassword ? "text" : "password"}
-                                value={currentPassword}
-                                autoComplete="current-password"
-                                onChange={(event) => {
-                                    setCurrentPassword(event.target.value);
-                                    setErrors((prev) => ({ ...prev, currentPassword: null, form: null }));
-                                }}
-                                placeholder="Enter your current password"
-                                className={errors.currentPassword ? "input-error" : ""}
-                            />
-                            <button
-                                type="button"
-                                className="password-toggle-btn"
-                                aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
-                                onClick={() => setShowCurrentPassword((prev) => !prev)}
-                            >
-                                {showCurrentPassword ? "Hide" : "Show"}
-                            </button>
-                        </div>
-                        {errors.currentPassword ? <span className="error-text">{errors.currentPassword}</span> : null}
-                    </div>
 
                     <div className="login-form__group">
                         <label htmlFor="newPassword">New Password</label>

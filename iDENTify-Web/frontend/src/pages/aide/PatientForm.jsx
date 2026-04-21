@@ -424,8 +424,8 @@ function PatientForm({ userRole }) {
     
     const isHistoryView = location.state?.status === "Done";
 
-	const isChartReadOnly = !isLatestYear || isHistoryView; 
-	const isVisitReadOnly = !isLatestYear || isHistoryView; 
+	const isChartReadOnly = !isLatestYear || isHistoryView || isDentistReviewing; 
+	const isVisitReadOnly = !isLatestYear || isHistoryView || isDentistReviewing; 
 
 	const getRecommendations = () => {
 		const issues = [];
@@ -1263,6 +1263,18 @@ function PatientForm({ userRole }) {
 						{(uploadedFiles || []).length === 0 ? <div className="muted-text">No files uploaded yet.</div> : (uploadedFiles || []).map((file, index) => (
 							<div key={index} className="thumbnail-item"><button onClick={() => openXrayViewer(file)}><img src={file.url} alt={file.name} /></button></div>
 						))}
+					</div>
+					
+					<div className="patient-notes-container" style={{ marginTop: '20px' }}>
+						<h3 className="section-title">Visit Notes (Year {selectedYear})</h3>
+						<textarea
+							className="pill-input-input"
+							placeholder="Add any additional notes for this year's visits..."
+							value={vitals.notes || ""}
+							onChange={(e) => updateVitals("notes", e.target.value)}
+							disabled={isVisitReadOnly}
+							style={{ width: '100%', minHeight: '100px', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', resize: 'vertical' }}
+						/>
 					</div>
 				</section>
 

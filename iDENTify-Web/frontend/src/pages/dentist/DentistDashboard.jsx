@@ -51,7 +51,8 @@ function DentistDashboard() {
 
     // 3. Cleanup the interval
     return () => clearInterval(syncInterval);
-  }, [api]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const myAppts = useMemo(() => {
     if (!appointments || !user) return [];

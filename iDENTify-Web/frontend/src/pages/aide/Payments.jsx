@@ -136,6 +136,7 @@ function Payments({
   pageSubtitle = "Review billing records, add installments, and finalize pending balances.",
   forcedDentistId = null,
   hideDentistFilter = false,
+  isReadOnly = false,
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -658,14 +659,18 @@ function Payments({
                         <td>{formatMethodLabel(row.latest_payment_method)}</td>
                         <td>
                           {isBillingRecord(row) ? (
-                            <button
-                              type="button"
-                              className="review-btn"
-                              onClick={() => handleOpenRecord(row)}
-                              disabled={busyId === row.id || openingRecordId === row.id}
-                            >
-                              {busyId === row.id ? "Saving..." : openingRecordId === row.id ? "Loading..." : "Update / Add Payment"}
-                            </button>
+                            isReadOnly ? (
+                              <span className="status-pending-text">Pending</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="review-btn"
+                                onClick={() => handleOpenRecord(row)}
+                                disabled={busyId === row.id || openingRecordId === row.id}
+                              >
+                                {busyId === row.id ? "Saving..." : openingRecordId === row.id ? "Loading..." : "Update / Add Payment"}
+                              </button>
+                            )
                           ) : (
                             <span className="status-paid-text">Paid</span>
                           )}

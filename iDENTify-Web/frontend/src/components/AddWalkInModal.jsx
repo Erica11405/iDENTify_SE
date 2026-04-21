@@ -330,7 +330,7 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
           
           <div className="form-actions">
             <button type="button" onClick={onClose}>Cancel</button>
-            <button type="submit">Add to Queue</button>
+            <button type="submit">Add Walk-In</button>
           </div>
         </form>
       </div>

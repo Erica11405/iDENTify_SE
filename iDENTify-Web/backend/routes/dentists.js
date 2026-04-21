@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db'); 
 const bcrypt = require('bcrypt');
 const { enforceAdminAccess } = require('../utils/accessControl');
+const { sendEmail } = require('../utils/mailer');
 
 // Helper to convert undefined to null to prevent MySQL crashes
 const safeVal = (val) => val === undefined ? null : val;
@@ -456,11 +457,36 @@ router.post('/', async (req, res) => {
 
       const userSql = `INSERT INTO users (${userColumns.join(', ')}) VALUES (${userColumns.map(() => '?').join(', ')})`;
       await db.query(userSql, userValues);
+
+      try {
+        await sendEmail({
+          to: email,
+          subject: 'Your iDENTify Staff Account Credentials',
+          text: `Hello ${fullName},\n\nYour iDENTify staff account has been created.\n\nLogin URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}\nEmail: ${email}\nTemporary Password: ${plainPassword}\n\nPlease change your password after your first login.\n\nBest regards,\niDENTify Team`,
+          html: `
+            <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+              <h2 style="color: #2c3e50;">Welcome to iDENTify!</h2>
+              <p>Hello <strong>${fullName}</strong>,</p>
+              <p>Your iDENTify staff account has been created successfully. You can now log in using the credentials below:</p>
+              <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
+                <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <code style="background: #eee; padding: 2px 5px; border-radius: 3px;">${plainPassword}</code></p>
+              </div>
+              <p>For security reasons, you will be required to change your password upon your first login.</p>
+              <p><a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" style="display: inline-block; background: #3498db; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Login to Your Account</a></p>
+              <p style="color: #7f8c8d; font-size: 0.9em; margin-top: 30px;">This is an automated message. Please do not reply.</p>
+            </div>
+          `
+        });
+      } catch (mailErr) {
+        console.error("Failed to send credentials email:", mailErr);
+        // We don't fail the whole request if email fails, but we might want to tell the user
+      }
     }
 
     res.status(201).json({
       id: newStaffId,
-      message: 'Staff profile and login account created successfully.',
+      message: 'Staff profile created and credentials have been sent to their email.',
       generated_password: generatedPassword,
       password_is_temporary: Boolean(generatedPassword),
     });

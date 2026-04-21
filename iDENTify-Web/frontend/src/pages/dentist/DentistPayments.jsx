@@ -41,6 +41,7 @@ function DentistPayments() {
       pageSubtitle="Payment records for your completed and billing cases."
       forcedDentistId={dentistId}
       hideDentistFilter
+      isReadOnly={true}
     />
   );
 }
