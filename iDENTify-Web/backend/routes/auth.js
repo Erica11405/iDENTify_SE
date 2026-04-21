@@ -3,6 +3,8 @@ const router = express.Router();
 const db = require('../db'); 
 const bcrypt = require('bcrypt');
 const { sendEmail } = require('../utils/mailer');
+const resend = require('../utils/resend');
+const { emailOTPtemplate } = require('../utils/emailOTPtemplate');
 const {
     normalizeApprovalStatus,
     getUserTenantAssignment,
@@ -246,9 +248,22 @@ async function sendOtpEmail({ email, name, otpCode, subject, introText }) {
     });
 }
 
+async function sendOtpEmailViaResend({ email, name, otpCode, subject }) {
+    await resend.sendEmail({
+        to: email,
+        subject,
+        html: emailOTPtemplate(otpCode, name),
+    });
+}
+
 async function ensureEmailNotRegistered(email) {
-    const [existingUser] = await db.query('SELECT id FROM users WHERE email = ? LIMIT 1', [email]);
-    return existingUser.length === 0;
+    try {
+        const [existingUser] = await db.query('SELECT id FROM users WHERE email = ? LIMIT 1', [email]);
+        return existingUser.length === 0;
+    } catch (err) {
+        if (err.code === 'ER_NO_SUCH_TABLE') return true; // Assume available if table doesn't exist yet (migrations will create it)
+        throw err;
+    }
 }
 
 async function ensureSignupOtpTable() {
@@ -365,22 +380,28 @@ router.post('/signup/superadmin/send-otp', async (req, res) => {
 
         await saveSignupOtp('superadmin', email, otpCode, expiresAt);
 
-        await sendOtpEmail({
+        await sendOtpEmailViaResend({
             email,
             otpCode,
             subject: 'Verify your iDENTify Super Admin Registration',
-            introText: 'Your registration verification code is',
         });
 
         res.status(200).json({ message: 'Verification code sent to email.' });
     } catch (err) {
         console.error('Super Admin OTP Send Error:', err);
+        
+        if (err.message && err.message.includes('RESEND_API_KEY')) {
+            return res.status(503).json({ 
+                error: 'Email service is not configured. Set RESEND_API_KEY in backend .env.' 
+            });
+        }
+        
         if (isMailerNotConfiguredError(err)) {
             return res.status(503).json({
                 error: 'OTP email service is not configured. Set MAILER_USER, MAILER_PASS, and MAILER_FROM in backend .env.',
             });
         }
-        res.status(500).json({ error: 'Failed to send verification email.' });
+        res.status(500).json({ error: 'Failed to send verification email: ' + (err.message || 'Unknown error') });
     }
 });
 

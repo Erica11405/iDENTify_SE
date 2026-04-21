@@ -5,6 +5,7 @@ import useAppStore from './store/useAppStore';
 import AppLayout from './layout/AppLayout';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
+import VerifyEmail from './pages/VerifyEmail';
 import Landing from './pages/Landing';
 import ChangePasswordRequired from './pages/ChangePasswordRequired';
 import SuperAdminRequestGate from './pages/SuperAdminRequestGate';
@@ -79,6 +80,7 @@ function App() {
                 <Route path="/download" element={<Landing />} />
                 <Route path="/" element={<Login />} />
                 <Route path="/signup" element={<SignUp />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         );

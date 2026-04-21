@@ -81,7 +81,7 @@ function getTransporter() {
   return transporterCache;
 }
 
-async function sendEmail({ to, subject, text }) {
+async function sendEmail({ to, subject, text, html }) {
   const destination = String(to || '').trim();
   if (!destination) {
     throw new Error('Email recipient is required.');
@@ -98,6 +98,7 @@ async function sendEmail({ to, subject, text }) {
     to: destination,
     subject: String(subject || '').trim() || 'iDENTify Notification',
     text: String(text || '').trim(),
+    html: html || undefined,
   });
 }
 
