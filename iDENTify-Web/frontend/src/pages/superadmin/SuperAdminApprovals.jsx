@@ -177,7 +177,7 @@ function SuperAdminApprovals() {
     return (
         <section className="approvals-page">
             <div className="approvals-header">
-                <h2>Super Admin Approvals</h2>
+                <h2>Request Approvals</h2>
                 <div className="approvals-header-actions">
                     <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                         <option value="pending_review">Pending Review</option>
