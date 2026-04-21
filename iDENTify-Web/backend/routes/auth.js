@@ -257,13 +257,8 @@ async function sendOtpEmailViaResend({ email, name, otpCode, subject }) {
 }
 
 async function ensureEmailNotRegistered(email) {
-    try {
-        const [existingUser] = await db.query('SELECT id FROM users WHERE email = ? LIMIT 1', [email]);
-        return existingUser.length === 0;
-    } catch (err) {
-        if (err.code === 'ER_NO_SUCH_TABLE') return true; // Assume available if table doesn't exist yet (migrations will create it)
-        throw err;
-    }
+    const [existingUser] = await db.query('SELECT id FROM users WHERE email = ? LIMIT 1', [email]);
+    return existingUser.length === 0;
 }
 
 async function ensureSignupOtpTable() {
@@ -355,7 +350,7 @@ async function clearSignupOtp(scope, email) {
 
 // --- STEP 1: SEND OTP FOR SUPER ADMIN SIGN UP ---
 router.post('/signup/superadmin/send-otp', async (req, res) => {
-    const email = toEmail(req.body?.email);
+    const email = toEmail(  .body?.email);
 
     if (!email) {
         return res.status(400).json({ error: 'Email is required.' });
@@ -389,19 +384,12 @@ router.post('/signup/superadmin/send-otp', async (req, res) => {
         res.status(200).json({ message: 'Verification code sent to email.' });
     } catch (err) {
         console.error('Super Admin OTP Send Error:', err);
-        
-        if (err.message && err.message.includes('RESEND_API_KEY')) {
-            return res.status(503).json({ 
-                error: 'Email service is not configured. Set RESEND_API_KEY in backend .env.' 
-            });
-        }
-        
         if (isMailerNotConfiguredError(err)) {
             return res.status(503).json({
                 error: 'OTP email service is not configured. Set MAILER_USER, MAILER_PASS, and MAILER_FROM in backend .env.',
             });
         }
-        res.status(500).json({ error: 'Failed to send verification email: ' + (err.message || 'Unknown error') });
+        res.status(500).json({ error: 'Failed to send verification email.' });
     }
 });
 
