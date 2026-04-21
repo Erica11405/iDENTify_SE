@@ -255,9 +255,16 @@ function PaymentModal({
           <p><strong>Date and Time:</strong> {summary.visit_datetime || summary.created_at ? formatDateTime(summary.visit_datetime || summary.created_at) : "Not set"}</p>
           <p><strong>Services:</strong></p>
           <div className="payment-service-list">
-            {services.length > 0 ? services.map((service) => (
-              <span key={service} className="payment-service-chip">{service}</span>
-            )) : <span className="payment-service-empty">No services listed.</span>}
+            {services.length > 0 ? services.map((service, idx) => {
+              const name = typeof service === 'object' ? service.name : service;
+              const price = typeof service === 'object' ? service.price : 0;
+              return (
+                <div key={idx} className="payment-service-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 10px', background: '#f8fafc', borderRadius: '4px', marginBottom: '5px' }}>
+                  <span className="payment-service-name">{name}</span>
+                  {price > 0 && <span className="payment-service-price">₱{price}</span>}
+                </div>
+              );
+            }) : <span className="payment-service-empty">No services listed.</span>}
           </div>
         </div>
 

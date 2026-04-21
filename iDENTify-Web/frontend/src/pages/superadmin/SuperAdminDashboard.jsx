@@ -202,6 +202,24 @@ function SuperAdminDashboard() {
         };
     }, [selectedClinicId, clinicBranchesByClinic]);
 
+    const [earningsData, setEarningsData] = useState(null);
+    const [earningsLoading, setEarningsLoading] = useState(false);
+
+    useEffect(() => {
+        const loadEarnings = async () => {
+            setEarningsLoading(true);
+            try {
+                const data = await api.getEarningsReport();
+                setEarningsData(data);
+            } catch (err) {
+                console.error("Failed to load earnings:", err);
+            } finally {
+                setEarningsLoading(false);
+            }
+        };
+        loadEarnings();
+    }, []);
+
     const metrics = useMemo(() => {
         const totalDentists = users.filter((u) => normalizeStatus(u.role) === 'dentist').length;
         const totalAides = users.filter((u) => normalizeStatus(u.role) === 'aide').length;
@@ -381,6 +399,35 @@ function SuperAdminDashboard() {
                         <StatCard label="Total Dentists" value={metrics.totalDentists} />
                         <StatCard label="Total Aides" value={metrics.totalAides} />
                         <StatCard label="Archived Accounts" value={metrics.archivedAccounts} />
+                    </div>
+
+                    <div className="settings-form-card dashboard-top-spacing-md">
+                        <h3>Earnings Overview</h3>
+                        <p className="dashboard-muted-text">Daily earnings and breakdown by dentist.</p>
+                        {earningsLoading ? <p>Loading earnings...</p> : (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '15px' }}>
+                                <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                    <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Total Earnings</h4>
+                                    <p style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981', margin: 0 }}>
+                                        ₱{(earningsData?.totalEarnings || 0).toLocaleString()}
+                                    </p>
+                                    <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '5px' }}>
+                                        For the period: {earningsData?.startDate} to {earningsData?.endDate}
+                                    </p>
+                                </div>
+                                <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                    <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Dentist Breakdown</h4>
+                                    <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                        {(earningsData?.dentistBreakdown || []).map((d, i) => (
+                                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #edf2f7' }}>
+                                                <span style={{ fontSize: '0.9rem' }}>{d.dentist}</span>
+                                                <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>₱{d.earnings.toLocaleString()}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="settings-form-card dashboard-top-spacing-md">

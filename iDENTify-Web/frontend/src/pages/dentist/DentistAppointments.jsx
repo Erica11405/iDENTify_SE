@@ -244,9 +244,22 @@ function DentistAppointments() {
                           <button
                             className="review-chart-btn"
                             onClick={() => navigate(`/patients/${appt.patient_id}`)}
-                            style={{ backgroundColor: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
+                            style={{ backgroundColor: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}
                           >
                             Review Chart
+                          </button>
+                          <button
+                            className="follow-up-btn"
+                            onClick={() => {
+                              const note = window.prompt("Reason for follow-up/reschedule:");
+                              if (note !== null) {
+                                api.updateAppointment(appt.id, { status: 'Scheduled', notes: note });
+                                toast.success("Marked for follow-up.");
+                              }
+                            }}
+                            style={{ backgroundColor: '#9b59b6', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
+                          >
+                            Follow-up
                           </button>
                         </div>
                       </td>

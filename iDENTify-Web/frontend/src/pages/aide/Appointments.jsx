@@ -122,8 +122,9 @@ function Appointments() {
             ) : (
               data.map((a) => {
                 const s = (a.status || "").toLowerCase().trim();
+                const ds = (a.decision_status || "").toLowerCase().trim();
                 const canStart = !["done", "cancelled", "declined", "no-show", "missed"].includes(s);
-                const canDecide = !["done", "cancelled", "declined", "no-show", "missed"].includes(s);
+                const canDecide = ds === "pending" && !["done", "cancelled", "declined", "no-show", "missed"].includes(s);
                 const apptDate = a.appointment_datetime ? new Date(a.appointment_datetime).toLocaleDateString() : "-";
                 const isApproveBusy = decisionLoadingId === `approve-${a.id}`;
                 const isDeclineBusy = decisionLoadingId === `decline-${a.id}`;
@@ -137,7 +138,10 @@ function Appointments() {
                     <td>{patients.find((p) => p.id === a.patient_id)?.name || a.patient}</td>
                     <td>{dentists.find((d) => d.id === a.dentist_id)?.name || a.dentist}</td>
                     <td><span className="badge badge-neutral">{a.procedure || a.reason}</span></td>
-                    <td><StatusBadge status={a.status} /></td>
+                    <td>
+                      <StatusBadge status={a.status} />
+                      {ds === "approved" && <span style={{fontSize: '0.7rem', color: '#2ecc71', display: 'block'}}>(Approved)</span>}
+                    </td>
                     <td><div className="notes-pill">{a.notes}</div></td>
                     <td className="contact-cell">
                       <button type="button" className="contact-button" onClick={() => setActiveContactId((prev) => prev === a.id ? null : a.id)}>📇</button>
@@ -150,34 +154,53 @@ function Appointments() {
                     </td>
                     {showActions && (
                       <td>
-                        {canDecide ? (
-                          <>
-                            <button
-                              className="approve-btn"
-                              onClick={() => handleApprove(a)}
-                              disabled={isApproveBusy || isDeclineBusy}
-                            >
-                              {isApproveBusy ? "Approving..." : "Approve"}
-                            </button>
-                            <button
-                              className="decline-btn"
-                              onClick={() => handleDecline(a)}
-                              disabled={isApproveBusy || isDeclineBusy}
-                            >
-                              {isDeclineBusy ? "Declining..." : "Decline"}
-                            </button>
-                          </>
-                        ) : null}
-                        {showEdit ? <button className="edit-btn" onClick={() => handleEdit(a)}>Edit</button> : null}
-                        <button
-                          className="start-btn"
-                          onClick={() => handleStartTreatment(a)}
-                          style={!canStart ? { backgroundColor: '#adb5bd', cursor: 'not-allowed' } : {}}
-                          disabled={!canStart}
-                        >
-                          Start
-                        </button>
-                        <button className="delete-btn" onClick={() => handleDelete(a)}>Delete</button>
+                        <div className="appt-action-group" style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                          {canDecide ? (
+                            <>
+                              <button
+                                className="approve-btn"
+                                onClick={() => handleApprove(a)}
+                                disabled={isApproveBusy || isDeclineBusy}
+                              >
+                                {isApproveBusy ? "Approving..." : "Approve"}
+                              </button>
+                              <button
+                                className="decline-btn"
+                                onClick={() => handleDecline(a)}
+                                disabled={isApproveBusy || isDeclineBusy}
+                              >
+                                {isDeclineBusy ? "Declining..." : "Decline"}
+                              </button>
+                            </>
+                          ) : null}
+                          {showEdit ? <button className="edit-btn" onClick={() => handleEdit(a)}>Edit</button> : null}
+                          
+                          <button 
+                            className="reassign-btn" 
+                            onClick={() => handleReassignDentist(a)}
+                            style={{ backgroundColor: '#f39c12', color: 'white' }}
+                          >
+                            Reassign
+                          </button>
+
+                          <button 
+                            className="reschedule-btn" 
+                            onClick={() => handleReschedule(a)}
+                            style={{ backgroundColor: '#9b59b6', color: 'white' }}
+                          >
+                            Reschedule
+                          </button>
+
+                          <button
+                            className="start-btn"
+                            onClick={() => handleStartTreatment(a)}
+                            style={!canStart ? { backgroundColor: '#adb5bd', cursor: 'not-allowed' } : {}}
+                            disabled={!canStart}
+                          >
+                            Start
+                          </button>
+                          <button className="delete-btn" onClick={() => handleDelete(a)}>Delete</button>
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -292,6 +315,16 @@ function Appointments() {
   const handleEdit = (appointment) => { setSelectedAppointment(appointment); setIsEditModalOpen(true); };
   const handleDelete = (appointment) => { setSelectedAppointment(appointment); setIsDeleteModalOpen(true); };
   const handleCloseModal = () => { setSelectedAppointment(null); setIsEditModalOpen(false); setIsDeleteModalOpen(false); };
+
+  const handleReassignDentist = (appointment) => {
+    setSelectedAppointment(appointment);
+    setIsEditModalOpen(true);
+  };
+
+  const handleReschedule = (appointment) => {
+    setSelectedAppointment(appointment);
+    setIsEditModalOpen(true);
+  };
 
   const handleSaveAppointment = async (updatedAppointment) => {
     try {

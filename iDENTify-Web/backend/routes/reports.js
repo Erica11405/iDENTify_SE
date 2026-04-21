@@ -736,6 +736,129 @@ function splitServiceText(value, sourceType) {
   return [...new Set(tokens)];
 }
 
+router.get("/earnings", async (req, res) => {
+  try {
+    const actorContext = assertReportActorContext(req, { disallowDentist: true });
+    if (!actorContext.allowed) {
+      return res.status(actorContext.status).json({
+        message: actorContext.message,
+        code: actorContext.code || 'REPORT_CONTEXT_FORBIDDEN',
+      });
+    }
+
+    const dateRange = resolveReportDateRange(req.query);
+    if (!dateRange.ok) {
+      return res.status(400).json({ message: dateRange.message });
+    }
+
+    const { start, end } = dateRange;
+    const actorScope = await getActorTenantScope(req);
+    const tenantScopeAccess = assertResolvedTenantScope(actorScope);
+    if (!tenantScopeAccess.allowed) {
+      return res.status(tenantScopeAccess.status).json({
+        message: tenantScopeAccess.message,
+        code: tenantScopeAccess.code || 'REPORT_SCOPE_FORBIDDEN',
+      });
+    }
+
+    const supportsQueueClinic = await hasQueueClinicColumn();
+    const supportsQueueBranch = await hasQueueBranchColumn();
+    const supportsAppointmentClinic = await hasAppointmentClinicColumn();
+    const supportsAppointmentBranch = await hasAppointmentBranchColumn();
+    const supportsUsersClinic = await hasUsersClinicColumn();
+    const supportsUsersBranch = await hasUsersBranchColumn();
+
+    const paymentJoinSql = [
+      'LEFT JOIN walk_in_queue q ON q.id = pr.queue_id',
+      'LEFT JOIN appointments a ON a.id = pr.appointment_id',
+    ];
+
+    const needsOwnerJoin = Boolean(actorScope?.scoped) && (
+      (actorScope?.clinicId && !supportsQueueClinic && !supportsAppointmentClinic && supportsUsersClinic) ||
+      (actorScope?.branchId && !supportsQueueBranch && !supportsAppointmentBranch && supportsUsersBranch)
+    );
+
+    if (needsOwnerJoin) {
+      paymentJoinSql.push(`LEFT JOIN (
+        SELECT dentist_id, MAX(clinic_id) AS clinic_id, MAX(branch_id) AS branch_id
+        FROM users
+        GROUP BY dentist_id
+      ) owner ON owner.dentist_id = COALESCE(pr.dentist_id, q.dentist_id, a.dentist_id)`);
+    }
+
+    const clinicExpressions = [];
+    if (supportsQueueClinic) clinicExpressions.push('q.clinic_id');
+    if (supportsAppointmentClinic) clinicExpressions.push('a.clinic_id');
+    if (needsOwnerJoin) clinicExpressions.push('owner.clinic_id');
+
+    const branchExpressions = [];
+    if (supportsQueueBranch) branchExpressions.push('q.branch_id');
+    if (supportsAppointmentBranch) branchExpressions.push('a.branch_id');
+    if (needsOwnerJoin) branchExpressions.push('owner.branch_id');
+
+    const whereClauses = ['DATE(pt.created_at) BETWEEN ? AND ?'];
+    const params = [start, end];
+
+    if (actorScope.scoped) {
+      if (actorScope.clinicId && clinicExpressions.length > 0) {
+        whereClauses.push(`COALESCE(${clinicExpressions.join(', ')}) = ?`);
+        params.push(actorScope.clinicId);
+      }
+      if (actorScope.branchId && branchExpressions.length > 0) {
+        whereClauses.push(`COALESCE(${branchExpressions.join(', ')}) = ?`);
+        params.push(actorScope.branchId);
+      }
+    }
+
+    const [earningsRows] = await db.query(
+      `SELECT 
+        SUM(pt.amount_paid) as total_earnings,
+        COUNT(pt.id) as transaction_count,
+        DATE(pt.created_at) as date
+      FROM payment_transactions pt
+      JOIN payment_records pr ON pr.id = pt.payment_record_id
+      ${paymentJoinSql.join('\n')}
+      WHERE ${whereClauses.join(' AND ')}
+      GROUP BY DATE(pt.created_at)
+      ORDER BY DATE(pt.created_at) ASC`,
+      params
+    );
+
+    const [breakdownRows] = await db.query(
+      `SELECT 
+        COALESCE(d.name, pr.dentist_name, 'Unknown') as dentist_name,
+        SUM(pt.amount_paid) as earnings
+      FROM payment_transactions pt
+      JOIN payment_records pr ON pr.id = pt.payment_record_id
+      LEFT JOIN dentists d ON d.id = pr.dentist_id
+      ${paymentJoinSql.join('\n')}
+      WHERE ${whereClauses.join(' AND ')}
+      GROUP BY COALESCE(d.name, pr.dentist_name, 'Unknown')
+      ORDER BY earnings DESC`,
+      params
+    );
+
+    res.json({
+      startDate: start,
+      endDate: end,
+      totalEarnings: earningsRows.reduce((sum, row) => sum + Number(row.total_earnings || 0), 0),
+      dailyEarnings: earningsRows.map(row => ({
+        date: row.date,
+        earnings: Number(row.total_earnings || 0),
+        transactions: row.transaction_count
+      })),
+      dentistBreakdown: breakdownRows.map(row => ({
+        dentist: row.dentist_name,
+        earnings: Number(row.earnings || 0)
+      }))
+    });
+
+  } catch (err) {
+    console.error("Earnings Report API Error:", err);
+    res.status(500).json({ message: "Failed to load earnings report" });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     const actorContext = assertReportActorContext(req, { disallowDentist: true });

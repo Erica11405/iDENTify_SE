@@ -122,6 +122,25 @@ export default function AppointmentDetails() {
     }
   };
 
+  const handleReportDentist = () => {
+    Alert.prompt(
+      "Report Dentist",
+      "Please describe the issue or reason for reporting this dentist:",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Submit Report", 
+          onPress: (reason) => {
+            if (reason?.trim()) {
+              // In a real app, this would call a backend endpoint
+              Alert.alert("Report Submitted", "Thank you for your feedback. We will investigate this matter.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const statusStyle = getStatusColor(appointment.status);
 
   return (
@@ -134,7 +153,12 @@ export default function AppointmentDetails() {
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Appointment Details</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={styles.title}>Appointment Details</Text>
+          <TouchableOpacity onPress={handleReportDentist} style={{ padding: 5 }}>
+            <Ionicons name="flag-outline" size={24} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.card}>

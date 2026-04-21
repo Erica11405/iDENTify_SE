@@ -43,7 +43,7 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
     first_name: dentist?.first_name || '',
     middle_name: dentist?.middle_name || '',
     last_name: dentist?.last_name || '',
-    specialization: dentist?.specialization || '',
+    specializations: (dentist?.specialization || '').split(',').map(s => s.trim()).filter(Boolean),
     phone: dentist?.phone || '',
     email: dentist?.email || '',
     days: dentist?.days || [1, 2, 3, 4, 5],
@@ -54,17 +54,24 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
     status: dentist?.status || "Available"
   });
 
+  const [specDraft, setSpecDraft] = useState("");
+
+  const addSpecialization = () => {
+    if (!specDraft) return;
+    if (formData.specializations.includes(specDraft)) return;
+    setFormData(prev => ({ ...prev, specializations: [...prev.specializations, specDraft] }));
+    setSpecDraft("");
+  };
+
+  const removeSpecialization = (spec) => {
+    setFormData(prev => ({ ...prev, specializations: prev.specializations.filter(s => s !== spec) }));
+  };
+
   const specializationOptions = useMemo(() => {
-    const base = (Array.isArray(dentistTypeOptions) && dentistTypeOptions.length > 0)
+    return (Array.isArray(dentistTypeOptions) && dentistTypeOptions.length > 0)
       ? dentistTypeOptions
       : FALLBACK_DENTIST_TYPES;
-
-    if (formData.specialization && !base.includes(formData.specialization)) {
-      return [formData.specialization, ...base];
-    }
-
-    return base;
-  }, [dentistTypeOptions, formData.specialization]);
+  }, [dentistTypeOptions]);
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -107,8 +114,12 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
     setLoading(true);
 
     try {
+      const payload = {
+        ...formData,
+        specialization: formData.specializations.join(", ")
+      };
       // Call the UPDATE API instead of the CREATE API
-      await api.updateDentist(dentist.id, formData); 
+      await api.updateDentist(dentist.id, payload); 
       toast.success('Dentist updated successfully!');
       
       if (onSuccess) onSuccess();
@@ -149,13 +160,26 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
 
             <div className="form-row">
               <div className="form-group">
-                <label>Specialization</label>
-                <select name="specialization" value={formData.specialization} onChange={handleChange} required>
-                  <option value="">Select Specialization</option>
-                  {specializationOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
+                <label>Specializations</label>
+                <div className="chips-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                  {formData.specializations.map((s, idx) => (
+                    <div className="chip" key={idx} style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 10px', borderRadius: '15px', fontSize: '0.85rem', display: 'flex', alignItems: 'center' }}>
+                      {s}
+                      <button type="button" onClick={() => removeSpecialization(s)} style={{ border: 'none', background: 'none', marginLeft: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#0369a1' }}>&times;</button>
+                    </div>
                   ))}
-                </select>
+                </div>
+                <div className="add-row" style={{ display: 'flex', gap: '8px' }}>
+                  <select 
+                    value={specDraft} 
+                    onChange={(e) => setSpecDraft(e.target.value)}
+                    style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                  >
+                    <option value="">Add Specialization</option>
+                    {specializationOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                  <button type="button" className="btn-small-add" onClick={addSpecialization} style={{ padding: '0 15px', background: '#3498db', color: 'white', border: 'none', borderRadius: '4px' }}>Add</button>
+                </div>
               </div>
               <div className="form-group">
                 <label>Phone</label>

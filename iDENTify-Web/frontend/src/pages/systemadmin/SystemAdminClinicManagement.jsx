@@ -197,6 +197,45 @@ function SystemAdminClinicManagement() {
 		}
 	};
 
+	const handleCreateClinic = async (e) => {
+		e.preventDefault();
+		if (!newClinic.name.trim()) {
+			toast.error('Clinic name is required.');
+			return;
+		}
+		try {
+			setBusy('create-clinic');
+			await api.createClinic(newClinic);
+			toast.success('Clinic created successfully.');
+			setNewClinic({ name: '', code: '' });
+			await loadClinics();
+		} catch (error) {
+			toast.error(error?.message || 'Failed to create clinic.');
+		} finally {
+			setBusy('');
+		}
+	};
+
+	const handleCreateBranch = async (e) => {
+		e.preventDefault();
+		if (!newBranch.clinicId || !newBranch.name.trim()) {
+			toast.error('Clinic and branch name are required.');
+			return;
+		}
+		try {
+			setBusy('create-branch');
+			await api.createBranch(newBranch);
+			toast.success('Branch created successfully.');
+			const currentClinicId = newBranch.clinicId;
+			setNewBranch({ clinicId: currentClinicId, name: '', code: '', address: '' });
+			await loadBranches(currentClinicId);
+		} catch (error) {
+			toast.error(error?.message || 'Failed to create branch.');
+		} finally {
+			setBusy('');
+		}
+	};
+
 	return (
 		<section className="systemadmin-page">
 			<div className="systemadmin-header">
@@ -214,6 +253,72 @@ function SystemAdminClinicManagement() {
 						<StatCard label="Suspended" value={summary.suspended} />
 						<StatCard label="Deactivated" value={summary.deactivated} />
 						<StatCard label="Archived" value={summary.archived} />
+					</div>
+
+					<div className="systemadmin-grid-two-cols" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+						<div className="systemadmin-card">
+							<h3>Add New Clinic</h3>
+							<form onSubmit={handleCreateClinic} className="systemadmin-form">
+								<div className="form-group">
+									<label>Clinic Name</label>
+									<input 
+										type="text" 
+										value={newClinic.name} 
+										onChange={(e) => setNewClinic({ ...newClinic, name: e.target.value })} 
+										placeholder="e.g. Smile Dental"
+									/>
+								</div>
+								<div className="form-group">
+									<label>Clinic Code</label>
+									<input 
+										type="text" 
+										value={newClinic.code} 
+										onChange={(e) => setNewClinic({ ...newClinic, code: e.target.value })} 
+										placeholder="e.g. SD01"
+									/>
+								</div>
+								<button type="submit" disabled={busyAction === 'create-clinic'}>
+									{busyAction === 'create-clinic' ? 'Creating...' : 'Create Clinic'}
+								</button>
+							</form>
+						</div>
+
+						<div className="systemadmin-card">
+							<h3>Add New Branch</h3>
+							<form onSubmit={handleCreateBranch} className="systemadmin-form">
+								<div className="form-group">
+									<label>Clinic</label>
+									<select 
+										value={newBranch.clinicId} 
+										onChange={(e) => setNewBranch({ ...newBranch, clinicId: e.target.value })}
+									>
+										<option value="">Select Clinic</option>
+										{clinics.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+									</select>
+								</div>
+								<div className="form-group">
+									<label>Branch Name</label>
+									<input 
+										type="text" 
+										value={newBranch.name} 
+										onChange={(e) => setNewBranch({ ...newBranch, name: e.target.value })} 
+										placeholder="e.g. Main Branch"
+									/>
+								</div>
+								<div className="form-group">
+									<label>Address</label>
+									<input 
+										type="text" 
+										value={newBranch.address} 
+										onChange={(e) => setNewBranch({ ...newBranch, address: e.target.value })} 
+										placeholder="Branch Address"
+									/>
+								</div>
+								<button type="submit" disabled={busyAction === 'create-branch'}>
+									{busyAction === 'create-branch' ? 'Creating...' : 'Create Branch'}
+								</button>
+							</form>
+						</div>
 					</div>
 
 					<div className="systemadmin-card">

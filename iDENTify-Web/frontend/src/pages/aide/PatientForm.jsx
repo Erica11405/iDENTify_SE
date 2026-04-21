@@ -169,6 +169,7 @@ function PatientForm({ userRole }) {
 	});
 	const [selectedTimelineServices, setSelectedTimelineServices] = useState([]);
 	const [currentTimelineService, setCurrentTimelineService] = useState("");
+	const [currentServicePrice, setCurrentServicePrice] = useState("");
 	const [medicationForm, setMedicationForm] = useState({ medicine: "", dosage: "", frequency: "", notes: "" });
 	const medicationFrequencyOptions = Array.from(new Set([
 		...DEFAULT_MEDICATION_FREQUENCIES,
@@ -570,6 +571,18 @@ function PatientForm({ userRole }) {
 	};
 
 	const resolveServicesForPayment = (appointment, queueItem) => {
+		const latestTimelineEntry = (timelineEntries || []).slice().reverse().find((entry) => entry?.procedure_text);
+		if (latestTimelineEntry?.procedure_text) {
+			try {
+				const parsed = JSON.parse(latestTimelineEntry.procedure_text);
+				if (Array.isArray(parsed) && typeof parsed[0] === 'object') {
+					return parsed;
+				}
+			} catch (e) {
+				// Fallback to comma split if not JSON
+			}
+		}
+
 		const appointmentServices = parseServiceListFromText(
 			appointment?.reason
 			|| appointment?.procedure
@@ -583,7 +596,7 @@ function PatientForm({ userRole }) {
 			|| location.state?.appointment?.dental_service
 			|| ""
 		);
-		if (appointmentServices.length > 0) return appointmentServices;
+		if (appointmentServices.length > 0) return appointmentServices.map(s => ({ name: s, price: 0 }));
 
 		const queueServices = parseServiceListFromText(
 			queueItem?.notes
@@ -594,14 +607,13 @@ function PatientForm({ userRole }) {
 			|| queueItem?.dental_service
 			|| ""
 		);
-		if (queueServices.length > 0) return queueServices;
+		if (queueServices.length > 0) return queueServices.map(s => ({ name: s, price: 0 }));
 
 		if ((selectedTimelineServices || []).length > 0) {
-			return selectedTimelineServices.map((item) => String(item || "").trim()).filter(Boolean);
+			return selectedTimelineServices;
 		}
 
-		const latestTimelineEntry = (timelineEntries || []).slice().reverse().find((entry) => entry?.procedure_text);
-		return parseServiceListFromText(latestTimelineEntry?.procedure_text || "");
+		return parseServiceListFromText(latestTimelineEntry?.procedure_text || "").map(s => ({ name: s, price: 0 }));
 	};
 
 	const resolveDentistInfoForPayment = (appointment, queueItem) => {
@@ -1162,13 +1174,17 @@ function PatientForm({ userRole }) {
 							</div>
 
                             <div className="form-group">
-								<label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '5px' }}>Select Procedure</label>
+								<label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '5px' }}>Select Procedure & Price</label>
                                 <div style={{ display: 'flex', gap: '8px' }}>
-                                    <div style={{ flex: 1 }}>
+                                    <div style={{ flex: 2 }}>
                                         <SearchableInput
                                             options={dentalServices || []}
                                             value={currentTimelineService}
-                                            onChange={(val) => setCurrentTimelineService(val)}
+                                            onChange={(val) => {
+                                                setCurrentTimelineService(val);
+                                                const match = dentalServices.find(s => s.name === val);
+                                                if (match) setCurrentServicePrice(match.price.replace(/[^0-9.]/g, ""));
+                                            }}
                                             placeholder="Search Procedure..."
                                             renderOption={(item) => (
                                                 <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -1178,6 +1194,14 @@ function PatientForm({ userRole }) {
                                             )}
                                         />
                                     </div>
+                                    <input 
+                                        type="number" 
+                                        className="pill-input-input" 
+                                        placeholder="Price" 
+                                        value={currentServicePrice} 
+                                        onChange={(e) => setCurrentServicePrice(e.target.value)} 
+                                        style={{ width: '80px' }}
+                                    />
                                     <button onClick={handleAddTimelineService} className="small-btn" style={{ width: "auto", padding: '0 15px', height: "38px", background: '#2563eb' }}>+ Add</button>
                                 </div>
 							</div>
@@ -1189,9 +1213,9 @@ function PatientForm({ userRole }) {
                             {selectedTimelineServices.length > 0 && (
                                 <div style={{ gridColumn: '1 / -1', display: "flex", flexWrap: "wrap", gap: "6px", marginTop: '5px' }}>
                                     {selectedTimelineServices.map((svc) => (
-                                        <span key={svc} style={{ background: "#eff6ff", color: "#2563eb", padding: "4px 10px", borderRadius: "20px", fontSize: "0.75rem", border: '1px solid #dbeafe', display: "inline-flex", alignItems: "center", gap: "5px", fontWeight: '500' }}>
-                                            {svc}
-                                            <button onClick={() => handleRemoveTimelineService(svc)} style={{ border: "none", background: "none", cursor: "pointer", fontWeight: '900', color: "#2563eb" }}>×</button>
+                                        <span key={svc.name} style={{ background: "#eff6ff", color: "#2563eb", padding: "4px 10px", borderRadius: "20px", fontSize: "0.75rem", border: '1px solid #dbeafe', display: "inline-flex", alignItems: "center", gap: "5px", fontWeight: '500' }}>
+                                            {svc.name} (₱{svc.price})
+                                            <button onClick={() => handleRemoveTimelineService(svc.name)} style={{ border: "none", background: "none", cursor: "pointer", fontWeight: '900', color: "#2563eb" }}>×</button>
                                         </span>
                                     ))}
                                 </div>

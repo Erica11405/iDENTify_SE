@@ -21,7 +21,7 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
-    specialization: '',
+    specializations: ['General Dentist'],
     phone: '',
     email: '',
     days: [1, 2, 3, 4, 5], 
@@ -31,6 +31,25 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
     leaveDays: [],
     status: "Available"
   });
+
+  const [specDraft, setSpecDraft] = useState("");
+
+  const addSpecialization = () => {
+    if (!specDraft) return;
+    if (formData.specializations.includes(specDraft)) return;
+    setFormData(prev => ({
+      ...prev,
+      specializations: [...prev.specializations, specDraft]
+    }));
+    setSpecDraft("");
+  };
+
+  const removeSpecialization = (spec) => {
+    setFormData(prev => ({
+      ...prev,
+      specializations: prev.specializations.filter(s => s !== spec)
+    }));
+  };
 
   const [breakDraft, setBreakDraft] = useState({ start: "", end: "" });
   const [leaveDraft, setLeaveDraft] = useState("");
@@ -99,7 +118,7 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
       first_name: formData.first_name,
       last_name: formData.last_name,
       name: `${formData.first_name} ${formData.last_name}`, 
-      specialization: formData.specialization,
+      specialization: formData.specializations.join(", "),
       phone: formData.phone,
       email: formData.email,
       days: formData.days,
@@ -176,14 +195,31 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
 
             <div className="form-row">
               <div className="form-group">
-                <label>Specialization</label>
-                <select name="specialization" value={formData.specialization} onChange={handleChange} required>
-                  <option value="">Select Specialization</option>
-                  <option value="General Dentist">General Dentist</option>
-                  <option value="Orthodontist">Orthodontist</option>
-                  <option value="Periodontist">Periodontist</option>
-                  <option value="Oral Surgeon">Oral Surgeon</option>
-                </select>
+                <label>Specializations</label>
+                <div className="chips-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                  {formData.specializations.map((s, idx) => (
+                    <div className="chip" key={idx} style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 10px', borderRadius: '15px', fontSize: '0.85rem', display: 'flex', alignItems: 'center' }}>
+                      {s}
+                      <button type="button" onClick={() => removeSpecialization(s)} style={{ border: 'none', background: 'none', marginLeft: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#0369a1' }}>&times;</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="add-row" style={{ display: 'flex', gap: '8px' }}>
+                  <select 
+                    value={specDraft} 
+                    onChange={(e) => setSpecDraft(e.target.value)}
+                    style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                  >
+                    <option value="">Add Specialization</option>
+                    <option value="General Dentist">General Dentist</option>
+                    <option value="Orthodontist">Orthodontist</option>
+                    <option value="Periodontist">Periodontist</option>
+                    <option value="Oral Surgeon">Oral Surgeon</option>
+                    <option value="Endodontist">Endodontist</option>
+                    <option value="Pediatric Dentist">Pediatric Dentist</option>
+                  </select>
+                  <button type="button" className="btn-small-add" onClick={addSpecialization} style={{ padding: '0 15px', background: '#3498db', color: 'white', border: 'none', borderRadius: '4px' }}>Add</button>
+                </div>
               </div>
               <div className="form-group">
                 <label>Phone</label>
