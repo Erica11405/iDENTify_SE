@@ -32,6 +32,7 @@ import DentistPayments from './pages/dentist/DentistPayments';
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import SuperAdminUsers from './pages/superadmin/SuperAdminUsers';
 import SuperAdminReports from './pages/superadmin/SuperAdminReports';
+import SuperAdminPatientReports from './pages/superadmin/SuperAdminPatientReports';
 import SuperAdminSettings from './pages/superadmin/SuperAdminSettings';
 import SuperAdminArchive from './pages/superadmin/SuperAdminArchive';
 
