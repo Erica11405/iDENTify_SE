@@ -146,6 +146,7 @@ function PatientForm({ userRole }) {
 	const [timelineEntries, setTimelineEntries] = useState([]);
 	const [medications, setMedications] = useState([]);
     const [clinicMedicationsList, setClinicMedicationsList] = useState([]); // Added state for dynamic meds
+	const [masterServices, setMasterServices] = useState([]);
 	const [vitals, setVitals] = useState({ bp: "", pulse: "", temp: "" });
 	const [uploadedFiles, setUploadedFiles] = useState([]);
 
@@ -213,6 +214,14 @@ function PatientForm({ userRole }) {
                 } catch (e) {
                     console.error("Failed to load clinic medications list", e);
                 }
+
+				// Fetch dynamic services list
+				try {
+					const svcs = await apiClient.getServices();
+					setMasterServices(svcs || []);
+				} catch (e) {
+					console.error("Failed to load clinic services list", e);
+				}
 
 				const patientData = await apiClient.getPatientById(id);
 				
@@ -909,18 +918,28 @@ function PatientForm({ userRole }) {
 
 	const handleAddTimelineService = () => {
 		if (!currentTimelineService) return;
-		if (selectedTimelineServices.includes(currentTimelineService)) return;
-		setSelectedTimelineServices([...selectedTimelineServices, currentTimelineService]);
+		if (selectedTimelineServices.find(s => s.name === currentTimelineService)) return;
+		setSelectedTimelineServices([...selectedTimelineServices, { name: currentTimelineService, price: parseFloat(currentServicePrice) || 0 }]);
 		setCurrentTimelineService("");
+		setCurrentServicePrice("");
 	};
 
-	const handleRemoveTimelineService = (svc) => { setSelectedTimelineServices(selectedTimelineServices.filter(s => s !== svc)); };
+	const handleRemoveTimelineService = (svcName) => { setSelectedTimelineServices(selectedTimelineServices.filter(s => s.name !== svcName)); };
 
 	const addTimelineEntry = async () => {
 		if (selectedTimelineServices.length === 0) { toast.error("Please add at least one procedure."); return; }
 		let providerName = user?.name || "Dental Aide";
-		const procedureString = selectedTimelineServices.join(", ");
-		const payload = { patient_id: id, procedure_text: procedureString, provider: providerName, start_time: timelineForm.start_time || new Date().toLocaleString(), notes: "", record_year: selectedYear };
+		const procedureString = JSON.stringify(selectedTimelineServices);
+		const totalEntryPrice = selectedTimelineServices.reduce((sum, s) => sum + s.price, 0);
+		const payload = { 
+			patient_id: id, 
+			procedure_text: procedureString, 
+			provider: providerName, 
+			start_time: timelineForm.start_time || new Date().toLocaleString(), 
+			notes: "", 
+			record_year: selectedYear,
+			price: totalEntryPrice
+		};
 
 		try {
 			const newEntry = await apiClient.addTreatmentTimelineEntry(payload);
@@ -1178,12 +1197,17 @@ function PatientForm({ userRole }) {
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                     <div style={{ flex: 2 }}>
                                         <SearchableInput
-                                            options={dentalServices || []}
+                                            options={masterServices.length > 0 ? masterServices : dentalServices}
                                             value={currentTimelineService}
                                             onChange={(val) => {
                                                 setCurrentTimelineService(val);
-                                                const match = dentalServices.find(s => s.name === val);
-                                                if (match) setCurrentServicePrice(match.price.replace(/[^0-9.]/g, ""));
+                                                const match = (masterServices.length > 0 ? masterServices : dentalServices).find(s => s.name === val);
+                                                if (match) {
+                                                    const priceVal = typeof match.price === 'string' 
+                                                        ? match.price.replace(/[^0-9.]/g, "") 
+                                                        : match.price;
+                                                    setCurrentServicePrice(priceVal);
+                                                }
                                             }}
                                             placeholder="Search Procedure..."
                                             renderOption={(item) => (

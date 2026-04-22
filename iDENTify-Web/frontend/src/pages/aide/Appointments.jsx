@@ -6,6 +6,7 @@ import EditAppointmentModal from "../../components/EditAppointmentModal";
 import AddAppointmentModal from "../../components/AddAppointmentModal";
 import StatusBadge from "../../components/StatusBadge";
 import ConfirmationModal from "../../components/ConfirmationModal";
+import DeclineAppointmentModal from "../../components/DeclineAppointmentModal";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
 
@@ -62,6 +63,7 @@ function Appointments() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [decisionLoadingId, setDecisionLoadingId] = useState(null);
+  const [declineModal, setDeclineModal] = useState({ isOpen: false, appointmentId: null });
 
   const [filters, setFilters] = useState({
     dentist: "all",
@@ -166,13 +168,24 @@ function Appointments() {
                               </button>
                               <button
                                 className="decline-btn"
-                                onClick={() => handleDecline(a)}
+                                onClick={() => handleDeclineClick(a)}
                                 disabled={isApproveBusy || isDeclineBusy}
                               >
                                 {isDeclineBusy ? "Declining..." : "Decline"}
                               </button>
                             </>
                           ) : null}
+
+                          {a.status === 'Scheduled' && !queue.some(q => q.appointment_id === a.id) && (
+                            <button
+                              className="check-in-btn"
+                              onClick={() => handleCheckIn(a)}
+                              style={{ backgroundColor: '#1abc9c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                              Check-In
+                            </button>
+                          )}
+
                           {showEdit ? <button className="edit-btn" onClick={() => handleEdit(a)}>Edit</button> : null}
                           
                           <button 
@@ -288,27 +301,38 @@ function Appointments() {
     }
   };
 
-  const handleDecline = async (appointment) => {
-    if (!appointment?.id) return;
+  const handleDeclineClick = (appointment) => {
+    setDeclineModal({ isOpen: true, appointmentId: appointment.id });
+  };
 
-    const input = window.prompt("Please provide a reason for declining this appointment:");
-    if (input === null) return;
-
-    const reason = String(input || "").trim();
-    if (!reason) {
-      toast.error("Decline reason is required.");
-      return;
-    }
-
+  const handleConfirmDecline = async (appointmentId, reason) => {
     try {
-      setDecisionLoadingId(`decline-${appointment.id}`);
-      await api.declineAppointment(appointment.id, { reason });
+      setDecisionLoadingId(`decline-${appointmentId}`);
+      await api.declineAppointment(appointmentId, { reason });
       toast.success("Appointment declined.");
+      setDeclineModal({ isOpen: false, appointmentId: null });
       await Promise.all([api.loadAppointments(), api.loadQueue()]);
     } catch (err) {
       toast.error(err?.message || "Failed to decline appointment.");
     } finally {
       setDecisionLoadingId(null);
+    }
+  };
+
+  const handleCheckIn = async (appt) => {
+    try {
+      await api.addQueueItem({
+        patient_id: appt.patient_id,
+        appointment_id: appt.id,
+        dentist_id: appt.dentist_id,
+        source: 'appointment',
+        status: 'Checked-In',
+        notes: appt.procedure || appt.reason || '',
+      });
+      toast.success('Patient checked in and added to queue.');
+      await api.loadQueue();
+    } catch (error) {
+      toast.error(error?.message || 'Failed to check in.');
     }
   };
 
@@ -443,6 +467,12 @@ function Appointments() {
       {isEditModalOpen && <EditAppointmentModal appointment={selectedAppointment} onSave={handleSaveAppointment} onCancel={handleCloseModal} dentists={dentists} />}
       {isAddModalOpen && <AddAppointmentModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} dentists={dentists} onSave={handleAddAppointment} />}
       {isDeleteModalOpen && <ConfirmationModal isOpen={isDeleteModalOpen} onClose={handleCloseModal} onConfirm={handleConfirmDelete} message="Delete appointment?" />}
+      <DeclineAppointmentModal 
+        isOpen={declineModal.isOpen}
+        appointmentId={declineModal.appointmentId}
+        onClose={() => setDeclineModal({ isOpen: false, appointmentId: null })}
+        onConfirm={handleConfirmDecline}
+      />
     </div>
   );
 }

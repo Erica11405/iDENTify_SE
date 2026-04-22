@@ -78,13 +78,15 @@ export default function AppointmentDetails() {
 
   const appointmentDate = parseDateTime(appointment.appointment_datetime);
   const statusKey = String(appointment.status || "").trim().toLowerCase();
+  const decisionStatusKey = String(appointment.decision_status || "").trim().toLowerCase();
   const minutesUntilAppointment = getMinutesUntil(appointment.appointment_datetime);
-  const isTerminalStatus = ["done", "cancelled", "no-show", "missed"].includes(statusKey);
+  const isTerminalStatus = ["done", "cancelled", "no-show", "missed", "declined"].includes(statusKey);
   const canCancel = !isTerminalStatus
+    && decisionStatusKey !== "declined"
     && Number.isFinite(minutesUntilAppointment)
     && minutesUntilAppointment > CANCELLATION_LOCK_MINUTES;
 
-  const cancelHint = isTerminalStatus
+  const cancelHint = (isTerminalStatus || decisionStatusKey === "declined")
     ? "This appointment can no longer be cancelled."
     : (!Number.isFinite(minutesUntilAppointment)
       ? "Cancellation window unavailable."

@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
 import "../../styles/pages/dentist/DentistAppointments.css";
+import DeclineAppointmentModal from "../../components/DeclineAppointmentModal";
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -39,6 +40,7 @@ function DentistAppointments() {
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' or 'patients'
   const [decisionLoadingId, setDecisionLoadingId] = useState(null);
+  const [declineModal, setDeclineModal] = useState({ isOpen: false, appointmentId: null });
 
   useEffect(() => {
     api.loadAppointments();
@@ -104,27 +106,38 @@ function DentistAppointments() {
     }
   };
 
-  const handleDecline = async (appointmentId) => {
-    if (!appointmentId) return;
+  const handleDeclineClick = (appointmentId) => {
+    setDeclineModal({ isOpen: true, appointmentId });
+  };
 
-    const input = window.prompt('Please provide a reason for declining this appointment:');
-    if (input === null) return;
-
-    const reason = String(input || '').trim();
-    if (!reason) {
-      toast.error('Decline reason is required.');
-      return;
-    }
-
+  const handleConfirmDecline = async (appointmentId, reason) => {
     try {
       setDecisionLoadingId(`decline-${appointmentId}`);
       await api.declineAppointment(appointmentId, { reason });
       toast.success('Appointment declined.');
+      setDeclineModal({ isOpen: false, appointmentId: null });
       await Promise.all([api.loadAppointments(), api.loadQueue()]);
     } catch (error) {
       toast.error(error?.message || 'Failed to decline appointment.');
     } finally {
       setDecisionLoadingId(null);
+    }
+  };
+
+  const handleCheckIn = async (appt) => {
+    try {
+      await api.addQueueItem({
+        patient_id: appt.patient_id,
+        appointment_id: appt.id,
+        dentist_id: appt.dentist_id,
+        source: 'appointment',
+        status: 'Checked-In',
+        notes: appt.procedure || appt.reason || '',
+      });
+      toast.success('Patient checked in and added to queue.');
+      await api.loadQueue();
+    } catch (error) {
+      toast.error(error?.message || 'Failed to check in.');
     }
   };
 
@@ -233,7 +246,7 @@ function DentistAppointments() {
                               </button>
                               <button
                                 className="decision-btn decline-btn"
-                                onClick={() => handleDecline(appt.id)}
+                                onClick={() => handleDeclineClick(appt.id)}
                                 disabled={isDecisionBusy(appt.id, 'approve') || isDecisionBusy(appt.id, 'decline')}
                                 style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}
                               >
@@ -241,6 +254,17 @@ function DentistAppointments() {
                               </button>
                             </>
                           ) : null}
+
+                          {appt.status === 'Scheduled' && !queue.some(q => q.appointment_id === appt.id) && (
+                            <button
+                              className="check-in-btn"
+                              onClick={() => handleCheckIn(appt)}
+                              style={{ backgroundColor: '#1abc9c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}
+                            >
+                              Check-In
+                            </button>
+                          )}
+
                           <button
                             className="review-chart-btn"
                             onClick={() => navigate(`/patients/${appt.patient_id}`)}
@@ -349,6 +373,13 @@ function DentistAppointments() {
           </table>
         </div>
       )}
+
+      <DeclineAppointmentModal 
+        isOpen={declineModal.isOpen}
+        appointmentId={declineModal.appointmentId}
+        onClose={() => setDeclineModal({ isOpen: false, appointmentId: null })}
+        onConfirm={handleConfirmDecline}
+      />
     </div>
   );
 }
