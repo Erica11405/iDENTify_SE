@@ -62,6 +62,19 @@ export default function RecordsScreen() {
 
   useFocusEffect(useCallback(() => { fetchRecords(); }, [fetchRecords]));
 
+  const renderProcedures = (text) => {
+    if (!text) return "N/A";
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed.map((svc) => (typeof svc === "object" ? svc.name : svc)).join(", ");
+      }
+    } catch (e) {
+      // Not JSON, return as is
+    }
+    return text;
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -87,7 +100,7 @@ export default function RecordsScreen() {
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{item.patientName}</Text>
               </View>
-              <Text style={styles.procedureName}>{item.procedure_text}</Text>
+              <Text style={styles.procedureName} numberOfLines={1}>{renderProcedures(item.procedure_text)}</Text>
               <Text style={styles.doctorName}>{item.provider}</Text>
             </View>
             

@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Image, ScrollView, ActivityIndicator, Alert, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { API } from "../../constants/Api";
 
@@ -60,6 +60,24 @@ export default function RecordDetails() {
     if (id) fetchDetailAndMeds();
   }, [id]);
 
+  const parsedProcedures = useMemo(() => {
+    if (!record?.procedure_text) return [];
+    try {
+      const parsed = JSON.parse(record.procedure_text);
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => (typeof item === 'object' ? item : { name: item, price: 0 }));
+      }
+    } catch (e) {
+      // not json
+    }
+    return [{ name: record.procedure_text, price: 0 }];
+  }, [record?.procedure_text]);
+
+  const procedureTitle = useMemo(() => {
+    if (parsedProcedures.length === 0) return "N/A";
+    return parsedProcedures.map(p => p.name).join(", ");
+  }, [parsedProcedures]);
+
   if (loading) return <ActivityIndicator size="large" color="#1B93D5" style={{ flex: 1 }} />;
   
   if (!record) {
@@ -81,7 +99,19 @@ export default function RecordDetails() {
       </TouchableOpacity>
 
       <Text style={styles.date}>{record.start_time}</Text>
-      <Text style={styles.procedure}>{record.procedure_text}</Text>
+      <Text style={styles.procedure}>{procedureTitle}</Text>
+
+      {parsedProcedures.length > 1 && (
+        <View style={{ marginBottom: 20 }}>
+          <Text style={styles.sectionLabel}>Service Breakdown</Text>
+          {parsedProcedures.map((proc, idx) => (
+            <View key={idx} style={styles.breakdownRow}>
+              <Text style={styles.breakdownName}>{proc.name}</Text>
+              <Text style={styles.breakdownPrice}>{formatPeso(proc.price)}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <Text style={styles.sectionLabel}>Appointment Details</Text>
       <View style={styles.detailCard}>
@@ -152,5 +182,8 @@ const styles = StyleSheet.create({
   medName: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
   medDetails: { fontSize: 13, color: '#64748B', marginTop: 2 },
   imageBox: { marginTop: 30 },
-  image: { width: "100%", height: 300, borderRadius: 12, backgroundColor: "#F8FAFC" }
+  image: { width: "100%", height: 300, borderRadius: 12, backgroundColor: "#F8FAFC" },
+  breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  breakdownName: { fontSize: 14, color: '#334155', fontWeight: '500' },
+  breakdownPrice: { fontSize: 14, color: '#1E293B', fontWeight: '600' }
 });
