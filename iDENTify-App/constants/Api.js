@@ -32,6 +32,7 @@ export const API = {
   medications: `${API_BASE_URL}/api/medications`,
   services: `${API_BASE_URL}/api/services`,
   clinicsDiscover: `${API_BASE_URL}/api/clinics/discover`,
+  patientReports: `${API_BASE_URL}/api/patient-reports`,
 };
 
 export const fetchPatientByEmail = async (email) => {

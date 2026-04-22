@@ -143,6 +143,7 @@ function App() {
                         <Route path="/admin/dashboard" element={<SuperAdminDashboard />} />
                         <Route path="/admin/users" element={<SuperAdminUsers />} />
                         <Route path="/admin/reports" element={<SuperAdminReports />} />
+                        <Route path="/admin/patient-reports" element={<SuperAdminPatientReports />} />
                         <Route path="/admin/settings" element={<SuperAdminSettings />} />
                         <Route path="/admin/archive" element={<SuperAdminArchive />} />
                         <Route path="/admin/approvals" element={<Navigate to="/admin/dashboard" replace />} />

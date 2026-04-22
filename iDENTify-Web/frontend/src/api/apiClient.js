@@ -753,6 +753,29 @@ export const deleteMedication = async (id) => {
     return handleResponse(res);
 };
 
+export const getPatientReports = async () => {
+    const res = await fetch(`${API_BASE}/patient-reports`, { headers: actorHeaders() });
+    return handleResponse(res);
+};
+
+export const updatePatientReportStatus = async (id, status) => {
+    const res = await fetch(`${API_BASE}/patient-reports/${id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...actorHeaders() },
+        body: JSON.stringify({ status })
+    });
+    return handleResponse(res);
+};
+
+export const suspendDentist = async (dentistId, suspend) => {
+    const res = await fetch(`${API_BASE}/patient-reports/dentist-suspend/${dentistId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...actorHeaders() },
+        body: JSON.stringify({ suspend })
+    });
+    return handleResponse(res);
+};
+
 export const get = async (url) => {
     const res = await fetch(`${API_BASE}${url}`, {
         headers: { ...actorHeaders() },
@@ -780,7 +803,8 @@ const api = {
     updateClinicBranchStatus, archiveClinicBranch, restoreClinicBranch,
     getClinicDiscovery,
     getAnnualRecord, saveAnnualRecord, getToothConditions, upsertToothCondition,
-    getTreatmentTimeline, addTreatmentTimelineEntry, getMedications, addMedication, deleteMedication
+    getTreatmentTimeline, addTreatmentTimelineEntry, getMedications, addMedication, deleteMedication,
+    getPatientReports, updatePatientReportStatus, suspendDentist
 };
 
 export default api;

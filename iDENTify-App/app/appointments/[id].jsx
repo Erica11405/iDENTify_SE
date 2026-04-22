@@ -132,10 +132,28 @@ export default function AppointmentDetails() {
         { text: "Cancel", style: "cancel" },
         { 
           text: "Submit Report", 
-          onPress: (reason) => {
+          onPress: async (reason) => {
             if (reason?.trim()) {
-              // In a real app, this would call a backend endpoint
-              Alert.alert("Report Submitted", "Thank you for your feedback. We will investigate this matter.");
+              try {
+                const res = await fetch(API.patientReports, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    patient_id: appointment.patient_id,
+                    dentist_id: appointment.dentist_id,
+                    branch_id: appointment.branch_id,
+                    reason: reason.trim()
+                  })
+                });
+                
+                if (res.ok) {
+                  Alert.alert("Report Submitted", "Thank you for your feedback. We will investigate this matter.");
+                } else {
+                  Alert.alert("Error", "Failed to submit report. Please try again.");
+                }
+              } catch (error) {
+                Alert.alert("Error", "Network error. Please try again.");
+              }
             }
           }
         }
