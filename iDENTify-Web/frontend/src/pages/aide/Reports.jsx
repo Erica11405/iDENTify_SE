@@ -215,7 +215,7 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
       doc.save(fileName);
     } catch (err) {
       console.error("PDF Export failed", err);
-      alert("Failed to export PDF.");
+      toast.error("Failed to export PDF.");
     }
   };
 

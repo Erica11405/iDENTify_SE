@@ -29,16 +29,20 @@ function History({ pageTitle = "Patient History", forcedDentistId = null }) {
 
     const hasForcedDentistScope = forcedDentistId !== null && forcedDentistId !== undefined && String(forcedDentistId).trim() !== "";
 
+    const [allPayments, setAllPayments] = useState([]);
+
     useEffect(() => {
         const loadData = async () => {
             try {
                 // FIXED: Request history data (all dates)
-                await Promise.all([
+                const [qData, dents, pts, appts, payments] = await Promise.all([
                     api.loadQueue(true), 
                     api.loadDentists(),
                     api.loadPatients(),
-                    api.loadAppointments()
+                    api.loadAppointments(),
+                    apiClient.getPayments({ startDate: '1970-01-01', endDate: '2100-01-01' })
                 ]);
+                setAllPayments(Array.isArray(payments) ? payments : []);
             } catch (e) {
                 console.error("Failed to load history data", e);
             }
@@ -56,8 +60,14 @@ function History({ pageTitle = "Patient History", forcedDentistId = null }) {
                 const dentist = dentists.find((d) => String(d.id) === String(item.dentist_id));
                 const dentistName = dentist ? dentist.name : (item.dentist_name || "Unassigned");
 
-                let procedureInfo = item.notes || "-";
-                if (item.appointment_id) {
+                // Try to find actual services from payment record
+                const linkedPayment = allPayments.find(p => 
+                    (p.queue_id && String(p.queue_id) === String(item.id)) ||
+                    (p.appointment_id && String(p.appointment_id) === String(item.appointment_id))
+                );
+
+                let procedureInfo = linkedPayment?.services_text || item.notes || "-";
+                if (item.appointment_id && (!linkedPayment || !linkedPayment.services_text)) {
                     const linkedAppt = appointments.find(a => String(a.id) === String(item.appointment_id));
                     if (linkedAppt) {
                         procedureInfo = linkedAppt.procedure || linkedAppt.reason || item.notes || "-";
@@ -87,6 +97,9 @@ function History({ pageTitle = "Patient History", forcedDentistId = null }) {
                 const dentist = dentists.find((d) => String(d.id) === String(appt.dentist_id));
                 const dentistName = dentist ? dentist.name : (appt.dentist_name || "Unassigned");
 
+                const linkedPayment = allPayments.find(p => String(p.appointment_id) === String(appt.id));
+                let procedureInfo = linkedPayment?.services_text || appt.procedure || appt.reason || "-";
+
                 const dateObj = new Date(appt.appointment_datetime || appt.created_at || 0);
 
                 return {
@@ -94,7 +107,7 @@ function History({ pageTitle = "Patient History", forcedDentistId = null }) {
                     rawDate: dateObj,
                     name: patientName,
                     assignedDentist: dentistName,
-                    procedureDisplay: appt.procedure || appt.reason || "-",
+                    procedureDisplay: procedureInfo,
                     source: 'appointment'
                 };
             });

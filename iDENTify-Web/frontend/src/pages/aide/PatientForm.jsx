@@ -839,6 +839,31 @@ function PatientForm({ userRole }) {
 		try {
 			await saveClinicalProgress();
 
+            // AUTOMATICALLY SAVE TO TREATMENT TIMELINE
+            if (selectedTimelineServices.length > 0) {
+                let providerName = user?.name || "Dental Aide";
+                const procedureString = JSON.stringify(selectedTimelineServices);
+                const totalEntryPrice = selectedTimelineServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+                
+                const timelinePayload = {
+                    patient_id: id,
+                    procedure_text: procedureString,
+                    provider: providerName,
+                    start_time: timelineForm.start_time || new Date().toLocaleString(),
+                    notes: "Saved via payment confirmation.",
+                    record_year: selectedYear,
+                    price: totalEntryPrice
+                };
+
+                try {
+                    await apiClient.addTreatmentTimelineEntry(timelinePayload);
+                    setSelectedTimelineServices([]); // Clear plan after saving to history
+                } catch (timelineErr) {
+                    console.error("Failed to auto-save timeline entry", timelineErr);
+                    // Continue with payment even if timeline save fails, but log it
+                }
+            }
+
 			const savedPayment = await apiClient.createPaymentRecord({
 				...paymentContext,
 				...paymentPayload,
@@ -855,7 +880,7 @@ function PatientForm({ userRole }) {
                 await apiClient.updateAppointment(sessionApptId, { status: "Done" });
             }
 
-			if (api.loadQueue) await api.loadQueue();
+			if (api.loadQueue) await api.loadQueue(true); // Load with history
 			if (api.loadAppointments) await api.loadAppointments();
 
 			setIsPaymentModalOpen(false);
