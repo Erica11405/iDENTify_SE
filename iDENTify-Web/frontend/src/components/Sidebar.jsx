@@ -181,7 +181,7 @@ import DentistIcon from "../assets/dentist.svg";
 import LogoutIcon from "../assets/logout.svg";
 
 function roleLabel(role) {
-    if (role === 'superadmin') return 'Super Admin';
+    if (role === 'superadmin') return 'Clinic Admin';
     if (role === 'globaladmin') return 'Global Admin';
     if (role === 'dentist') return 'Dentist';
     return 'Dental Aide';

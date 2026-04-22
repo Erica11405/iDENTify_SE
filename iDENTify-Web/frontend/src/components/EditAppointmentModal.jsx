@@ -57,6 +57,8 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 function EditAppointmentModal({ appointment, initialContact, initialAge, initialSex, onSave, onCancel, dentists = [] }) {
   if (!appointment) return null;
 
+  const isReassign = appointment._action === 'reassign';
+
   // --- INITIALIZE STATE ---
 
   // Helper to split full name if specific fields aren't available
@@ -90,9 +92,9 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
   };
 
   const [formData, setFormData] = useState({
-    first_name: initialNameParts.first,
-    last_name: initialNameParts.last,
-    middle_name: "", // Defaults to empty if not provided separately
+    first_name: appointment.first_name || initialNameParts.first,
+    last_name: appointment.last_name || initialNameParts.last,
+    middle_name: appointment.middle_name || "", 
 
     patient_name: appointment.patient_name || appointment.patient || "",
     appointmentDate: getInitialDate(),
@@ -100,10 +102,10 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
     dentist_id: appointment.dentist_id || "",
     dentist: appointment.dentist || "",
     notes: appointment.notes || "",
-    contact_number: initialContact || "",
-    birthdate: "",
-    age: initialAge || "",
-    sex: initialSex || "",
+    contact_number: appointment.contact_number || initialContact || "",
+    birthdate: appointment.birthdate ? appointment.birthdate.split('T')[0] : "",
+    age: appointment.age || initialAge || "",
+    sex: appointment.sex || initialSex || "",
     status: appointment.status || "Scheduled"
   });
 
@@ -352,20 +354,20 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
           {/* SPLIT NAMES */}
           <div className="form-group">
             <label>First Name</label>
-            <input name="first_name" value={formData.first_name} onChange={handleChange} placeholder="First Name" />
+            <input name="first_name" value={formData.first_name} onChange={handleChange} placeholder="First Name" readOnly style={{ backgroundColor: '#f8fafc', color: '#64748b' }} />
           </div>
           <div className="form-group">
             <label>Middle Name</label>
-            <input name="middle_name" value={formData.middle_name} onChange={handleChange} placeholder="Middle Name" />
+            <input name="middle_name" value={formData.middle_name} onChange={handleChange} placeholder="Middle Name" readOnly style={{ backgroundColor: '#f8fafc', color: '#64748b' }} />
           </div>
           <div className="form-group full-width">
             <label>Last Name</label>
-            <input name="last_name" value={formData.last_name} onChange={handleChange} placeholder="Last Name" />
+            <input name="last_name" value={formData.last_name} onChange={handleChange} placeholder="Last Name" readOnly style={{ backgroundColor: '#f8fafc', color: '#64748b' }} />
           </div>
 
           <div className="form-group">
             <label htmlFor="birthdate">Date of Birth</label>
-            <input type="date" id="birthdate" name="birthdate" value={formData.birthdate} onChange={handleChange} />
+            <input type="date" id="birthdate" name="birthdate" value={formData.birthdate} onChange={handleChange} readOnly style={{ backgroundColor: '#f8fafc', color: '#64748b' }} />
           </div>
 
           <div className="form-group">
@@ -383,14 +385,13 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
 
           <div className="form-group">
             <label htmlFor="sex">Sex</label>
-            <select id="sex" name="sex" value={formData.sex} onChange={handleChange}>
+            <select id="sex" name="sex" value={formData.sex} onChange={handleChange} disabled style={{ backgroundColor: '#f8fafc', color: '#64748b' }}>
               <option value="">Select Sex</option>
               <option value="Male">Male</option>
               <option value="Female">Female</option>
             </select>
           </div>
 
-          {/* UPDATED: PHONE WITH +63 PREFIX MATCHING ADD MODAL */}
           <div className="form-group full-width">
             <label htmlFor="contact_number">Contact Number</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -402,7 +403,8 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
                 value={formData.contact_number}
                 onChange={handleChange}
                 placeholder="917..."
-                style={{ flex: 1 }}
+                readOnly
+                style={{ flex: 1, backgroundColor: '#f8fafc', color: '#64748b' }}
               />
             </div>
           </div>
@@ -432,6 +434,8 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
               name="appointmentDate"
               value={formData.appointmentDate}
               onChange={handleChange}
+              readOnly={isReassign}
+              style={isReassign ? { backgroundColor: '#f8fafc', color: '#64748b', pointerEvents: 'none' } : {}}
             />
           </div>
 
@@ -453,7 +457,7 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '10px', maxHeight: '200px', overflowY: 'auto', padding: '4px' }}>
                 {generatedSlots.map((slot) => {
-                  const isDisabled = slot.type !== 'open';
+                  const isDisabled = slot.type !== 'open' || isReassign;
                   const isSelected = formData.timeStart === slot.value;
 
                   let bg = 'white';
@@ -507,6 +511,8 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
               name="status"
               value={formData.status}
               onChange={handleChange}
+              disabled={isReassign}
+              style={isReassign ? { backgroundColor: '#f8fafc', color: '#64748b' } : {}}
             >
               <option value="Scheduled">Scheduled</option>
               <option value="Checked-In">Checked-In</option>
@@ -522,6 +528,8 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
               <select
                 value={currentService}
                 onChange={(e) => setCurrentService(e.target.value)}
+                disabled={isReassign}
+                style={isReassign ? { backgroundColor: '#f8fafc', color: '#64748b' } : {}}
               >
                 <option value="">Select a service to add...</option>
                 {(availableServices.length > 0 ? availableServices : dentalServices).map((service, index) => (
@@ -532,14 +540,16 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
                   </option>
                 ))}
               </select>
-              <button
-                type="button"
-                className="add-service-btn"
-                onClick={handleAddService}
-                title="Add Service"
-              >
-                +
-              </button>
+              {!isReassign && (
+                <button
+                  type="button"
+                  className="add-service-btn"
+                  onClick={handleAddService}
+                  title="Add Service"
+                >
+                  +
+                </button>
+              )}
             </div>
 
             <div className="selected-services-container">
@@ -547,13 +557,15 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
               {selectedServices.map((service, index) => (
                 <span key={`${service}-${index}`} className="service-chip">
                   {service}
-                  <button
-                    type="button"
-                    className="remove-service-btn"
-                    onClick={() => handleRemoveService(service)}
-                  >
-                    ×
-                  </button>
+                  {!isReassign && (
+                    <button
+                      type="button"
+                      className="remove-service-btn"
+                      onClick={() => handleRemoveService(service)}
+                    >
+                      ×
+                    </button>
+                  )}
                 </span>
               ))}
             </div>
@@ -567,6 +579,8 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
               value={formData.notes}
               onChange={handleChange}
               rows="3"
+              readOnly={isReassign}
+              style={isReassign ? { backgroundColor: '#f8fafc', color: '#64748b' } : {}}
             ></textarea>
           </div>
         </div>

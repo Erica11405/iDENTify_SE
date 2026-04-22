@@ -332,17 +332,57 @@ function Appointments() {
     }
   };
 
-  const handleEdit = (appointment) => { setSelectedAppointment(appointment); setIsEditModalOpen(true); };
+  const getPatientData = (patientId) => {
+    return patients.find((p) => String(p.id) === String(patientId)) || {};
+  };
+
+  const handleEdit = (appointment) => { 
+    const p = getPatientData(appointment.patient_id);
+    setSelectedAppointment({ 
+      ...appointment, 
+      _action: 'edit',
+      first_name: p.first_name || p.full_name || appointment.first_name,
+      last_name: p.last_name || appointment.last_name,
+      middle_name: p.middle_name || appointment.middle_name,
+      contact_number: p.contact_number || p.contact?.phone || appointment.contact?.phone,
+      birthdate: p.birthdate,
+      age: p.age,
+      sex: p.gender || p.sex
+    }); 
+    setIsEditModalOpen(true); 
+  };
   const handleDelete = (appointment) => { setSelectedAppointment(appointment); setIsDeleteModalOpen(true); };
   const handleCloseModal = () => { setSelectedAppointment(null); setIsEditModalOpen(false); setIsDeleteModalOpen(false); };
 
   const handleReassignDentist = (appointment) => {
-    setSelectedAppointment(appointment);
+    const p = getPatientData(appointment.patient_id);
+    setSelectedAppointment({ 
+      ...appointment, 
+      _action: 'reassign',
+      first_name: p.first_name || p.full_name || appointment.first_name,
+      last_name: p.last_name || appointment.last_name,
+      middle_name: p.middle_name || appointment.middle_name,
+      contact_number: p.contact_number || p.contact?.phone || appointment.contact?.phone,
+      birthdate: p.birthdate,
+      age: p.age,
+      sex: p.gender || p.sex
+    });
     setIsEditModalOpen(true);
   };
 
   const handleReschedule = (appointment) => {
-    setSelectedAppointment(appointment);
+    const p = getPatientData(appointment.patient_id);
+    setSelectedAppointment({ 
+      ...appointment, 
+      _action: 'reschedule',
+      first_name: p.first_name || p.full_name || appointment.first_name,
+      last_name: p.last_name || appointment.last_name,
+      middle_name: p.middle_name || appointment.middle_name,
+      contact_number: p.contact_number || p.contact?.phone || appointment.contact?.phone,
+      birthdate: p.birthdate,
+      age: p.age,
+      sex: p.gender || p.sex
+    });
     setIsEditModalOpen(true);
   };
 

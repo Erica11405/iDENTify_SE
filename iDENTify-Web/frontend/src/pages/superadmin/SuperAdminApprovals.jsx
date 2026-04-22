@@ -283,24 +283,28 @@ function SuperAdminApprovals() {
                                         placeholder="Add optional notes for approval context"
                                     />
                                 </div>
-                                <div className="field">
-                                    <label>Decline Reason *</label>
-                                    <textarea
-                                        rows="3"
-                                        value={declineReason}
-                                        onChange={(e) => setDeclineReason(e.target.value)}
-                                        placeholder="Provide required reason when declining"
-                                    />
-                                </div>
+                                {normalizeStatus(selectedRequest?.status) === 'pending_review' && (
+                                    <>
+                                        <div className="field">
+                                            <label>Decline Reason *</label>
+                                            <textarea
+                                                rows="3"
+                                                value={declineReason}
+                                                onChange={(e) => setDeclineReason(e.target.value)}
+                                                placeholder="Provide required reason when declining"
+                                            />
+                                        </div>
 
-                                <div className="button-row">
-                                    <button type="button" className="approve-btn" onClick={handleApprove} disabled={savingAction || !canApprove}>
-                                        {savingAction ? 'Saving...' : 'Approve Request'}
-                                    </button>
-                                    <button type="button" className="decline-btn" onClick={handleDecline} disabled={savingAction || !canDecline}>
-                                        {savingAction ? 'Saving...' : 'Decline Request'}
-                                    </button>
-                                </div>
+                                        <div className="button-row">
+                                            <button type="button" className="approve-btn" onClick={handleApprove} disabled={savingAction || !canApprove}>
+                                                {savingAction ? 'Saving...' : 'Approve Request'}
+                                            </button>
+                                            <button type="button" className="decline-btn" onClick={handleDecline} disabled={savingAction || !canDecline}>
+                                                {savingAction ? 'Saving...' : 'Decline Request'}
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </>
                     ) : null}

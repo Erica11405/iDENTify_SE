@@ -5,6 +5,7 @@ import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
 import "../../styles/pages/dentist/DentistAppointments.css";
 import DeclineAppointmentModal from "../../components/DeclineAppointmentModal";
+import FollowUpModal from "../../components/FollowUpModal";
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -41,6 +42,7 @@ function DentistAppointments() {
   const [activeTab, setActiveTab] = useState('appointments'); // 'appointments' or 'patients'
   const [decisionLoadingId, setDecisionLoadingId] = useState(null);
   const [declineModal, setDeclineModal] = useState({ isOpen: false, appointmentId: null });
+  const [followUpModal, setFollowUpModal] = useState({ isOpen: false, patient: null });
 
   useEffect(() => {
     api.loadAppointments();
@@ -258,11 +260,8 @@ function DentistAppointments() {
                           <button
                             className="follow-up-btn"
                             onClick={() => {
-                              const note = window.prompt("Reason for follow-up/reschedule:");
-                              if (note !== null) {
-                                api.updateAppointment(appt.id, { status: 'Scheduled', notes: note });
-                                toast.success("Marked for follow-up.");
-                              }
+                              const patientData = patients.find(p => p.id === appt.patient_id) || { id: appt.patient_id, name: appt.patient_name || appt.patient };
+                              setFollowUpModal({ isOpen: true, patient: patientData });
                             }}
                           >
                             Follow-up
@@ -343,6 +342,15 @@ function DentistAppointments() {
                           >
                             Review Chart
                           </button>
+                          <button
+                            className="follow-up-btn"
+                            onClick={() => {
+                              const patientData = patients.find(p => p.id === entry.patient_id) || { id: entry.patient_id, name: patientName };
+                              setFollowUpModal({ isOpen: true, patient: patientData });
+                            }}
+                          >
+                            Follow-up
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -359,6 +367,22 @@ function DentistAppointments() {
         appointmentId={declineModal.appointmentId}
         onClose={() => setDeclineModal({ isOpen: false, appointmentId: null })}
         onConfirm={handleConfirmDecline}
+      />
+
+      <FollowUpModal
+        isOpen={followUpModal.isOpen}
+        patient={followUpModal.patient}
+        dentists={dentists}
+        onClose={() => setFollowUpModal({ isOpen: false, patient: null })}
+        onSave={async (data) => {
+          try {
+            await api.createAppointment(data);
+            toast.success("Follow-up appointment scheduled.");
+            api.loadAppointments();
+          } catch (err) {
+            toast.error("Failed to schedule follow-up.");
+          }
+        }}
       />
     </div>
   );

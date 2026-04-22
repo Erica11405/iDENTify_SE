@@ -302,14 +302,19 @@ function SuperAdminDashboard() {
             return;
         }
 
+        if (!address) {
+            setClinicActionNotice({ type: 'error', message: 'Branch address is required.' });
+            return;
+        }
+
         setCreatingBranch(true);
         setClinicActionNotice({ type: '', message: '' });
-
+// ... (rest of the method unchanged, but for replacement I need to provide it)
         try {
             const created = await api.createClinicBranch(clinicId, {
                 name,
                 code: code || undefined,
-                address: address || undefined,
+                address,
             });
 
             const targetClinicId = String(clinicId);
@@ -416,12 +421,12 @@ function SuperAdminDashboard() {
                                     </p>
                                 </div>
                                 <div style={{ background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                                    <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Dentist Breakdown</h4>
+                                    <h4 style={{ margin: '0 0 10px 0', fontSize: '1rem' }}>Branch Breakdown</h4>
                                     <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                                        {(earningsData?.dentistBreakdown || []).map((d, i) => (
+                                        {(earningsData?.branchBreakdown || []).map((b, i) => (
                                             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #edf2f7' }}>
-                                                <span style={{ fontSize: '0.9rem' }}>{d.dentist}</span>
-                                                <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>₱{d.earnings.toLocaleString()}</span>
+                                                <span style={{ fontSize: '0.9rem' }}>{b.branch}</span>
+                                                <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>₱{b.earnings.toLocaleString()}</span>
                                             </div>
                                         ))}
                                     </div>

@@ -824,16 +824,18 @@ router.get("/earnings", async (req, res) => {
       params
     );
 
-    const [breakdownRows] = await db.query(
+    const [branchBreakdownRows] = await db.query(
       `SELECT 
-        COALESCE(d.name, pr.dentist_name, 'Unknown') as dentist_name,
+        COALESCE(cb.name, 'Unknown Branch') as branch_name,
         SUM(pt.amount_paid) as earnings
       FROM payment_transactions pt
       JOIN payment_records pr ON pr.id = pt.payment_record_id
-      LEFT JOIN dentists d ON d.id = pr.dentist_id
+      LEFT JOIN walk_in_queue q ON q.id = pr.queue_id
+      LEFT JOIN appointments a ON a.id = pr.appointment_id
+      LEFT JOIN clinic_branches cb ON cb.id = COALESCE(q.branch_id, a.branch_id)
       ${paymentJoinSql.join('\n')}
       WHERE ${whereClauses.join(' AND ')}
-      GROUP BY COALESCE(d.name, pr.dentist_name, 'Unknown')
+      GROUP BY COALESCE(cb.name, 'Unknown Branch')
       ORDER BY earnings DESC`,
       params
     );
@@ -847,8 +849,8 @@ router.get("/earnings", async (req, res) => {
         earnings: Number(row.total_earnings || 0),
         transactions: row.transaction_count
       })),
-      dentistBreakdown: breakdownRows.map(row => ({
-        dentist: row.dentist_name,
+      branchBreakdown: branchBreakdownRows.map(row => ({
+        branch: row.branch_name,
         earnings: Number(row.earnings || 0)
       }))
     });
