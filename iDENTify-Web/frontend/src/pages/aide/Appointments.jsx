@@ -180,7 +180,6 @@ function Appointments() {
                             <button
                               className="check-in-btn"
                               onClick={() => handleCheckIn(a)}
-                              style={{ backgroundColor: '#1abc9c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
                             >
                               Check-In
                             </button>
@@ -191,7 +190,6 @@ function Appointments() {
                           <button 
                             className="reassign-btn" 
                             onClick={() => handleReassignDentist(a)}
-                            style={{ backgroundColor: '#f39c12', color: 'white' }}
                           >
                             Reassign
                           </button>
@@ -199,7 +197,6 @@ function Appointments() {
                           <button 
                             className="reschedule-btn" 
                             onClick={() => handleReschedule(a)}
-                            style={{ backgroundColor: '#9b59b6', color: 'white' }}
                           >
                             Reschedule
                           </button>
@@ -207,7 +204,6 @@ function Appointments() {
                           <button
                             className="start-btn"
                             onClick={() => handleStartTreatment(a)}
-                            style={!canStart ? { backgroundColor: '#adb5bd', cursor: 'not-allowed' } : {}}
                             disabled={!canStart}
                           >
                             Start

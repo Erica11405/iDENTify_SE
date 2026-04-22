@@ -88,22 +88,6 @@
   margin-bottom: 0.5rem;
 }
 
-.reschedule-btn {
-  background-color: #ffc107;
-  color: #212529;
-  border: none;
-  padding: 0.3rem 0.8rem;
-  border-radius: 8px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s;
-  margin-left: 1rem;
-}
-
-.reschedule-btn:hover {
-  background-color: #e0a800;
-}
-
 .appointments-table-container {
   background-color: #fff;
   padding: 2rem;
@@ -207,6 +191,38 @@
 
 .edit-btn:hover, .start-btn:hover, .delete-btn:hover, .approve-btn:hover, .decline-btn:hover {
   background-color: #3b5bdb;
+}
+
+.reassign-btn {
+  background-color: #f39c12;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin-right: 0.5rem;
+}
+
+.reassign-btn:hover {
+  background-color: #e67e22;
+}
+
+.reschedule-btn {
+  background-color: #9b59b6;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin-right: 0.5rem;
+}
+
+.reschedule-btn:hover {
+  background-color: #8e44ad;
 }
 
 .approve-btn {

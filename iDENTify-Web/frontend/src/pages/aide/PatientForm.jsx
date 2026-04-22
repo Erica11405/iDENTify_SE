@@ -389,20 +389,37 @@ function PatientForm({ userRole }) {
 						}
 					}
 					
+					const mapStringsToServiceObjects = (list) => {
+						if (!Array.isArray(list)) return [];
+						return list.map(item => {
+							if (typeof item === 'object' && item !== null && item.name) return item;
+							const name = String(item || "").trim();
+							if (!name) return null;
+							const match = (masterServices || []).find(s => s.name.toLowerCase() === name.toLowerCase());
+							let price = 0;
+							if (match) {
+								price = typeof match.price === 'number' 
+									? match.price 
+									: parseFloat(String(match.price || "0").replace(/[^0-9.]/g, "")) || 0;
+							}
+							return { name, price };
+						}).filter(Boolean);
+					};
+
 					if (typeof procData === 'string' && procData.trim() !== "") {
 						try {
 							const parsed = JSON.parse(procData);
 							if (Array.isArray(parsed)) {
-								setSelectedTimelineServices(parsed);
+								setSelectedTimelineServices(mapStringsToServiceObjects(parsed));
 							} else {
-								setSelectedTimelineServices(procData.split(',').map(s => s.trim()).filter(Boolean));
+								setSelectedTimelineServices(mapStringsToServiceObjects(procData.split(',').map(s => s.trim()).filter(Boolean)));
 							}
 						} catch {
 							const procedures = procData.split(',').map(s => s.trim()).filter(Boolean);
-							setSelectedTimelineServices(procedures);
+							setSelectedTimelineServices(mapStringsToServiceObjects(procedures));
 						}
 					} else if (Array.isArray(procData) && procData.length > 0) {
-						setSelectedTimelineServices(procData);
+						setSelectedTimelineServices(mapStringsToServiceObjects(procData));
 					} else {
 						setSelectedTimelineServices([]);
 					}
@@ -461,8 +478,16 @@ function PatientForm({ userRole }) {
 
 	const handleApplyRecommendation = (treatmentName) => {
 		if (isVisitReadOnly) return; 
-		if (!selectedTimelineServices.includes(treatmentName)) {
-			setSelectedTimelineServices([...selectedTimelineServices, treatmentName]);
+		const alreadyInPlan = selectedTimelineServices.some(s => s.name === treatmentName);
+		if (!alreadyInPlan) {
+			const match = (masterServices || []).find(s => s.name.toLowerCase() === treatmentName.toLowerCase());
+			let price = 0;
+			if (match) {
+				price = typeof match.price === 'number' 
+					? match.price 
+					: parseFloat(String(match.price || "0").replace(/[^0-9.]/g, "")) || 0;
+			}
+			setSelectedTimelineServices([...selectedTimelineServices, { name: treatmentName, price }]);
 			toast.success(`Added ${treatmentName} to Plan`);
 			const timelineSection = document.querySelector('.timeline-section');
 			if (timelineSection) timelineSection.scrollIntoView({ behavior: 'smooth' });
@@ -1059,6 +1084,31 @@ function PatientForm({ userRole }) {
 	const panelTitle = selected.boxKind === "treatment" ? "Treatment" : selected.boxKind === "condition" ? "Condition" : "Legend";
 	const panelOptions = selected.boxKind === "treatment" ? treatmentOptions : selected.boxKind === "condition" ? conditionOptions : [];
 
+	const renderProcedures = (text) => {
+		if (!text) return null;
+		try {
+			const parsed = JSON.parse(text);
+			if (Array.isArray(parsed)) {
+				return parsed.map((svc, i) => {
+					const name = typeof svc === 'object' ? svc.name : svc;
+					return (
+						<span key={i} style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>
+							{name}{i < parsed.length - 1 ? ", " : ""}
+						</span>
+					);
+				});
+			}
+		} catch (e) {
+			// fallback to legacy comma-split
+		}
+		const split = text.split(", ").filter(Boolean);
+		return split.map((proc, index) => (
+			<span key={index} style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>
+				{proc}{index < split.length - 1 ? ", " : ""}
+			</span>
+		));
+	};
+
 	if (!patient) return <div>Loading...</div>;
 
 	return (
@@ -1258,9 +1308,7 @@ function PatientForm({ userRole }) {
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Procedures</div>
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '3px' }}>
-                                            {entry.procedure_text.split(", ").map((proc, index) => {
-                                                return <span key={index} style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>{proc}{index < entry.procedure_text.split(", ").length - 1 ? "," : ""}</span>;
-                                            })}
+                                            {renderProcedures(entry.procedure_text)}
                                         </div>
                                     </div>
                                     <div style={{ minWidth: '120px' }}>

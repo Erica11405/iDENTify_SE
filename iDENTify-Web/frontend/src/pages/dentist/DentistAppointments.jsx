@@ -124,9 +124,13 @@ function DentistAppointments() {
     }
   };
 
+  const [checkingInId, setCheckingInId] = useState(null);
+
   const handleCheckIn = async (appt) => {
+    if (!appt?.id) return;
     try {
-      await api.addQueueItem({
+      setCheckingInId(appt.id);
+      await api.addQueue({
         patient_id: appt.patient_id,
         appointment_id: appt.id,
         dentist_id: appt.dentist_id,
@@ -138,55 +142,38 @@ function DentistAppointments() {
       await api.loadQueue();
     } catch (error) {
       toast.error(error?.message || 'Failed to check in.');
+    } finally {
+      setCheckingInId(null);
     }
   };
 
   return (
     <div className="appointments-container">
-      <div className="appointments-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div className="appointments-header">
         <h1 className="appointments-title">Dentist Management</h1>
         
-        <div className="date-picker-container" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <label htmlFor="date-picker" style={{ fontWeight: 'bold' }}>Select Date:</label>
+        <div className="date-picker-container">
+          <label htmlFor="date-picker">Select Date:</label>
           <input 
             id="date-picker"
             type="date" 
             value={selectedDate} 
             onChange={(e) => setSelectedDate(e.target.value)}
             className="date-input"
-            style={{ padding: '0.5rem', borderRadius: '5px', border: '1px solid #ccc' }}
           />
         </div>
       </div>
 
-      <div className="appointments-tabs" style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+      <div className="appointments-tabs">
         <button 
           className={`tab-btn ${activeTab === 'appointments' ? 'active' : ''}`}
           onClick={() => setActiveTab('appointments')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '5px',
-            border: 'none',
-            backgroundColor: activeTab === 'appointments' ? '#3498db' : '#f0f0f0',
-            color: activeTab === 'appointments' ? '#fff' : '#333',
-            cursor: 'pointer',
-            fontWeight: 'bold'
-          }}
         >
           Appointments
         </button>
         <button 
           className={`tab-btn ${activeTab === 'patients' ? 'active' : ''}`}
           onClick={() => setActiveTab('patients')}
-          style={{
-            padding: '10px 20px',
-            borderRadius: '5px',
-            border: 'none',
-            backgroundColor: activeTab === 'patients' ? '#3498db' : '#f0f0f0',
-            color: activeTab === 'patients' ? '#fff' : '#333',
-            cursor: 'pointer',
-            fontWeight: 'bold'
-          }}
         >
           Patients
         </button>
@@ -240,7 +227,6 @@ function DentistAppointments() {
                                 className="decision-btn approve-btn"
                                 onClick={() => handleApprove(appt.id)}
                                 disabled={isDecisionBusy(appt.id, 'approve') || isDecisionBusy(appt.id, 'decline')}
-                                style={{ backgroundColor: '#2ecc71', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}
                               >
                                 {isDecisionBusy(appt.id, 'approve') ? 'Approving...' : 'Approve'}
                               </button>
@@ -248,7 +234,6 @@ function DentistAppointments() {
                                 className="decision-btn decline-btn"
                                 onClick={() => handleDeclineClick(appt.id)}
                                 disabled={isDecisionBusy(appt.id, 'approve') || isDecisionBusy(appt.id, 'decline')}
-                                style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}
                               >
                                 {isDecisionBusy(appt.id, 'decline') ? 'Declining...' : 'Decline'}
                               </button>
@@ -259,7 +244,6 @@ function DentistAppointments() {
                             <button
                               className="check-in-btn"
                               onClick={() => handleCheckIn(appt)}
-                              style={{ backgroundColor: '#1abc9c', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}
                             >
                               Check-In
                             </button>
@@ -268,7 +252,6 @@ function DentistAppointments() {
                           <button
                             className="review-chart-btn"
                             onClick={() => navigate(`/patients/${appt.patient_id}`)}
-                            style={{ backgroundColor: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}
                           >
                             Review Chart
                           </button>
@@ -281,7 +264,6 @@ function DentistAppointments() {
                                 toast.success("Marked for follow-up.");
                               }
                             }}
-                            style={{ backgroundColor: '#9b59b6', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
                           >
                             Follow-up
                           </button>
@@ -350,7 +332,6 @@ function DentistAppointments() {
                                 className="decision-btn approve-btn"
                                 onClick={() => handleApprove(linkedAppt.id)}
                                 disabled={isDecisionBusy(linkedAppt.id, 'approve') || isDecisionBusy(linkedAppt.id, 'decline')}
-                                style={{ backgroundColor: '#2ecc71', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', marginRight: '5px' }}
                               >
                                 {isDecisionBusy(linkedAppt.id, 'approve') ? 'Approving...' : 'Approve'}
                               </button>
@@ -359,7 +340,6 @@ function DentistAppointments() {
                           <button
                             className="review-chart-btn"
                             onClick={() => navigate(`/patients/${entry.patient_id}`)}
-                            style={{ backgroundColor: '#3498db', color: 'white', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
                           >
                             Review Chart
                           </button>
