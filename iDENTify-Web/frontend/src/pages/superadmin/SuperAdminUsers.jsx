@@ -671,24 +671,24 @@ function SuperAdminUsers() {
                                 <div className="form-row">
                                     <div className="form-group" style={{ flex: 1 }}>
                                         <label>Specializations *</label>
-                                        <div className="chips-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                                        <div className="add-row" style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                            <select 
+                                                value={specDraft} 
+                                                onChange={(e) => setSpecDraft(e.target.value)}
+                                                style={{ flex: 1 }}
+                                            >
+                                                <option value="">Add Specialization</option>
+                                                {dentistTypeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                            </select>
+                                            <button type="button" className="btn-small-add" onClick={addSpecialization}>Add</button>
+                                        </div>
+                                        <div className="chips-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
                                             {(dentistForm.specializations || []).map((s, idx) => (
                                                 <div className="chip" key={idx} style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 10px', borderRadius: '15px', fontSize: '0.85rem', display: 'flex', alignItems: 'center' }}>
                                                     {s}
                                                     <button type="button" onClick={() => removeSpecialization(s)} style={{ border: 'none', background: 'none', marginLeft: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#0369a1' }}>&times;</button>
                                                 </div>
                                             ))}
-                                        </div>
-                                        <div className="add-row" style={{ display: 'flex', gap: '8px' }}>
-                                            <select 
-                                                value={specDraft} 
-                                                onChange={(e) => setSpecDraft(e.target.value)}
-                                                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
-                                            >
-                                                <option value="">Add Specialization</option>
-                                                {dentistTypeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                            </select>
-                                            <button type="button" className="btn-small-add" onClick={addSpecialization} style={{ padding: '0 15px', background: '#3498db', color: 'white', border: 'none', borderRadius: '4px' }}>Add</button>
                                         </div>
                                     </div>
                                     <div className="form-group">
