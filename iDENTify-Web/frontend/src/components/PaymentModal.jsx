@@ -59,7 +59,11 @@ function resolveProofSource(proofData) {
 
 function normalizeServices(value) {
   if (Array.isArray(value)) {
-    return value.map((item) => String(item || "").trim()).filter(Boolean);
+    return value.map((item) => {
+      if (typeof item === 'object' && item !== null) return item;
+      const str = String(item || "").trim();
+      return str ? { name: str, price: 0 } : null;
+    }).filter(Boolean);
   }
 
   const text = String(value || "").trim();
@@ -68,13 +72,20 @@ function normalizeServices(value) {
   try {
     const parsed = JSON.parse(text);
     if (Array.isArray(parsed)) {
-      return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+      return parsed.map((item) => {
+        if (typeof item === 'object' && item !== null) return item;
+        const str = String(item || "").trim();
+        return str ? { name: str, price: 0 } : null;
+      }).filter(Boolean);
     }
   } catch {
     // Ignore parse errors and fallback to comma split.
   }
 
-  return text.split(",").map((item) => item.trim()).filter(Boolean);
+  return text.split(",").map((item) => {
+    const str = item.trim();
+    return str ? { name: str, price: 0 } : null;
+  }).filter(Boolean);
 }
 
 function isOnlineMethod(method) {
@@ -111,7 +122,9 @@ function PaymentModal({
     if (!isOpen) return;
 
     setForm({
-      total_due: initialValues.total_due !== undefined ? String(initialValues.total_due) : "",
+      total_due: initialValues.total_due !== undefined && initialValues.total_due !== "" 
+        ? String(initialValues.total_due) 
+        : (summary.total_due_prefill !== undefined ? String(summary.total_due_prefill) : ""),
       is_deposit: Boolean(initialValues.is_deposit),
       payment_method: String(initialValues.payment_method || "cash"),
       amount_paid_now: initialValues.amount_paid_now !== undefined ? String(initialValues.amount_paid_now) : "",
@@ -119,7 +132,7 @@ function PaymentModal({
       proof_data: String(initialValues.proof_data || ""),
       already_paid: initialValues.already_paid !== undefined ? String(initialValues.already_paid) : "0",
     });
-  }, [isOpen, initialValues]);
+  }, [isOpen, initialValues, summary.total_due_prefill]);
 
   useEffect(() => {
     if (isOpen) return;

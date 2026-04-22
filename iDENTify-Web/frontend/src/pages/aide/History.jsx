@@ -46,42 +46,66 @@ function History({ pageTitle = "Patient History", forcedDentistId = null }) {
         loadData();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const baseHistoryList = useMemo(
-        () =>
-            queue
-                .filter((item) => item.status === "Done")
-                .filter((item) => {
-                    if (!hasForcedDentistScope) return true;
-                    return String(item.dentist_id || "") === String(forcedDentistId);
-                })
-                .map((item) => {
-                    const patient = patients.find((p) => String(p.id) === String(item.patient_id));
-                    const patientName = patient ? (patient.full_name || patient.name) : (item.full_name || "Unknown");
+    const baseHistoryList = useMemo(() => {
+        const queueDone = queue
+            .filter((item) => item.status === "Done")
+            .map((item) => {
+                const patient = patients.find((p) => String(p.id) === String(item.patient_id));
+                const patientName = patient ? (patient.full_name || patient.name) : (item.full_name || "Unknown");
 
-                    const dentist = dentists.find((d) => String(d.id) === String(item.dentist_id));
-                    const dentistName = dentist ? dentist.name : (item.dentist_name || "Unassigned");
+                const dentist = dentists.find((d) => String(d.id) === String(item.dentist_id));
+                const dentistName = dentist ? dentist.name : (item.dentist_name || "Unassigned");
 
-                    let procedureInfo = item.notes || "-";
-                    if (item.appointment_id) {
-                        const linkedAppt = appointments.find(a => String(a.id) === String(item.appointment_id));
-                        if (linkedAppt) {
-                            procedureInfo = linkedAppt.procedure || linkedAppt.reason || item.notes || "-";
-                        }
+                let procedureInfo = item.notes || "-";
+                if (item.appointment_id) {
+                    const linkedAppt = appointments.find(a => String(a.id) === String(item.appointment_id));
+                    if (linkedAppt) {
+                        procedureInfo = linkedAppt.procedure || linkedAppt.reason || item.notes || "-";
                     }
+                }
 
-                    const dateObj = new Date(item.time_added || item.checkedInTime || 0);
+                const dateObj = new Date(item.time_added || item.checkedInTime || 0);
 
-                    return {
-                        ...item,
-                        rawDate: dateObj,
-                        name: patientName,
-                        assignedDentist: dentistName,
-                        procedureDisplay: procedureInfo
-                    };
-                })
-                .sort((a, b) => b.rawDate - a.rawDate),
-        [queue, patients, dentists, appointments, hasForcedDentistScope, forcedDentistId]
-    );
+                return {
+                    ...item,
+                    rawDate: dateObj,
+                    name: patientName,
+                    assignedDentist: dentistName,
+                    procedureDisplay: procedureInfo,
+                    source: 'queue'
+                };
+            });
+
+        // Add Done appointments that might NOT be in the queue
+        const appointmentsDone = appointments
+            .filter((appt) => appt.status === "Done")
+            .filter((appt) => !queue.some(q => q.appointment_id === appt.id)) // Avoid duplicates
+            .map((appt) => {
+                const patient = patients.find((p) => String(p.id) === String(appt.patient_id));
+                const patientName = patient ? (patient.full_name || patient.name) : (appt.full_name || "Unknown");
+
+                const dentist = dentists.find((d) => String(d.id) === String(appt.dentist_id));
+                const dentistName = dentist ? dentist.name : (appt.dentist_name || "Unassigned");
+
+                const dateObj = new Date(appt.appointment_datetime || appt.created_at || 0);
+
+                return {
+                    ...appt,
+                    rawDate: dateObj,
+                    name: patientName,
+                    assignedDentist: dentistName,
+                    procedureDisplay: appt.procedure || appt.reason || "-",
+                    source: 'appointment'
+                };
+            });
+
+        return [...queueDone, ...appointmentsDone]
+            .filter((item) => {
+                if (!hasForcedDentistScope) return true;
+                return String(item.dentist_id || "") === String(forcedDentistId);
+            })
+            .sort((a, b) => b.rawDate - a.rawDate);
+    }, [queue, patients, dentists, appointments, hasForcedDentistScope, forcedDentistId]);
 
     const uniqueProcedures = useMemo(() => {
         return Array.from(new Set(baseHistoryList.map(item => item.procedureDisplay).filter(p => p !== "-")));

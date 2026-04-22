@@ -144,8 +144,12 @@ function Payments({
   const [error, setError] = useState("");
   const [paymentRows, setPaymentRows] = useState([]);
 
-  const [rangeType, setRangeType] = useState("daily");
-  const [startDate, setStartDate] = useState(new Date());
+  const [rangeType, setRangeType] = useState("monthly");
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d;
+  });
   const [endDate, setEndDate] = useState(new Date());
 
   const [search, setSearch] = useState("");

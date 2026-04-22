@@ -21,6 +21,26 @@ const CollapsibleSection = ({ title, children }) => {
 
 function PatientHistorySidebar({ patient, timeline = [], appointments = [] }) {
 
+  const renderProcedures = (text) => {
+    if (!text) return "N/A";
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed.map((svc, i) => {
+          const name = typeof svc === 'object' ? svc.name : svc;
+          return (
+            <span key={i}>
+              {name}{i < parsed.length - 1 ? ", " : ""}
+            </span>
+          );
+        });
+      }
+    } catch (e) {
+      // fallback
+    }
+    return text;
+  };
+
   // 1. Calculate Last Visit
   const lastVisit = useMemo(() => {
     if (!appointments || appointments.length === 0) return "No previous visits";
@@ -119,7 +139,7 @@ function PatientHistorySidebar({ patient, timeline = [], appointments = [] }) {
             {previousProcedures.map((proc, idx) => (
               <li key={idx} className="procedure-item">
                 <div className="procedure-date">{proc.date}</div>
-                <div className="procedure-text">{proc.text}</div>
+                <div className="procedure-text">{renderProcedures(proc.text)}</div>
               </li>
             ))}
           </ul>

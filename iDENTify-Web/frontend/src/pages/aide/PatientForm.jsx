@@ -723,10 +723,19 @@ function PatientForm({ userRole }) {
 		const context = buildPaymentContext();
 		setPaymentContext(context);
 
+        // Calculate total price for pre-filling the modal
+        const totalPrice = (context.services || []).reduce((sum, s) => {
+            const price = typeof s === 'object' ? (Number(s.price) || 0) : 0;
+            return sum + price;
+        }, 0);
+
 		try {
 			const patientId = toPositiveInt(context?.patient_id);
 			const services = Array.isArray(context?.services)
-				? context.services.map((item) => String(item || "").trim()).filter(Boolean)
+				? context.services.map((item) => {
+                    if (typeof item === 'object') return item.name;
+                    return String(item || "").trim();
+                }).filter(Boolean)
 				: [];
 
 			if (patientId && services.length > 0) {
@@ -750,6 +759,12 @@ function PatientForm({ userRole }) {
 		}
 
 		setIsPaymentModalOpen(true);
+        
+        // Inject total price into initialValues for the modal
+        setPaymentContext(prev => ({
+            ...prev,
+            total_due_prefill: totalPrice > 0 ? totalPrice : ""
+        }));
 	};
 
 	const handleClosePaymentModal = () => {
@@ -828,6 +843,17 @@ function PatientForm({ userRole }) {
 				...paymentContext,
 				...paymentPayload,
 			});
+
+            // Mark Queue item and Appointment as Done
+            const sessionQueueId = toPositiveInt(paymentContext?.queue_id);
+            const sessionApptId = toPositiveInt(paymentContext?.appointment_id);
+
+            if (sessionQueueId) {
+                await apiClient.updateQueueItem(sessionQueueId, { status: "Done" });
+            }
+            if (sessionApptId) {
+                await apiClient.updateAppointment(sessionApptId, { status: "Done" });
+            }
 
 			if (api.loadQueue) await api.loadQueue();
 			if (api.loadAppointments) await api.loadAppointments();
