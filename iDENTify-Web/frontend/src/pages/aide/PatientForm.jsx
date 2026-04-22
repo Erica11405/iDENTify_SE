@@ -1336,13 +1336,27 @@ function PatientForm({ userRole }) {
                             </div>
 
                             {selectedTimelineServices.length > 0 && (
-                                <div style={{ gridColumn: '1 / -1', display: "flex", flexWrap: "wrap", gap: "6px", marginTop: '5px' }}>
-                                    {selectedTimelineServices.map((svc) => (
-                                        <span key={svc.name} style={{ background: "#eff6ff", color: "#2563eb", padding: "4px 10px", borderRadius: "20px", fontSize: "0.75rem", border: '1px solid #dbeafe', display: "inline-flex", alignItems: "center", gap: "5px", fontWeight: '500' }}>
-                                            {svc.name} (₱{svc.price})
-                                            <button onClick={() => handleRemoveTimelineService(svc.name)} style={{ border: "none", background: "none", cursor: "pointer", fontWeight: '900', color: "#2563eb" }}>×</button>
-                                        </span>
-                                    ))}
+                                <div style={{ gridColumn: '1 / -1', display: "flex", flexDirection: "column", gap: "6px", marginTop: '5px' }}>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                        {selectedTimelineServices.map((svc) => (
+                                            <div key={svc.name} style={{ background: "#eff6ff", color: "#2563eb", padding: "6px 12px", borderRadius: "8px", fontSize: "0.85rem", border: '1px solid #dbeafe', display: "inline-flex", alignItems: "center", gap: "8px", fontWeight: '500' }}>
+                                                <span>{svc.name}</span>
+                                                <input 
+                                                    type="number" 
+                                                    value={svc.price} 
+                                                    onChange={(e) => {
+                                                        const newPrice = e.target.value;
+                                                        setSelectedTimelineServices(prev => prev.map(s => s.name === svc.name ? { ...s, price: parseFloat(newPrice) || 0 } : s));
+                                                    }}
+                                                    style={{ width: '80px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #93c5fd', outline: 'none' }}
+                                                />
+                                                <button onClick={() => handleRemoveTimelineService(svc.name)} style={{ border: "none", background: "none", cursor: "pointer", fontWeight: '900', color: "#2563eb", padding: '0 5px' }}>×</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#1e293b', marginTop: '10px' }}>
+                                        Total: ₱{selectedTimelineServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0).toLocaleString()}
+                                    </div>
                                 </div>
                             )}
 						</div>

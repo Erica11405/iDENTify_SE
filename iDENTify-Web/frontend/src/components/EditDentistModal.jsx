@@ -17,11 +17,12 @@ const FALLBACK_DENTIST_TYPES = [
   'Endodontist',
 ];
 
-const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess }) => {
+const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess, actorContext: actorProp }) => {
   const [loading, setLoading] = useState(false);
   const [leaveDraft, setLeaveDraft] = useState('');
 
   const actorContext = useMemo(() => {
+    if (actorProp) return actorProp;
     try {
       const raw = localStorage.getItem('identify-auth-storage');
       const parsed = raw ? JSON.parse(raw) : null;
@@ -29,14 +30,30 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
     } catch {
       return null;
     }
-  }, []);
+  }, [actorProp]);
 
   const canEditSchedule = useMemo(() => {
     const role = String(actorContext?.role || '').trim().toLowerCase();
+    
+    // Global admins and clinic admins can edit anyone's schedule
+    if (role === 'superadmin' || role === 'clinic admin' || role === 'globaladmin' || role === 'clinicadmin' || role === 'systemadmin') {
+      return true;
+    }
+
+    // Dentists can only edit their own schedule
     const actorDentistId = Number(actorContext?.dentist_id || 0);
     const targetDentistId = Number(dentist?.id || 0);
-    return role === 'dentist' && actorDentistId > 0 && actorDentistId === targetDentistId;
-  }, [actorContext, dentist?.id]);
+    
+    // Also check if the user id matches the dentist's user_id just in case
+    const actorUserId = Number(actorContext?.id || 0);
+    const targetUserId = Number(dentist?.user_id || 0);
+
+    return role === 'dentist' && (
+      (actorDentistId > 0 && actorDentistId === targetDentistId) || 
+      (actorUserId > 0 && actorUserId === targetUserId) ||
+      (actorContext?.name === dentist?.name) // Ultimate fallback
+    );
+  }, [actorContext, dentist]);
   
   // Pre-fill the form with the dentist's existing data
   const [formData, setFormData] = useState({
