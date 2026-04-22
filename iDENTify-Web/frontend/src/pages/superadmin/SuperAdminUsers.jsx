@@ -63,7 +63,7 @@ function initialDentistForm(defaultSpecialization = 'General Dentist') {
         middleName: '',
         lastName: '',
         email: '',
-        specialization: defaultSpecialization,
+        specializations: [defaultSpecialization],
         phone: '',
         days: [1, 2, 3, 4, 5],
         operatingHours: { start: '09:00', end: '17:00' },
@@ -162,6 +162,24 @@ function SuperAdminUsers() {
     const [dentistForm, setDentistForm] = useState(initialDentistForm);
     const [aideForm, setAideForm] = useState(initialAideForm);
     const [leaveDraft, setLeaveDraft] = useState('');
+    const [specDraft, setSpecDraft] = useState('');
+
+    const addSpecialization = () => {
+        if (!specDraft) return;
+        setDentistForm(prev => {
+            const currentSpecs = prev.specializations || [];
+            if (currentSpecs.includes(specDraft)) return prev;
+            return { ...prev, specializations: [...currentSpecs, specDraft] };
+        });
+        setSpecDraft('');
+    };
+
+    const removeSpecialization = (spec) => {
+        setDentistForm(prev => ({
+            ...prev,
+            specializations: (prev.specializations || []).filter(s => s !== spec)
+        }));
+    };
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -368,8 +386,8 @@ function SuperAdminUsers() {
     const handleCreateDentist = async (event) => {
         event.preventDefault();
 
-        if (!dentistForm.firstName || !dentistForm.lastName || !dentistForm.email || !dentistForm.specialization) {
-            toast.error('First name, last name, email, and dentist type are required.');
+        if (!dentistForm.firstName || !dentistForm.lastName || !dentistForm.email || !dentistForm.specializations?.length) {
+            toast.error('First name, last name, email, and at least one specialization are required.');
             return;
         }
 
@@ -392,7 +410,7 @@ function SuperAdminUsers() {
                 middle_name: normalizeText(dentistForm.middleName),
                 last_name: normalizeText(dentistForm.lastName),
                 name: fullName(dentistForm.firstName, dentistForm.middleName, dentistForm.lastName),
-                specialization: dentistForm.specialization,
+                specialization: (dentistForm.specializations || []).join(', '),
                 email: normalizeText(dentistForm.email),
                 password: dentistForm.password,
                 phone: normalizeText(dentistForm.phone),
@@ -651,13 +669,27 @@ function SuperAdminUsers() {
                                 </div>
 
                                 <div className="form-row">
-                                    <div className="form-group">
-                                        <label>Type of Dentist *</label>
-                                        <select value={dentistForm.specialization} onChange={(e) => setDentistForm((prev) => ({ ...prev, specialization: e.target.value }))}>
-                                            {dentistTypeOptions.map((option) => (
-                                                <option key={option} value={option}>{option}</option>
+                                    <div className="form-group" style={{ flex: 1 }}>
+                                        <label>Specializations *</label>
+                                        <div className="chips-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '8px' }}>
+                                            {(dentistForm.specializations || []).map((s, idx) => (
+                                                <div className="chip" key={idx} style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 10px', borderRadius: '15px', fontSize: '0.85rem', display: 'flex', alignItems: 'center' }}>
+                                                    {s}
+                                                    <button type="button" onClick={() => removeSpecialization(s)} style={{ border: 'none', background: 'none', marginLeft: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#0369a1' }}>&times;</button>
+                                                </div>
                                             ))}
-                                        </select>
+                                        </div>
+                                        <div className="add-row" style={{ display: 'flex', gap: '8px' }}>
+                                            <select 
+                                                value={specDraft} 
+                                                onChange={(e) => setSpecDraft(e.target.value)}
+                                                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+                                            >
+                                                <option value="">Add Specialization</option>
+                                                {dentistTypeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                            </select>
+                                            <button type="button" className="btn-small-add" onClick={addSpecialization} style={{ padding: '0 15px', background: '#3498db', color: 'white', border: 'none', borderRadius: '4px' }}>Add</button>
+                                        </div>
                                     </div>
                                     <div className="form-group">
                                         <label>Contact Number</label>
