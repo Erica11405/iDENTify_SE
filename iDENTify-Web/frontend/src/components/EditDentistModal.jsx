@@ -56,6 +56,14 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
     );
   }, [actorContext, dentist]);
   
+  const isAdmin = useMemo(() => {
+    const role = String(actorContext?.role || '').trim().toLowerCase();
+    return ['superadmin', 'clinic admin', 'globaladmin', 'clinicadmin', 'systemadmin'].includes(role);
+  }, [actorContext]);
+
+  const clinics = []; // TODO: Fetch clinics if needed
+  const branches = []; // TODO: Fetch branches if needed
+
   // Pre-fill the form with the dentist's existing data
   const [formData, setFormData] = useState({
     first_name: dentist?.first_name || '',
@@ -315,24 +323,6 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
                   <span style={{margin: '0 8px', display: 'flex', alignItems: 'center'}}>to</span>
                   <input type="date" value={leaveDraftEnd} onChange={(e) => setLeaveDraftEnd(e.target.value)} disabled={!canEditSchedule} />
                   <button type="button" className="btn-small-add" onClick={addLeaveDay} disabled={!canEditSchedule}>Add</button>
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-actions">
-              <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
-              <button type="submit" className="btn-submit" disabled={loading}>
-                {loading ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-export default EditDentistModal;d" onClick={addLeaveDay} disabled={!canEditSchedule}>Add</button>
                 </div>
               </div>
             </div>
