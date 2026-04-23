@@ -362,19 +362,18 @@ function SystemAdminDashboard() {
                                 <thead>
                                     <tr>
                                         <th>Clinic</th>
-                                        <th>Code</th>
                                         <th>Total Branches</th>
                                         <th>Active Branches</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {clinics.length === 0 ? (
+                                    {clinics.filter(c => !c.archived_at).length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} className="empty-state">No clinics found.</td>
+                                            <td colSpan={4} className="empty-state">No active clinics found.</td>
                                         </tr>
                                     ) : (
-                                        clinics.map((clinic) => {
+                                        clinics.filter(c => !c.archived_at).map((clinic) => {
                                             const active = normalizeBoolean(clinic.is_active);
                                             return (
                                                 <tr
@@ -383,7 +382,6 @@ function SystemAdminDashboard() {
                                                     onClick={() => setSelectedClinicId(String(clinic.id))}
                                                 >
                                                     <td className="font-semibold">{clinic.name}</td>
-                                                    <td>{clinic.code || '-'}</td>
                                                     <td>{Number(clinic.total_branches || 0)}</td>
                                                     <td>{Number(clinic.active_branches || 0)}</td>
                                                     <td>
@@ -410,7 +408,6 @@ function SystemAdminDashboard() {
                                     <thead>
                                         <tr>
                                             <th>Branch</th>
-                                            <th>Code</th>
                                             <th>Address</th>
                                             <th>Status</th>
                                         </tr>
@@ -418,7 +415,7 @@ function SystemAdminDashboard() {
                                     <tbody>
                                         {selectedClinicBranches.length === 0 ? (
                                             <tr>
-                                                <td colSpan={4} className="empty-state">No branches found for this clinic.</td>
+                                                <td colSpan={3} className="empty-state">No branches found for this clinic.</td>
                                             </tr>
                                         ) : (
                                             selectedClinicBranches.map((branch) => {
@@ -426,7 +423,6 @@ function SystemAdminDashboard() {
                                                 return (
                                                     <tr key={branch.id}>
                                                         <td className="font-semibold">{branch.name}</td>
-                                                        <td>{branch.code || '-'}</td>
                                                         <td>{branch.address || '-'}</td>
                                                         <td>
                                                             <span className={`status-pill ${active ? 'active' : 'archived'}`}>

@@ -276,6 +276,11 @@ function FollowUpModal({ isOpen, onClose, patient, dentists = [], onSave }) {
             <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
               <p><strong>Name:</strong> {patient?.name || patient?.full_name}</p>
               <p><strong>Contact:</strong> {patient?.contact || patient?.contact_number || 'N/A'}</p>
+              {balanceDue > 0 && (
+                  <p style={{ color: '#ef4444', fontWeight: 'bold', marginTop: '5px' }}>
+                    <strong>Unpaid Balance Carried Over:</strong> ₱{balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+              )}
             </div>
           </div>
 
@@ -351,6 +356,21 @@ function FollowUpModal({ isOpen, onClose, patient, dentists = [], onSave }) {
           <div className="form-group full-width">
             <label>Notes</label>
             <textarea name="notes" value={form.notes} onChange={handleChange} rows="2"></textarea>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button type="button" onClick={onClose}>Cancel</button>
+          <button type="button" onClick={handleSubmit} disabled={isSaving} style={{ background: '#0ea5e9', color: 'white' }}>
+            {isSaving ? "Scheduling..." : "Schedule Follow-up"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default FollowUpModal;>
           </div>
         </div>
 

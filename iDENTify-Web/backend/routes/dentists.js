@@ -289,14 +289,16 @@ router.get('/', async (req, res) => {
       whereClauses.push("specialization = 'Dental Aide'");
     }
 
-    let query = 'SELECT d.* FROM dentists d';
-    if (needsOwnerJoin) {
-      query += `
-        LEFT JOIN (
+    let query = 'SELECT d.*';
+    
+    if (supportsUsersClinic || supportsUsersBranch) {
+       query += `, owner.clinic_id, owner.branch_id FROM dentists d LEFT JOIN (
           SELECT dentist_id, MAX(clinic_id) AS clinic_id, MAX(branch_id) AS branch_id
           FROM users
           GROUP BY dentist_id
         ) owner ON owner.dentist_id = d.id`;
+    } else {
+       query += ' FROM dentists d';
     }
 
     if (whereClauses.length > 0) {
@@ -525,6 +527,29 @@ router.put('/:id', async (req, res) => {
         requireApprovedSuperAdmin: true,
       });
       if (!access.ok) return;
+
+      const supportsUsersClinic = await hasUsersClinicColumn();
+      const supportsUsersBranch = await hasUsersBranchColumn();
+
+      if (supportsUsersClinic || supportsUsersBranch) {
+        const updates = [];
+        const updateValues = [];
+        
+        if (supportsUsersClinic && Object.prototype.hasOwnProperty.call(req.body, 'clinic_id')) {
+          updates.push('clinic_id = ?');
+          updateValues.push(toPositiveInt(req.body.clinic_id) || null);
+        }
+        
+        if (supportsUsersBranch && Object.prototype.hasOwnProperty.call(req.body, 'branch_id')) {
+          updates.push('branch_id = ?');
+          updateValues.push(toPositiveInt(req.body.branch_id) || null);
+        }
+
+        if (updates.length > 0) {
+          updateValues.push(id);
+          await db.query(`UPDATE users SET ${updates.join(', ')} WHERE dentist_id = ?`, updateValues);
+        }
+      }
     }
 
     const [existingRows] = await db.query('SELECT * FROM dentists WHERE id = ? LIMIT 1', [id]);

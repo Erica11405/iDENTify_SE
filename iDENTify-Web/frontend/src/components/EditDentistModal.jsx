@@ -229,6 +229,33 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
               <label>Email</label>
               <input name="email" type="email" value={formData.email} onChange={handleChange} required />
             </div>
+
+            {isAdmin && (
+              <div className="form-row" style={{ marginTop: '15px' }}>
+                <div className="form-group">
+                  <label>Assigned Clinic</label>
+                  <select 
+                    name="clinic_id" 
+                    value={formData.clinic_id || ''} 
+                    onChange={(e) => setFormData(prev => ({ ...prev, clinic_id: e.target.value, branch_id: '' }))}
+                  >
+                    <option value="">Select Clinic</option>
+                    {clinics.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Assigned Branch</label>
+                  <select 
+                    name="branch_id" 
+                    value={formData.branch_id || ''} 
+                    onChange={handleChange}
+                  >
+                    <option value="">Select Branch</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
 
           <hr className="divider" />
@@ -288,6 +315,24 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
                   <span style={{margin: '0 8px', display: 'flex', alignItems: 'center'}}>to</span>
                   <input type="date" value={leaveDraftEnd} onChange={(e) => setLeaveDraftEnd(e.target.value)} disabled={!canEditSchedule} />
                   <button type="button" className="btn-small-add" onClick={addLeaveDay} disabled={!canEditSchedule}>Add</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
+              <button type="submit" className="btn-submit" disabled={loading}>
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default EditDentistModal;d" onClick={addLeaveDay} disabled={!canEditSchedule}>Add</button>
                 </div>
               </div>
             </div>

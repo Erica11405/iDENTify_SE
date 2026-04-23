@@ -1497,16 +1497,24 @@ function PatientForm({ userRole }) {
 
                 <div className="form-actions-bottom" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid #e9ecef', paddingTop: '1rem' }}>
                     {!isVisitReadOnly ? (
-                        <button className="done-btn" onClick={handleSaveAll} disabled={isSaving}>
-                            {isSaving ? "Saving..." : (isDentistReviewing ? "Verify & Save Progress" : "Save Appointment Progress")}
-                        </button>
-                    ) : ( 
+                        <>
+                            <button 
+                                className="done-btn" 
+                                style={{ background: '#3498db' }} 
+                                onClick={() => navigate('/dentist/appointments')}
+                            >
+                                Schedule Follow-up
+                            </button>
+                            <button className="done-btn" onClick={handleSaveAll} disabled={isSaving}>
+                                {isSaving ? "Saving..." : "Save"}
+                            </button>
+                        </>
+                    ) : (
                         <div style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            ✓ {isHistoryView ? "Completed Appointment Record (Read-Only)" : `Year ${selectedYear} is Historical (Read-Only)`}
-                        </div> 
+                            {isDentistReviewing && !isHistoryView ? "✓ Read-Only View (Dentist)" : `✓ ${isHistoryView ? "Completed Appointment Record (Read-Only)" : `Year ${selectedYear} is Historical (Read-Only)`}`}
+                        </div>
                     )}
                 </div>
-
 				<div className={`side-panel-backdrop${isPanelOpen ? " side-panel-open" : ""}`} onClick={closePanel}>
 					<div className="side-panel" onClick={(e) => e.stopPropagation()}>
 						<h3 className="section-title">{panelTitle}</h3>
@@ -1540,6 +1548,21 @@ function PatientForm({ userRole }) {
 				}}
 				mode="create"
 			/>
+            <FollowUpModal
+                isOpen={followUpModal.isOpen}
+                patient={followUpModal.patient}
+                dentists={dentists}
+                onClose={() => setFollowUpModal({ isOpen: false, patient: null })}
+                onSave={async (data) => {
+                    try {
+                        await api.createAppointment(data);
+                        toast.success("Follow-up appointment scheduled.");
+                        if (api.loadAppointments) api.loadAppointments();
+                    } catch (err) {
+                        toast.error("Failed to schedule follow-up.");
+                    }
+                }}
+            />
 		</div>
 	);
 }

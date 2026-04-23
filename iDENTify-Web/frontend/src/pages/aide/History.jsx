@@ -310,7 +310,6 @@ function History({ pageTitle = "Patient History", forcedDentistId = null }) {
                                     </td>
                                     <td>
                                         <button className="action-btn update-btn" onClick={() => handleUpdate(item)}>View</button>
-                                        <button className="action-btn delete-btn" onClick={() => handleDeleteClick(item)}>Delete</button>
                                     </td>
                                 </tr>
                             ))

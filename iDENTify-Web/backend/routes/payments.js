@@ -310,7 +310,8 @@ function canMutatePayments(req) {
 function normalizeServices(value) {
   if (Array.isArray(value)) {
     return value
-      .map((item) => String(item || "").trim())
+      .map((item) => (typeof item === 'object' && item !== null ? String(item.name || item.service || "") : String(item || "")))
+      .map(s => s.trim())
       .filter(Boolean);
   }
 
@@ -321,16 +322,17 @@ function normalizeServices(value) {
     const parsed = JSON.parse(text);
     if (Array.isArray(parsed)) {
       return parsed
-        .map((item) => String(item || "").trim())
+        .map((item) => (typeof item === 'object' && item !== null ? String(item.name || item.service || "") : String(item || "")))
+        .map(s => s.trim())
         .filter(Boolean);
     }
-  } catch {
-    // Ignore JSON parse errors and fall back to comma parsing.
+  } catch (e) {
+    // Ignore parsing errors, assume comma-separated list
   }
 
   return text
     .split(",")
-    .map((item) => item.trim())
+    .map((item) => String(item || "").trim())
     .filter(Boolean);
 }
 
