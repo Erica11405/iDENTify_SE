@@ -161,6 +161,7 @@ function SuperAdminUsers() {
 
     const [dentistForm, setDentistForm] = useState(initialDentistForm);
     const [aideForm, setAideForm] = useState(initialAideForm);
+    const [specDraft, setSpecDraft] = useState('');
     const [leaveDraftStart, setLeaveDraftStart] = useState('');
     const [leaveDraftEnd, setLeaveDraftEnd] = useState('');
 
