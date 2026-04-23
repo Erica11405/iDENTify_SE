@@ -209,6 +209,8 @@ function PatientForm({ userRole }) {
 			if (!id) return;
 			try {
 				await api.loadDentists();
+				if (api.loadQueue) await api.loadQueue();
+				if (api.loadAppointments) await api.loadAppointments();
 
                 // Fetch dynamic medications list
                 try {
@@ -273,7 +275,7 @@ function PatientForm({ userRole }) {
 			} catch (err) { console.error("Failed to load global data", err); }
 		};
 		loadGlobalData();
-	}, [id, allAppointments]); // eslint-disable-line react-hooks/exhaustive-deps
+	}, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	useEffect(() => {
 		const loadAnnualData = async () => {
@@ -401,9 +403,12 @@ function PatientForm({ userRole }) {
 							const match = (masterServices || []).find(s => s.name.toLowerCase() === name.toLowerCase());
 							let price = 0;
 							if (match) {
-								price = typeof match.price === 'number' 
-									? match.price 
-									: parseFloat(String(match.price || "0").replace(/[^0-9.]/g, "")) || 0;
+                                if (typeof match.price === 'number') {
+                                    price = match.price;
+                                } else {
+                                    const matchPrice = String(match.price || "0").match(/[\d.]+/);
+                                    price = matchPrice ? parseFloat(matchPrice[0]) : 0;
+                                }
 							}
 							return { name, price };
 						}).filter(Boolean);
@@ -423,7 +428,7 @@ function PatientForm({ userRole }) {
 						}
 					} else if (Array.isArray(procData) && procData.length > 0) {
 						setSelectedTimelineServices(mapStringsToServiceObjects(procData));
-					} else {
+					} else if (!selectedTimelineServices.length) {
 						setSelectedTimelineServices([]);
 					}
 					
@@ -440,14 +445,18 @@ function PatientForm({ userRole }) {
 
 					setTimelineForm(prev => ({ ...prev, start_time: formattedStart }));
 				} else {
-					setTimelineForm({ start_time: `${cleanDate} ${cleanTime}` });
-					setSelectedTimelineServices([]);
+                    // Only set current time if form is empty
+                    if (!timelineForm.start_time) {
+                        setTimelineForm({ start_time: `${cleanDate} ${cleanTime}` });
+                    }
+                    // Only clear services if we are sure there is no linked appointment and they were just autofilled
+                    // Actually, if we don't have a linked appointment, we should probably just keep what's there if the user typed it.
 				}
 
 			} catch (err) { console.error("Failed to load annual data", err); }
 		};
 		loadAnnualData();
-	}, [id, selectedYear, location.state, allAppointments, queue]);
+	}, [id, selectedYear, location.state, allAppointments, queue, masterServices]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const maxYear = Math.max(...(yearsList.length > 0 ? yearsList : [1]));
 	const isLatestYear = selectedYear === maxYear;

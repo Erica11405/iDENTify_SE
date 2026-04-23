@@ -149,12 +149,23 @@ function FollowUpModal({ isOpen, onClose, patient, dentists = [], onSave }) {
     const endMin = toMinutes24(operatingEnd);
     const dateObj = new Date(form.appointmentDate);
     const dayIndex = dateObj.getDay();
-    const worksToday = selectedDentist.days?.includes(dayIndex);
-    const isOnLeave = selectedDentist.leaveDays?.includes(form.appointmentDate);
+    
+    // Convert days to numbers for reliable matching
+    const workingDays = (selectedDentist.days || []).map(d => Number(d));
+    const worksToday = workingDays.includes(dayIndex);
+    const isOnLeave = (selectedDentist.leaveDays || []).includes(form.appointmentDate);
     const isOff = selectedDentist.status === 'Off';
 
-    if (!worksToday || isOnLeave || isOff) {
-      setGeneratedSlots([]);
+    if (!worksToday) {
+      setGeneratedSlots([{ label: "Not working today", value: "", type: "info" }]);
+      return;
+    }
+    if (isOnLeave) {
+      setGeneratedSlots([{ label: "On leave", value: "", type: "info" }]);
+      return;
+    }
+    if (isOff) {
+      setGeneratedSlots([{ label: "Dentist Off", value: "", type: "info" }]);
       return;
     }
 
@@ -183,6 +194,7 @@ function FollowUpModal({ isOpen, onClose, patient, dentists = [], onSave }) {
       const slotEnd = time + selectedDurationMinutes;
       let type = 'open';
       const timeStr24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      
       if (selectedDentist.lunch) {
         const lStart = toMinutes24(selectedDentist.lunch.start);
         const lEnd = toMinutes24(selectedDentist.lunch.end);
@@ -204,7 +216,12 @@ function FollowUpModal({ isOpen, onClose, patient, dentists = [], onSave }) {
       }
       slots.push({ value: timeStr24, label: formatTime12Hour(timeStr24), type });
     }
-    setGeneratedSlots(slots);
+
+    if (slots.length === 0) {
+        setGeneratedSlots([{ label: "No slots available", value: "", type: "info" }]);
+    } else {
+        setGeneratedSlots(slots);
+    }
   }, [selectedDentist, form.appointmentDate, appointments, selectedDurationMinutes]);
 
   if (!isOpen) return null;
@@ -279,27 +296,38 @@ function FollowUpModal({ isOpen, onClose, patient, dentists = [], onSave }) {
 
           <div className="form-group full-width">
             <label>Time Slot</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px', maxHeight: '150px', overflowY: 'auto' }}>
-              {generatedSlots.map(slot => (
-                <button
-                  key={slot.value}
-                  type="button"
-                  disabled={slot.type !== 'open'}
-                  onClick={() => setForm(prev => ({ ...prev, timeStart: slot.value }))}
-                  style={{
-                    padding: '8px 4px',
-                    borderRadius: '4px',
-                    background: form.timeStart === slot.value ? '#0ea5e9' : slot.type !== 'open' ? '#f1f5f9' : 'white',
-                    color: form.timeStart === slot.value ? 'white' : '#334155',
-                    border: '1px solid #e2e8f0',
-                    cursor: slot.type === 'open' ? 'pointer' : 'not-allowed',
-                    fontSize: '0.8rem'
-                  }}
-                >
-                  {slot.label}
-                </button>
-              ))}
-            </div>
+            {generatedSlots.length > 0 && generatedSlots[0].type === 'info' ? (
+               <div style={{ padding: '20px', textAlign: 'center', background: '#f8fafc', borderRadius: '4px', border: '1px solid #e2e8f0', color: '#64748b' }}>
+                  {generatedSlots[0].label}
+               </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px', maxHeight: '150px', overflowY: 'auto' }}>
+                {generatedSlots.map(slot => (
+                  <button
+                    key={slot.value}
+                    type="button"
+                    disabled={slot.type !== 'open'}
+                    onClick={() => setForm(prev => ({ ...prev, timeStart: slot.value }))}
+                    style={{
+                      padding: '8px 4px',
+                      borderRadius: '4px',
+                      background: form.timeStart === slot.value ? '#0ea5e9' : slot.type !== 'open' ? '#f1f5f9' : 'white',
+                      color: form.timeStart === slot.value ? 'white' : '#334155',
+                      border: '1px solid #e2e8f0',
+                      cursor: slot.type === 'open' ? 'pointer' : 'not-allowed',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    {slot.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {generatedSlots.length === 0 && !form.dentist_id && (
+              <div style={{ padding: '20px', textAlign: 'center', background: '#f8fafc', borderRadius: '4px', border: '1px solid #e2e8f0', color: '#64748b' }}>
+                Please select a dentist to see available slots.
+              </div>
+            )}
           </div>
 
           <div className="form-group full-width">
