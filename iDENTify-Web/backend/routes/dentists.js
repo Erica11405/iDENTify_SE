@@ -8,6 +8,15 @@ const { sendEmail } = require('../utils/mailer');
 // Helper to convert undefined to null to prevent MySQL crashes
 const safeVal = (val) => val === undefined ? null : val;
 
+const safeJsonParse = (data, fallback) => {
+  if (!data) return fallback;
+  try {
+    return typeof data === "string" ? JSON.parse(data) : data;
+  } catch (e) {
+    return fallback;
+  }
+};
+
 let hasMiddleNameColumnCache = null;
 let hasIsArchivedColumnCache = null;
 let hasPasswordChangeRequiredColumnCache = null;

@@ -2,6 +2,15 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
+const safeJsonParse = (data, fallback) => {
+  if (!data) return fallback;
+  try {
+    return typeof data === "string" ? JSON.parse(data) : data;
+  } catch (e) {
+    return fallback;
+  }
+};
+
 // Get Available Years for a Patient
 router.get("/years/:patientId", async (req, res) => {
   try {
@@ -72,16 +81,6 @@ router.post("/", async (req, res) => {
         `INSERT INTO patient_annual_records (patient_id, record_year, vitals, dental_history, xrays, status)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [patient_id, record_year, vitalsJson, dental_history, xraysJson, recordStatus]
-      );
-      res.status(201).json({ message: "Record created", id: result.insertId });
-    }
-  } catch (error) {
-    console.error("Error saving annual record:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-module.exports = router;on, dental_history, xraysJson, recordStatus]
       );
       res.status(201).json({ message: "Record created", id: result.insertId });
     }
