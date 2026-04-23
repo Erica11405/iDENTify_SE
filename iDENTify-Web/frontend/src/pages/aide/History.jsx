@@ -6,6 +6,7 @@ import StatusBadge from "../../components/StatusBadge";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import useAppStore from "../../store/useAppStore";
 import useApi from "../../hooks/useApi";
+import apiClient from "../../api/apiClient";
 
 function History({ pageTitle = "Patient History", forcedDentistId = null }) {
     const navigate = useNavigate();

@@ -297,11 +297,11 @@ router.get('/', async (req, res) => {
     const [rows] = await db.query(query, params);
     const formattedDentists = rows.map(d => ({
       ...d,
-      days: typeof d.schedule_days === 'string' ? JSON.parse(d.schedule_days) : (d.schedule_days || []),
-      operatingHours: typeof d.operating_hours === 'string' ? JSON.parse(d.operating_hours) : (d.operating_hours || { start: '09:00', end: '17:00' }),
-      lunch: typeof d.lunch === 'string' ? JSON.parse(d.lunch) : (d.lunch || { start: '', end: '' }),
-      breaks: typeof d.breaks === 'string' ? JSON.parse(d.breaks) : (d.breaks || []),
-      leaveDays: typeof d.leave_days === 'string' ? JSON.parse(d.leave_days) : (d.leave_days || []),
+      days: safeJsonParse(d.schedule_days, []),
+      operatingHours: safeJsonParse(d.operating_hours, { start: '09:00', end: '17:00' }),
+      lunch: safeJsonParse(d.lunch, { start: '', end: '' }),
+      breaks: safeJsonParse(d.breaks, []),
+      leaveDays: safeJsonParse(d.leave_days, []),
       name: d.name || composeStaffName(d.first_name, d.middle_name, d.last_name)
     }));
     res.json(formattedDentists);

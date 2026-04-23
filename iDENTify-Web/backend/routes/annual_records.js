@@ -32,8 +32,8 @@ router.get("/:patientId/:year", async (req, res) => {
     }
 
     const record = rows[0];
-    record.vitals = typeof record.vitals === 'string' ? JSON.parse(record.vitals) : (record.vitals || {});
-    record.xrays = typeof record.xrays === 'string' ? JSON.parse(record.xrays) : (record.xrays || []);
+    record.vitals = safeJsonParse(record.vitals, {});
+    record.xrays = safeJsonParse(record.xrays, []);
     
     res.json(record);
   } catch (error) {
@@ -72,6 +72,16 @@ router.post("/", async (req, res) => {
         `INSERT INTO patient_annual_records (patient_id, record_year, vitals, dental_history, xrays, status)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [patient_id, record_year, vitalsJson, dental_history, xraysJson, recordStatus]
+      );
+      res.status(201).json({ message: "Record created", id: result.insertId });
+    }
+  } catch (error) {
+    console.error("Error saving annual record:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+module.exports = router;on, dental_history, xraysJson, recordStatus]
       );
       res.status(201).json({ message: "Record created", id: result.insertId });
     }

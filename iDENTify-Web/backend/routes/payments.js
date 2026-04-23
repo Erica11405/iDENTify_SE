@@ -3,6 +3,16 @@ const router = express.Router();
 const db = require("../db");
 const { getActorTenantScope, appendTenantWhereClauses, hasColumn } = require("../utils/accessControl");
 
+const safeJsonParse = (data, fallback) => {
+  if (!data) return fallback;
+  if (typeof data === "object") return data;
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return fallback;
+  }
+};
+
 function isDateOnly(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ""));
 }
