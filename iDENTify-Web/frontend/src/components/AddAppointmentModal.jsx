@@ -64,7 +64,7 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
   const [isSearching, setIsSearching] = useState(false);
 
   const [form, setForm] = useState({
-    patient_id: null, // ADDED: Explicitly track existing patient ID
+    patient_id: null, 
     first_name: "",
     last_name: "",
     middle_name: "",
@@ -73,6 +73,10 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
     birthdate: "",
     age: "",
     sex: "",
+    street: "",
+    barangay: "",
+    city: "",
+    province: "",
     dentist_id: "", 
     appointmentDate: getLocalToday(),
     timeStart: "",
@@ -480,6 +484,28 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
                 <span style={{ padding: '10px', background: '#e2e8f0', borderRadius: '4px', color: '#64748b', fontSize: '0.9rem' }}>+63</span>
                 <input name="contact_number" type="text" value={form.contact_number} onChange={handleChange} placeholder="9123456789" readOnly={patientType === "old"} style={{ flex: 1, ...(patientType === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}) }} />
               </div>
+            </div>
+          </div>
+
+          {/* --- ADDRESS FIELDS --- */}
+          <div className="form-group-row" style={{ display: 'flex', gap: '10px' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Street *</label>
+              <input name="street" type="text" value={form.street} onChange={handleChange} placeholder="Street" readOnly={patientType === "old"} style={patientType === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Barangay *</label>
+              <input name="barangay" type="text" value={form.barangay} onChange={handleChange} placeholder="Barangay" readOnly={patientType === "old"} style={patientType === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
+            </div>
+          </div>
+          <div className="form-group-row" style={{ display: 'flex', gap: '10px' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>City *</label>
+              <input name="city" type="text" value={form.city} onChange={handleChange} placeholder="City" readOnly={patientType === "old"} style={patientType === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Province *</label>
+              <input name="province" type="text" value={form.province} onChange={handleChange} placeholder="Province" readOnly={patientType === "old"} style={patientType === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
             </div>
           </div>
 

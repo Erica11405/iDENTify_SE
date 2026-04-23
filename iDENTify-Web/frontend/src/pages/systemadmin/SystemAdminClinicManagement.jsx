@@ -37,7 +37,7 @@ function SystemAdminClinicManagement() {
 	const [branchStatusDrafts, setBranchStatusDrafts] = useState({});
 
 	const [newClinic, setNewClinic] = useState({ name: '', code: '' });
-	const [newBranch, setNewBranch] = useState({ clinicId: '', name: '', code: '', address: '' });
+	const [newBranch, setNewBranch] = useState({ clinicId: '', name: '', code: '', street: '', barangay: '', city: '', province: '' });
 
 	const [showConfirmModal, setShowConfirmModal] = useState(false);
 	const [confirmModalConfig, setConfirmModalConfig] = useState({ message: '', onConfirm: () => {} });
@@ -227,7 +227,7 @@ function SystemAdminClinicManagement() {
 			await api.createBranch(newBranch);
 			toast.success('Branch created successfully.');
 			const currentClinicId = newBranch.clinicId;
-			setNewBranch({ clinicId: currentClinicId, name: '', code: '', address: '' });
+			setNewBranch({ clinicId: currentClinicId, name: '', code: '', street: '', barangay: '', city: '', province: '' });
 			await loadBranches(currentClinicId);
 		} catch (error) {
 			toast.error(error?.message || 'Failed to create branch.');
@@ -346,6 +346,91 @@ function SystemAdminClinicManagement() {
 								</table>
 							</div>
 						)}
+					</div>
+
+					<div className="systemadmin-card">
+						<h3>Create Branch</h3>
+						<form onSubmit={handleCreateBranch}>
+							<div className="systemadmin-form-grid">
+								<div className="form-group">
+									<label>Select Clinic *</label>
+									<select
+										value={newBranch.clinicId}
+										onChange={(e) => setNewBranch({ ...newBranch, clinicId: e.target.value })}
+									>
+										{clinics.map((c) => (
+											<option key={c.id} value={c.id}>{c.name}</option>
+										))}
+									</select>
+								</div>
+								<div className="form-group">
+									<label>Branch Name *</label>
+									<input
+										type="text"
+										value={newBranch.name}
+										onChange={(e) => setNewBranch({ ...newBranch, name: e.target.value })}
+										placeholder="e.g. Downtown Branch"
+									/>
+								</div>
+								<div className="form-group">
+									<label>Branch Code</label>
+									<input
+										type="text"
+										value={newBranch.code}
+										onChange={(e) => setNewBranch({ ...newBranch, code: e.target.value })}
+										placeholder="e.g. DT-01"
+									/>
+								</div>
+							</div>
+
+							<div className="systemadmin-form-grid" style={{ marginTop: '10px' }}>
+								<div className="form-group">
+									<label>Street *</label>
+									<input
+										type="text"
+										value={newBranch.street}
+										onChange={(e) => setNewBranch({ ...newBranch, street: e.target.value })}
+										placeholder="Street"
+									/>
+								</div>
+								<div className="form-group">
+									<label>Barangay *</label>
+									<input
+										type="text"
+										value={newBranch.barangay}
+										onChange={(e) => setNewBranch({ ...newBranch, barangay: e.target.value })}
+										placeholder="Barangay"
+									/>
+								</div>
+								<div className="form-group">
+									<label>City *</label>
+									<input
+										type="text"
+										value={newBranch.city}
+										onChange={(e) => setNewBranch({ ...newBranch, city: e.target.value })}
+										placeholder="City"
+									/>
+								</div>
+								<div className="form-group">
+									<label>Province *</label>
+									<input
+										type="text"
+										value={newBranch.province}
+										onChange={(e) => setNewBranch({ ...newBranch, province: e.target.value })}
+										placeholder="Province"
+									/>
+								</div>
+							</div>
+
+							<button
+								type="submit"
+								className="primary-btn"
+								style={{ marginTop: '15px' }}
+								disabled={busyAction === 'create-branch'}
+							>
+								{busyAction === 'create-branch' ? 'Creating...' : 'Create Branch'}
+							</button>
+						</form>
 					</div>
 
 					<div className="systemadmin-card">

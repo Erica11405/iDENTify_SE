@@ -308,6 +308,70 @@ async function enforceAdminAccess(req, res, {
   return { ok: true, role, userId, actor };
 }
 
+async function getActorTenantScope(req) {
+  const role = normalizeRole(req.headers['x-user-role']);
+  const userId = actorUserId(req);
+
+  if (!userId) {
+    return { role, userId: null, clinicId: null, branchId: null, scoped: false };
+  }
+
+  const supportsUsersClinic = await hasUsersClinicColumn();
+  const supportsUsersBranch = await hasUsersBranchColumn();
+  if (!supportsUsersClinic && !supportsUsersBranch) {
+    return { role, userId, clinicId: null, branchId: null, scoped: false };
+  }
+
+  const selectColumns = [];
+  if (supportsUsersClinic) selectColumns.push('clinic_id');
+  if (supportsUsersBranch) selectColumns.push('branch_id');
+
+  try {
+    const [rows] = await db.query(
+      `SELECT ${selectColumns.join(', ')} FROM users WHERE id = ? LIMIT 1`,
+      [userId]
+    );
+
+    const row = rows[0] || {};
+    const clinicId = supportsUsersClinic ? toPositiveInt(row.clinic_id) : null;
+    const branchId = supportsUsersBranch ? toPositiveInt(row.branch_id) : null;
+
+    if (role === 'globaladmin') {
+      return { role, userId, clinicId, branchId, scoped: false };
+    }
+
+    const scopedRoles = new Set(['superadmin', 'dentist', 'aide']);
+    const scoped = scopedRoles.has(role) && Boolean(clinicId || branchId);
+
+    return { role, userId, clinicId, branchId, scoped };
+  } catch (_err) {
+    return { role, userId, clinicId: null, branchId: null, scoped: false };
+  }
+}
+
+function appendTenantWhereClauses({ whereClauses, params, scope, clinicExpression, branchExpression }) {
+  if (!scope?.scoped) return;
+
+  if (scope.clinicId && clinicExpression) {
+    whereClauses.push(`${clinicExpression} = ?`);
+    params.push(scope.clinicId);
+  }
+
+  if (scope.branchId && branchExpression) {
+    whereClauses.push(`${branchExpression} = ?`);
+    params.push(scope.branchId);
+  }
+}
+
+async function hasColumn(tableName, columnName) {
+  try {
+    const [rows] = await db.query(`SHOW COLUMNS FROM ${tableName} LIKE '${columnName}'`);
+    return rows.length > 0;
+  } catch (_err) {
+    return false;
+  }
+}
+
 module.exports = {
   normalizeRole,
   normalizeLifecycleStatus,
@@ -324,4 +388,7 @@ module.exports = {
   hasUsersApprovalStatusColumn,
   getActorUserRow,
   enforceAdminAccess,
+  getActorTenantScope,
+  appendTenantWhereClauses,
+  hasColumn,
 };

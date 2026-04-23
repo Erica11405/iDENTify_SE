@@ -161,8 +161,8 @@ function SuperAdminUsers() {
 
     const [dentistForm, setDentistForm] = useState(initialDentistForm);
     const [aideForm, setAideForm] = useState(initialAideForm);
-    const [leaveDraft, setLeaveDraft] = useState('');
-    const [specDraft, setSpecDraft] = useState('');
+    const [leaveDraftStart, setLeaveDraftStart] = useState('');
+    const [leaveDraftEnd, setLeaveDraftEnd] = useState('');
 
     const addSpecialization = () => {
         if (!specDraft) return;
@@ -363,17 +363,37 @@ function SuperAdminUsers() {
     };
 
     const addLeaveDay = () => {
-        if (!leaveDraft) return;
+        if (!leaveDraftStart || !leaveDraftEnd) {
+            toast.error("Please select both start and end dates.");
+            return;
+        }
+
+        const start = new Date(leaveDraftStart);
+        const end = new Date(leaveDraftEnd);
+
+        if (start > end) {
+            toast.error("Start date must be before or equal to end date.");
+            return;
+        }
+
+        const newDates = [];
+        let current = new Date(start);
+        while (current <= end) {
+            const dateString = current.toISOString().split('T')[0];
+            newDates.push(dateString);
+            current.setDate(current.getDate() + 1);
+        }
 
         setDentistForm((prev) => {
-            const nextLeaveDays = prev.leaveDays || [];
-            if (nextLeaveDays.includes(leaveDraft)) return prev;
+            const nextLeaveDays = new Set(prev.leaveDays || []);
+            newDates.forEach(d => nextLeaveDays.add(d));
             return {
                 ...prev,
-                leaveDays: [...nextLeaveDays, leaveDraft],
+                leaveDays: Array.from(nextLeaveDays).sort(),
             };
         });
-        setLeaveDraft('');
+        setLeaveDraftStart('');
+        setLeaveDraftEnd('');
     };
 
     const removeLeaveDay = (dateValue) => {
@@ -643,15 +663,22 @@ function SuperAdminUsers() {
                                 </div>
 
                                 <div className="form-row">
-                                    <div className="form-group">
-                                        <label>Clinic *</label>
-                                        <select value={selectedClinicId} onChange={(e) => setSelectedClinicId(e.target.value)}>
-                                            {clinicOptions.length === 0 ? <option value="">No clinics available</option> : null}
-                                            {clinicOptions.map((clinic) => (
-                                                <option key={clinic.id} value={clinic.id}>{clinic.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                    {user?.clinic_id ? (
+                                        <div className="form-group">
+                                            <label>Clinic *</label>
+                                            <input type="text" value={clinicOptions.find(c => String(c.id) === String(user.clinic_id))?.name || ''} readOnly disabled />
+                                        </div>
+                                    ) : (
+                                        <div className="form-group">
+                                            <label>Clinic *</label>
+                                            <select value={selectedClinicId} onChange={(e) => setSelectedClinicId(e.target.value)}>
+                                                {clinicOptions.length === 0 ? <option value="">No clinics available</option> : null}
+                                                {clinicOptions.map((clinic) => (
+                                                    <option key={clinic.id} value={clinic.id}>{clinic.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                     <div className="form-group">
                                         <label>Branch *</label>
                                         <select
@@ -746,7 +773,9 @@ function SuperAdminUsers() {
                                             ))}
                                         </div>
                                         <div className="add-row">
-                                            <input type="date" value={leaveDraft} onChange={(e) => setLeaveDraft(e.target.value)} />
+                                            <input type="date" value={leaveDraftStart} onChange={(e) => setLeaveDraftStart(e.target.value)} />
+                                            <span style={{margin: '0 8px', display: 'flex', alignItems: 'center'}}>to</span>
+                                            <input type="date" value={leaveDraftEnd} onChange={(e) => setLeaveDraftEnd(e.target.value)} />
                                             <button type="button" className="btn-small-add" onClick={addLeaveDay}>Add</button>
                                         </div>
                                     </div>
@@ -847,15 +876,22 @@ function SuperAdminUsers() {
                                 </div>
 
                                 <div className="form-row">
-                                    <div className="form-group">
-                                        <label>Clinic *</label>
-                                        <select value={selectedClinicId} onChange={(e) => setSelectedClinicId(e.target.value)}>
-                                            {clinicOptions.length === 0 ? <option value="">No clinics available</option> : null}
-                                            {clinicOptions.map((clinic) => (
-                                                <option key={clinic.id} value={clinic.id}>{clinic.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                    {user?.clinic_id ? (
+                                        <div className="form-group">
+                                            <label>Clinic *</label>
+                                            <input type="text" value={clinicOptions.find(c => String(c.id) === String(user.clinic_id))?.name || ''} readOnly disabled />
+                                        </div>
+                                    ) : (
+                                        <div className="form-group">
+                                            <label>Clinic *</label>
+                                            <select value={selectedClinicId} onChange={(e) => setSelectedClinicId(e.target.value)}>
+                                                {clinicOptions.length === 0 ? <option value="">No clinics available</option> : null}
+                                                {clinicOptions.map((clinic) => (
+                                                    <option key={clinic.id} value={clinic.id}>{clinic.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
                                     <div className="form-group">
                                         <label>Branch *</label>
                                         <select

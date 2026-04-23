@@ -46,6 +46,10 @@ function emptyForm() {
         clinic_name: '',
         branch_count: '1',
         clinic_address: '',
+        street: '',
+        barangay: '',
+        city: '',
+        province: '',
         contact_phone: '',
         business_permit_or_license_number: '',
         owner_valid_id_name: '',
@@ -69,6 +73,10 @@ function toFormState(request) {
         clinic_name: String(request.clinic_name || ''),
         branch_count: String(request.branch_count || '1'),
         clinic_address: String(request.clinic_address || ''),
+        street: String(request.street || ''),
+        barangay: String(request.barangay || ''),
+        city: String(request.city || ''),
+        province: String(request.province || ''),
         contact_phone: String(request.contact_phone || ''),
         business_permit_or_license_number: String(request.business_permit_or_license_number || ''),
         owner_valid_id_name: String(request.owner_valid_id_name || ''),
@@ -102,7 +110,10 @@ function SuperAdminRequestGate() {
         let error = '';
         if (!value || String(value).trim() === '') {
             if (field === 'clinic_name') error = 'Clinic name is required.';
-            if (field === 'clinic_address') error = 'Clinic address is required.';
+            if (field === 'street') error = 'Street is required.';
+            if (field === 'barangay') error = 'Barangay is required.';
+            if (field === 'city') error = 'City is required.';
+            if (field === 'province') error = 'Province is required.';
             if (field === 'contact_phone') error = 'Contact phone is required.';
             if (field === 'business_permit_or_license_number') error = 'Business permit number is required.';
         }
@@ -177,7 +188,7 @@ function SuperAdminRequestGate() {
         event.preventDefault();
         if (!canSubmit) return;
 
-        const fieldsToValidate = ['clinic_name', 'branch_count', 'clinic_address', 'contact_phone', 'business_permit_or_license_number'];
+        const fieldsToValidate = ['clinic_name', 'branch_count', 'street', 'barangay', 'city', 'province', 'contact_phone', 'business_permit_or_license_number'];
         let isFormValid = true;
         fieldsToValidate.forEach(field => {
             if (!validateField(field, form[field])) isFormValid = false;
@@ -190,8 +201,10 @@ function SuperAdminRequestGate() {
 
         setSaving(true);
         try {
+            const finalAddress = `${form.street}, ${form.barangay}, ${form.city}, ${form.province}`;
             await api.submitSuperadminRequest({
                 ...form,
+                clinic_address: finalAddress,
                 branch_count: Number.parseInt(String(form.branch_count || '1'), 10) || 1,
             });
             toast.success('Requirements submitted. Please wait for global admin response.');
@@ -307,15 +320,50 @@ function SuperAdminRequestGate() {
                             </div>
                         </div>
 
-                        <div className="request-field">
-                            <label>Clinic Address *</label>
-                            <textarea 
-                                rows="2" 
-                                className={errors.clinic_address ? 'error' : ''}
-                                value={form.clinic_address} 
-                                onChange={(e) => handleInputChange('clinic_address', e.target.value)} 
-                            />
-                            {errors.clinic_address && <span className="error-message">{errors.clinic_address}</span>}
+                        <div className="request-section-title">Clinic Address</div>
+                        <div className="request-grid two-col">
+                            <div className="request-field">
+                                <label>Street *</label>
+                                <input 
+                                    type="text" 
+                                    className={errors.street ? 'error' : ''}
+                                    value={form.street} 
+                                    onChange={(e) => handleInputChange('street', e.target.value)} 
+                                />
+                                {errors.street && <span className="error-message">{errors.street}</span>}
+                            </div>
+                            <div className="request-field">
+                                <label>Barangay *</label>
+                                <input 
+                                    type="text" 
+                                    className={errors.barangay ? 'error' : ''}
+                                    value={form.barangay} 
+                                    onChange={(e) => handleInputChange('barangay', e.target.value)} 
+                                />
+                                {errors.barangay && <span className="error-message">{errors.barangay}</span>}
+                            </div>
+                        </div>
+                        <div className="request-grid two-col">
+                            <div className="request-field">
+                                <label>City *</label>
+                                <input 
+                                    type="text" 
+                                    className={errors.city ? 'error' : ''}
+                                    value={form.city} 
+                                    onChange={(e) => handleInputChange('city', e.target.value)} 
+                                />
+                                {errors.city && <span className="error-message">{errors.city}</span>}
+                            </div>
+                            <div className="request-field">
+                                <label>Province *</label>
+                                <input 
+                                    type="text" 
+                                    className={errors.province ? 'error' : ''}
+                                    value={form.province} 
+                                    onChange={(e) => handleInputChange('province', e.target.value)} 
+                                />
+                                {errors.province && <span className="error-message">{errors.province}</span>}
+                            </div>
                         </div>
 
                         <div className="request-field">

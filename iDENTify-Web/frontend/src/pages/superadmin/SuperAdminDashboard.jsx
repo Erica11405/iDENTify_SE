@@ -77,7 +77,7 @@ function SuperAdminDashboard() {
     const [clinicBranchesByClinic, setClinicBranchesByClinic] = useState({});
     const [branchesLoading, setBranchesLoading] = useState(false);
 
-    const [branchForm, setBranchForm] = useState({ clinicId: '', name: '', code: '', address: '' });
+    const [branchForm, setBranchForm] = useState({ clinicId: '', name: '', code: '', street: '', barangay: '', city: '', province: '' });
     const [creatingBranch, setCreatingBranch] = useState(false);
     const [clinicActionNotice, setClinicActionNotice] = useState({ type: '', message: '' });
     const [selectedClinicId, setSelectedClinicId] = useState('');
@@ -290,7 +290,10 @@ function SuperAdminDashboard() {
         const clinicId = String(branchForm.clinicId || '').trim();
         const name = String(branchForm.name || '').trim();
         const code = String(branchForm.code || '').trim();
-        const address = String(branchForm.address || '').trim();
+        const street = String(branchForm.street || '').trim();
+        const barangay = String(branchForm.barangay || '').trim();
+        const city = String(branchForm.city || '').trim();
+        const province = String(branchForm.province || '').trim();
 
         if (!clinicId) {
             setClinicActionNotice({ type: 'error', message: 'Select a clinic before adding a branch.' });
@@ -302,19 +305,22 @@ function SuperAdminDashboard() {
             return;
         }
 
-        if (!address) {
-            setClinicActionNotice({ type: 'error', message: 'Branch address is required.' });
+        if (!street || !barangay || !city || !province) {
+            setClinicActionNotice({ type: 'error', message: 'Branch complete address is required.' });
             return;
         }
 
         setCreatingBranch(true);
         setClinicActionNotice({ type: '', message: '' });
-// ... (rest of the method unchanged, but for replacement I need to provide it)
+
         try {
             const created = await api.createClinicBranch(clinicId, {
                 name,
                 code: code || undefined,
-                address,
+                street,
+                barangay,
+                city,
+                province,
             });
 
             const targetClinicId = String(clinicId);
@@ -333,7 +339,10 @@ function SuperAdminDashboard() {
                 clinicId: targetClinicId,
                 name: '',
                 code: '',
-                address: '',
+                street: '',
+                barangay: '',
+                city: '',
+                province: '',
             }));
             setClinicActionNotice({ type: 'success', message: 'Branch created successfully.' });
         } catch (err) {
@@ -450,21 +459,31 @@ function SuperAdminDashboard() {
                             <div className="form-row">
                                 <div className="form-group">
                                     <label htmlFor="branch-clinic">Clinic</label>
-                                    <select
-                                        id="branch-clinic"
-                                        value={branchForm.clinicId}
-                                        onChange={(event) => {
-                                            const value = event.target.value;
-                                            setBranchForm((prev) => ({ ...prev, clinicId: value }));
-                                            setSelectedClinicId(value);
-                                        }}
-                                        disabled={clinics.length <= 1}
-                                    >
-                                        {clinics.length === 0 ? <option value="">No clinics available</option> : null}
-                                        {clinics.map((clinic) => (
-                                            <option key={clinic.id} value={String(clinic.id)}>{clinic.name}</option>
-                                        ))}
-                                    </select>
+                                    {user?.clinic_id ? (
+                                        <input
+                                            id="branch-clinic"
+                                            type="text"
+                                            value={clinics.find(c => String(c.id) === String(user.clinic_id))?.name || ''}
+                                            readOnly
+                                            disabled
+                                        />
+                                    ) : (
+                                        <select
+                                            id="branch-clinic"
+                                            value={branchForm.clinicId}
+                                            onChange={(event) => {
+                                                const value = event.target.value;
+                                                setBranchForm((prev) => ({ ...prev, clinicId: value }));
+                                                setSelectedClinicId(value);
+                                            }}
+                                            disabled={clinics.length <= 1}
+                                        >
+                                            {clinics.length === 0 ? <option value="">No clinics available</option> : null}
+                                            {clinics.map((clinic) => (
+                                                <option key={clinic.id} value={String(clinic.id)}>{clinic.name}</option>
+                                            ))}
+                                        </select>
+                                    )}
                                 </div>
 
                                 <div className="form-group flex-2">
@@ -491,13 +510,45 @@ function SuperAdminDashboard() {
                                     />
                                 </div>
                                 <div className="form-group flex-2">
-                                    <label htmlFor="branch-address">Address (Optional)</label>
+                                    <label htmlFor="branch-street">Street *</label>
                                     <input
-                                        id="branch-address"
+                                        id="branch-street"
                                         type="text"
-                                        value={branchForm.address}
-                                        onChange={(event) => setBranchForm((prev) => ({ ...prev, address: event.target.value }))}
-                                        placeholder="Branch address"
+                                        value={branchForm.street}
+                                        onChange={(event) => setBranchForm((prev) => ({ ...prev, street: event.target.value }))}
+                                        placeholder="Street"
+                                    />
+                                </div>
+                                <div className="form-group flex-2">
+                                    <label htmlFor="branch-barangay">Barangay *</label>
+                                    <input
+                                        id="branch-barangay"
+                                        type="text"
+                                        value={branchForm.barangay}
+                                        onChange={(event) => setBranchForm((prev) => ({ ...prev, barangay: event.target.value }))}
+                                        placeholder="Barangay"
+                                    />
+                                </div>
+                            </div>
+                            <div className="form-row">
+                                <div className="form-group flex-2">
+                                    <label htmlFor="branch-city">City *</label>
+                                    <input
+                                        id="branch-city"
+                                        type="text"
+                                        value={branchForm.city}
+                                        onChange={(event) => setBranchForm((prev) => ({ ...prev, city: event.target.value }))}
+                                        placeholder="City"
+                                    />
+                                </div>
+                                <div className="form-group flex-2">
+                                    <label htmlFor="branch-province">Province *</label>
+                                    <input
+                                        id="branch-province"
+                                        type="text"
+                                        value={branchForm.province}
+                                        onChange={(event) => setBranchForm((prev) => ({ ...prev, province: event.target.value }))}
+                                        placeholder="Province"
                                     />
                                 </div>
                             </div>

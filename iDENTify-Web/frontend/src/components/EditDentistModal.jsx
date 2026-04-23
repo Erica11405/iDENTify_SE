@@ -19,7 +19,8 @@ const FALLBACK_DENTIST_TYPES = [
 
 const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess, actorContext: actorProp }) => {
   const [loading, setLoading] = useState(false);
-  const [leaveDraft, setLeaveDraft] = useState('');
+  const [leaveDraftStart, setLeaveDraftStart] = useState('');
+  const [leaveDraftEnd, setLeaveDraftEnd] = useState('');
 
   const actorContext = useMemo(() => {
     if (actorProp) return actorProp;
@@ -105,18 +106,38 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
   };
 
   const addLeaveDay = () => {
-    if (!leaveDraft) return;
+    if (!leaveDraftStart || !leaveDraftEnd) {
+      toast.error("Please select both start and end dates.");
+      return;
+    }
+
+    const start = new Date(leaveDraftStart);
+    const end = new Date(leaveDraftEnd);
+
+    if (start > end) {
+      toast.error("Start date must be before or equal to end date.");
+      return;
+    }
+
+    const newDates = [];
+    let current = new Date(start);
+    while (current <= end) {
+      const dateString = current.toISOString().split('T')[0];
+      newDates.push(dateString);
+      current.setDate(current.getDate() + 1);
+    }
 
     setFormData((prev) => {
-      const nextLeaveDays = prev.leaveDays || [];
-      if (nextLeaveDays.includes(leaveDraft)) return prev;
+      const nextLeaveDays = new Set(prev.leaveDays || []);
+      newDates.forEach(d => nextLeaveDays.add(d));
       return {
         ...prev,
-        leaveDays: [...nextLeaveDays, leaveDraft],
+        leaveDays: Array.from(nextLeaveDays).sort(),
       };
     });
 
-    setLeaveDraft('');
+    setLeaveDraftStart('');
+    setLeaveDraftEnd('');
   };
 
   const removeLeaveDay = (dateValue) => {
@@ -263,7 +284,9 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
                   ))}
                 </div>
                 <div className="add-row">
-                  <input type="date" value={leaveDraft} onChange={(e) => setLeaveDraft(e.target.value)} disabled={!canEditSchedule} />
+                  <input type="date" value={leaveDraftStart} onChange={(e) => setLeaveDraftStart(e.target.value)} disabled={!canEditSchedule} />
+                  <span style={{margin: '0 8px', display: 'flex', alignItems: 'center'}}>to</span>
+                  <input type="date" value={leaveDraftEnd} onChange={(e) => setLeaveDraftEnd(e.target.value)} disabled={!canEditSchedule} />
                   <button type="button" className="btn-small-add" onClick={addLeaveDay} disabled={!canEditSchedule}>Add</button>
                 </div>
               </div>

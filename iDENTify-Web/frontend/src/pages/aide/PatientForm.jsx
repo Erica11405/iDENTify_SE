@@ -171,6 +171,9 @@ function PatientForm({ userRole }) {
 	const [selectedTimelineServices, setSelectedTimelineServices] = useState([]);
 	const [currentTimelineService, setCurrentTimelineService] = useState("");
 	const [currentServicePrice, setCurrentServicePrice] = useState("");
+	const [additionalCharges, setAdditionalCharges] = useState([]);
+	const [currentChargeName, setCurrentChargeName] = useState("");
+	const [currentChargePrice, setCurrentChargePrice] = useState("");
 	const [medicationForm, setMedicationForm] = useState({ medicine: "", dosage: "", frequency: "", notes: "" });
 	const medicationFrequencyOptions = Array.from(new Set([
 		...DEFAULT_MEDICATION_FREQUENCIES,
@@ -693,6 +696,7 @@ function PatientForm({ userRole }) {
 			queue_id: toPositiveInt(queueItem?.id),
 			visit_datetime: resolveVisitDateTimeForPayment(appointment),
 			services,
+            additional_charges: additionalCharges,
 		};
 	};
 
@@ -727,7 +731,7 @@ function PatientForm({ userRole }) {
         const totalPrice = (context.services || []).reduce((sum, s) => {
             const price = typeof s === 'object' ? (Number(s.price) || 0) : 0;
             return sum + price;
-        }, 0);
+        }, 0) + (additionalCharges || []).reduce((sum, c) => sum + (Number(c.price) || 0), 0);
 
 		try {
 			const patientId = toPositiveInt(context?.patient_id);
@@ -1001,6 +1005,15 @@ function PatientForm({ userRole }) {
 	};
 
 	const handleRemoveTimelineService = (svcName) => { setSelectedTimelineServices(selectedTimelineServices.filter(s => s.name !== svcName)); };
+
+	const handleAddCharge = () => {
+		if (!currentChargeName) return;
+		setAdditionalCharges([...additionalCharges, { name: currentChargeName, price: parseFloat(currentChargePrice) || 0 }]);
+		setCurrentChargeName("");
+		setCurrentChargePrice("");
+	};
+
+	const handleRemoveCharge = (cName) => { setAdditionalCharges(additionalCharges.filter(c => c.name !== cName)); };
 
 	const addTimelineEntry = async () => {
 		if (selectedTimelineServices.length === 0) { toast.error("Please add at least one procedure."); return; }
@@ -1329,6 +1342,40 @@ function PatientForm({ userRole }) {
                                     />
                                     <button onClick={handleAddTimelineService} className="small-btn" style={{ width: "auto", padding: '0 15px', height: "38px", background: '#2563eb' }}>+ Add</button>
                                 </div>
+							</div>
+
+                            <div className="form-group" style={{ gridColumn: '1 / -1', borderTop: '1px dashed #cbd5e1', paddingTop: '15px', marginTop: '10px' }}>
+								<label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '5px' }}>Additional Charges (e.g. Anesthesia)</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input 
+                                        type="text" 
+                                        className="pill-input-input" 
+                                        placeholder="Charge Name" 
+                                        value={currentChargeName} 
+                                        onChange={(e) => setCurrentChargeName(e.target.value)} 
+                                        style={{ flex: 2 }}
+                                    />
+                                    <input 
+                                        type="number" 
+                                        className="pill-input-input" 
+                                        placeholder="Amount" 
+                                        value={currentChargePrice} 
+                                        onChange={(e) => setCurrentChargePrice(e.target.value)} 
+                                        style={{ width: '100px' }}
+                                    />
+                                    <button onClick={handleAddCharge} className="small-btn" style={{ width: "auto", padding: '0 15px', height: "38px", background: '#64748b' }}>+ Add</button>
+                                </div>
+                                {additionalCharges.length > 0 && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
+                                        {additionalCharges.map((charge) => (
+                                            <div key={charge.name} style={{ background: "#f1f5f9", color: "#475569", padding: "6px 12px", borderRadius: "8px", fontSize: "0.85rem", border: '1px solid #cbd5e1', display: "inline-flex", alignItems: "center", gap: "8px", fontWeight: '500' }}>
+                                                <span>{charge.name}</span>
+                                                <span style={{ fontWeight: 'bold' }}>₱{Number(charge.price).toLocaleString()}</span>
+                                                <button onClick={() => handleRemoveCharge(charge.name)} style={{ border: "none", background: "none", cursor: "pointer", fontWeight: '900', color: "#64748b", padding: '0 5px' }}>×</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
 							</div>
 
                             <div className="form-group">

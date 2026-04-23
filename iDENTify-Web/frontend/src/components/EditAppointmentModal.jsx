@@ -323,6 +323,11 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
     if (!formData.timeStart) return toast.error("Start time cannot be empty.");
     if (selectedServices.length === 0) return toast.error("Please select at least one procedure.");
 
+    const isRescheduled = formData.appointmentDate !== getInitialDate() || formData.timeStart !== getInitialTime();
+    if (isRescheduled && (!formData.notes || !formData.notes.trim())) {
+      return toast.error("A rescheduling note/reason is required when changing the date or time.");
+    }
+
     setIsLoading(true);
 
     const fullTimeStart = `${formData.appointmentDate} ${formatTime12Hour(formData.timeStart)}`;

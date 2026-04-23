@@ -51,6 +51,41 @@ function FollowUpModal({ isOpen, onClose, patient, dentists = [], onSave }) {
   const [slotsLoading, setSlotsLoading] = useState(false);
 
   useEffect(() => {
+    if (isOpen && patient) {
+        let initialServices = [];
+        const procData = patient.procedure || patient.reason || patient.service || patient.services;
+        if (procData) {
+            if (typeof procData === 'string') {
+                try {
+                    const parsed = JSON.parse(procData);
+                    if (Array.isArray(parsed)) {
+                        initialServices = parsed.map(s => typeof s === 'object' ? s.name : s);
+                    }
+                } catch {
+                    initialServices = procData.split(',').map(s => s.trim()).filter(Boolean);
+                }
+            } else if (Array.isArray(procData)) {
+                initialServices = procData.map(s => typeof s === 'object' ? s.name : s);
+            }
+        }
+        setSelectedServices(initialServices);
+        setForm(prev => ({
+            ...prev,
+            dentist_id: patient.dentist_id || "",
+            notes: `Follow-up for ${initialServices.join(", ")}`
+        }));
+    } else if (!isOpen) {
+        setSelectedServices([]);
+        setForm({
+            dentist_id: "", 
+            appointmentDate: getLocalToday(),
+            timeStart: "",
+            notes: "Follow-up",
+        });
+    }
+  }, [isOpen, patient]);
+
+  useEffect(() => {
     const fetchServices = async () => {
       try {
         const data = await api.getServices();

@@ -42,6 +42,10 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
 
   const [sex, setSex] = useState(''); 
   const [contact, setContact] = useState(''); 
+  const [street, setStreet] = useState(''); 
+  const [barangay, setBarangay] = useState(''); 
+  const [city, setCity] = useState(''); 
+  const [province, setProvince] = useState(''); 
   const [dentistName, setDentistName] = useState(''); 
   const [dentistId, setDentistId] = useState(''); 
 
@@ -98,6 +102,10 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
     setBirthday(normalizedBirthdate); 
     setSex(patient.gender || patient.sex || ""); 
     setContact(patient.contact_number || patient.contact || ""); 
+    setStreet(patient.street || "");
+    setBarangay(patient.barangay || "");
+    setCity(patient.city || "");
+    setProvince(patient.province || "");
     setCalculatedAge(computeAgeFromBirthdate(normalizedBirthdate)); 
 
     toast.success("Patient selected!"); 
@@ -288,6 +296,27 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
                 <span style={{ padding: '10px', background: '#e2e8f0', borderRadius: '4px', color: '#64748b', fontSize: '0.9rem' }}>+63</span>
                 <input type="text" value={contact} onChange={(e) => setContact(e.target.value)} placeholder="9123456789" readOnly={activeTab === "old"} style={{ flex: 1, ...(activeTab === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}) }} />
               </div>
+            </div>
+          </div>
+
+          <div className="form-group-row" style={{ display: 'flex', gap: '10px' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Street *</label>
+              <input type="text" value={street} onChange={(e) => setStreet(e.target.value)} readOnly={activeTab === "old"} style={activeTab === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Barangay *</label>
+              <input type="text" value={barangay} onChange={(e) => setBarangay(e.target.value)} readOnly={activeTab === "old"} style={activeTab === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
+            </div>
+          </div>
+          <div className="form-group-row" style={{ display: 'flex', gap: '10px' }}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>City *</label>
+              <input type="text" value={city} onChange={(e) => setCity(e.target.value)} readOnly={activeTab === "old"} style={activeTab === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label>Province *</label>
+              <input type="text" value={province} onChange={(e) => setProvince(e.target.value)} readOnly={activeTab === "old"} style={activeTab === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
             </div>
           </div>
 

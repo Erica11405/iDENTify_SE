@@ -1,4 +1,4 @@
-import { Alert, View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from "react-native";
+import { Alert, View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, Modal, TextInput } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { API } from "../../constants/Api";
@@ -24,6 +24,9 @@ export default function AppointmentDetails() {
   const [appointment, setAppointment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportReason, setReportReason] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -125,40 +128,36 @@ export default function AppointmentDetails() {
   };
 
   const handleReportDentist = () => {
-    Alert.prompt(
-      "Report Dentist",
-      "Please describe the issue or reason for reporting this dentist:",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Submit Report", 
-          onPress: async (reason) => {
-            if (reason?.trim()) {
-              try {
-                const res = await fetch(API.patientReports, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    patient_id: appointment.patient_id,
-                    dentist_id: appointment.dentist_id,
-                    branch_id: appointment.branch_id,
-                    reason: reason.trim()
-                  })
-                });
-                
-                if (res.ok) {
-                  Alert.alert("Report Submitted", "Thank you for your feedback. We will investigate this matter.");
-                } else {
-                  Alert.alert("Error", "Failed to submit report. Please try again.");
-                }
-              } catch (error) {
-                Alert.alert("Error", "Network error. Please try again.");
-              }
-            }
-          }
-        }
-      ]
-    );
+    setReportReason("");
+    setReportModalVisible(true);
+  };
+
+  const submitReport = async () => {
+    if (!reportReason.trim()) {
+      Alert.alert("Required", "Please provide a reason for the report.");
+      return;
+    }
+    setReportModalVisible(false);
+    try {
+      const res = await fetch(API.patientReports, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_id: appointment.patient_id,
+          dentist_id: appointment.dentist_id,
+          branch_id: appointment.branch_id,
+          reason: reportReason.trim()
+        })
+      });
+      
+      if (res.ok) {
+        Alert.alert("Report Submitted", "Thank you for your feedback. We will investigate this matter.");
+      } else {
+        Alert.alert("Error", "Failed to submit report. Please try again.");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Network error. Please try again.");
+    }
   };
 
   const statusStyle = getStatusColor(appointment.status);
@@ -180,6 +179,31 @@ export default function AppointmentDetails() {
           </TouchableOpacity>
         </View>
       </View>
+
+      <Modal visible={reportModalVisible} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Report Dentist</Text>
+            <Text style={styles.modalSubtitle}>Please describe the issue or reason for reporting this dentist:</Text>
+            <TextInput
+              style={styles.modalInput}
+              multiline
+              numberOfLines={4}
+              placeholder="Reason..."
+              value={reportReason}
+              onChangeText={setReportReason}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={[styles.modalButton, styles.modalCancel]} onPress={() => setReportModalVisible(false)}>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, styles.modalSubmit]} onPress={submitReport}>
+                <Text style={[styles.modalButtonText, { color: 'white' }]}>Submit Report</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.card}>
         {/* Header Section: Status & ID */}
@@ -471,4 +495,67 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     textAlign: 'center',
   },
+
+  /* MODAL STYLES */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 20,
+    width: "100%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1E293B",
+    marginBottom: 8
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: "#64748B",
+    marginBottom: 16
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    height: 100,
+    textAlignVertical: "top",
+    marginBottom: 20
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: "center"
+  },
+  modalCancel: {
+    backgroundColor: "#F1F5F9"
+  },
+  modalSubmit: {
+    backgroundColor: "#EF4444"
+  },
+  modalButtonText: {
+    fontWeight: "bold",
+    color: "#1E293B"
+  }
 });

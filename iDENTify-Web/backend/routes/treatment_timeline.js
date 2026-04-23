@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const { getActorTenantScope, appendTenantWhereClauses, hasColumn } = require("../utils/accessControl");
 
 function parseTimelineStartTime(value) {
   const raw = String(value || "").trim();
@@ -92,14 +93,28 @@ async function resolveDentistInfo(record) {
   };
 }
 
-// ADDED: Single record fetch endpoint for the mobile app details page
-// Note: This must come BEFORE the "/:patientId" route so it doesn't get confused
+// Single record fetch endpoint
 router.get("/record/:id", async (req, res) => {
   try {
-    const [rows] = await db.query("SELECT * FROM treatment_timeline WHERE id = ?", [req.params.id]);
+    const actorScope = await getActorTenantScope(req);
+    const supportsClinic = await hasColumn('treatment_timeline', 'clinic_id');
+    const supportsBranch = await hasColumn('treatment_timeline', 'branch_id');
+
+    const whereClauses = ["id = ?"];
+    const params = [req.params.id];
+
+    appendTenantWhereClauses({
+      whereClauses,
+      params,
+      scope: actorScope,
+      clinicExpression: supportsClinic ? "clinic_id" : null,
+      branchExpression: supportsBranch ? "branch_id" : null,
+    });
+
+    const [rows] = await db.query(`SELECT * FROM treatment_timeline WHERE ${whereClauses.join(" AND ")} LIMIT 1`, params);
     
     if (rows.length === 0) {
-      return res.status(404).json({ message: "Record not found" });
+      return res.status(404).json({ message: "Record not found or access denied." });
     }
     
     const record = rows[0];
@@ -116,18 +131,35 @@ router.get("/record/:id", async (req, res) => {
   }
 });
 
-// Existing route: Fetch all records for a patient
+// Fetch all records for a patient
 router.get("/:patientId", async (req, res) => {
   const { patientId } = req.params;
   const year = req.query.year || req.query.record_year;
 
   try {
+    const actorScope = await getActorTenantScope(req);
+    const supportsClinic = await hasColumn('treatment_timeline', 'clinic_id');
+    const supportsBranch = await hasColumn('treatment_timeline', 'branch_id');
+
     let query = "SELECT * FROM treatment_timeline WHERE patient_id = ?";
     let params = [patientId];
 
     if (year) {
         query += " AND record_year = ?";
         params.push(year);
+    }
+
+    const whereClauses = [];
+    appendTenantWhereClauses({
+      whereClauses,
+      params,
+      scope: actorScope,
+      clinicExpression: supportsClinic ? "clinic_id" : null,
+      branchExpression: supportsBranch ? "branch_id" : null,
+    });
+
+    if (whereClauses.length > 0) {
+      query += ` AND ${whereClauses.join(" AND ")}`;
     }
     
     query += " ORDER BY id DESC";
@@ -141,13 +173,31 @@ router.get("/:patientId", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const { patient_id, start_time, end_time, provider, procedure_text, notes, image_url, price, record_year } = req.body;
+  const { patient_id, start_time, end_time, provider, procedure_text, notes, image_url, price, record_year, clinic_id, branch_id } = req.body;
   
   try {
+    const actorScope = await getActorTenantScope(req);
+    const supportsClinic = await hasColumn('treatment_timeline', 'clinic_id');
+    const supportsBranch = await hasColumn('treatment_timeline', 'branch_id');
+
+    let finalClinicId = toPositiveInt(clinic_id) || actorScope.clinicId;
+    let finalBranchId = toPositiveInt(branch_id) || actorScope.branchId;
+
+    const columns = ["patient_id", "start_time", "end_time", "provider", "procedure_text", "notes", "image_url", "price", "record_year"];
+    const values = [patient_id, start_time, end_time, provider, procedure_text, notes, image_url, price || 0.00, record_year || 1];
+
+    if (supportsClinic) {
+      columns.push("clinic_id");
+      values.push(finalClinicId);
+    }
+    if (supportsBranch) {
+      columns.push("branch_id");
+      values.push(finalBranchId);
+    }
+
     const [result] = await db.query(
-      `INSERT INTO treatment_timeline (patient_id, start_time, end_time, provider, procedure_text, notes, image_url, price, record_year)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [patient_id, start_time, end_time, provider, procedure_text, notes, image_url, price || 0.00, record_year || 1]
+      `INSERT INTO treatment_timeline (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`,
+      values
     );
     const [rows] = await db.query("SELECT * FROM treatment_timeline WHERE id = ?", [result.insertId]);
     res.status(201).json(rows[0]);

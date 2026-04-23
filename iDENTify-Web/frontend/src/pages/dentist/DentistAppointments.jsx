@@ -177,7 +177,7 @@ function DentistAppointments() {
           className={`tab-btn ${activeTab === 'patients' ? 'active' : ''}`}
           onClick={() => setActiveTab('patients')}
         >
-          Patients
+          Walk-in
         </button>
       </div>
 
