@@ -667,7 +667,7 @@ function SuperAdminUsers() {
                                     {user?.clinic_id ? (
                                         <div className="form-group">
                                             <label>Clinic *</label>
-                                            <input type="text" value={clinicOptions.find(c => String(c.id) === String(user.clinic_id))?.name || ''} readOnly disabled />
+                                            <input type="text" value={clinicOptions.find(c => String(c.id) === String(user.clinic_id))?.name || 'Your Clinic'} readOnly disabled />
                                         </div>
                                     ) : (
                                         <div className="form-group">
@@ -685,10 +685,10 @@ function SuperAdminUsers() {
                                         <select
                                             value={selectedBranchId}
                                             onChange={(e) => setSelectedBranchId(e.target.value)}
-                                            disabled={!selectedClinicId || branchOptions.length === 0}
+                                            disabled={(!user?.clinic_id && !selectedClinicId) || branchOptions.length === 0}
                                         >
-                                            {!selectedClinicId ? <option value="">Select a clinic first</option> : null}
-                                            {selectedClinicId && branchOptions.length === 0 ? <option value="">No branches available</option> : null}
+                                            {!user?.clinic_id && !selectedClinicId ? <option value="">Select a clinic first</option> : null}
+                                            {(user?.clinic_id || selectedClinicId) && branchOptions.length === 0 ? <option value="">No branches available</option> : null}
                                             {branchOptions.map((branch) => (
                                                 <option key={branch.id} value={branch.id}>{branch.name}</option>
                                             ))}
@@ -880,7 +880,7 @@ function SuperAdminUsers() {
                                     {user?.clinic_id ? (
                                         <div className="form-group">
                                             <label>Clinic *</label>
-                                            <input type="text" value={clinicOptions.find(c => String(c.id) === String(user.clinic_id))?.name || ''} readOnly disabled />
+                                            <input type="text" value={clinicOptions.find(c => String(c.id) === String(user.clinic_id))?.name || 'Your Clinic'} readOnly disabled />
                                         </div>
                                     ) : (
                                         <div className="form-group">
@@ -898,10 +898,10 @@ function SuperAdminUsers() {
                                         <select
                                             value={selectedBranchId}
                                             onChange={(e) => setSelectedBranchId(e.target.value)}
-                                            disabled={!selectedClinicId || branchOptions.length === 0}
+                                            disabled={(!user?.clinic_id && !selectedClinicId) || branchOptions.length === 0}
                                         >
-                                            {!selectedClinicId ? <option value="">Select a clinic first</option> : null}
-                                            {selectedClinicId && branchOptions.length === 0 ? <option value="">No branches available</option> : null}
+                                            {!user?.clinic_id && !selectedClinicId ? <option value="">Select a clinic first</option> : null}
+                                            {(user?.clinic_id || selectedClinicId) && branchOptions.length === 0 ? <option value="">No branches available</option> : null}
                                             {branchOptions.map((branch) => (
                                                 <option key={branch.id} value={branch.id}>{branch.name}</option>
                                             ))}

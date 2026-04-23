@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../api/apiClient';
+import useAppStore from '../../store/useAppStore';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import '../../styles/pages/systemadmin/SystemAdminClinicManagement.css';
 
@@ -26,6 +27,7 @@ function hasArchivedTimestamp(item) {
 }
 
 function SystemAdminClinicManagement() {
+	const user = useAppStore((state) => state.user);
 	const [loading, setLoading] = useState(true);
 	const [clinics, setClinics] = useState([]);
 	const [branchesByClinic, setBranchesByClinic] = useState({});
@@ -354,14 +356,24 @@ function SystemAdminClinicManagement() {
 							<div className="systemadmin-form-grid">
 								<div className="form-group">
 									<label>Select Clinic *</label>
-									<select
-										value={newBranch.clinicId}
-										onChange={(e) => setNewBranch({ ...newBranch, clinicId: e.target.value })}
-									>
-										{clinics.map((c) => (
-											<option key={c.id} value={c.id}>{c.name}</option>
-										))}
-									</select>
+									{user?.clinic_id ? (
+										<input
+											type="text"
+											value={clinics.find(c => String(c.id) === String(user.clinic_id))?.name || 'Your Clinic'}
+											readOnly
+											disabled
+											className="form-control"
+										/>
+									) : (
+										<select
+											value={newBranch.clinicId}
+											onChange={(e) => setNewBranch({ ...newBranch, clinicId: e.target.value })}
+										>
+											{clinics.map((c) => (
+												<option key={c.id} value={c.id}>{c.name}</option>
+											))}
+										</select>
+									)}
 								</div>
 								<div className="form-group">
 									<label>Branch Name *</label>
