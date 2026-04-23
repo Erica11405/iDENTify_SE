@@ -35,6 +35,7 @@ function getLocalToday() {
 }
 
 function FollowUpModal({ isOpen, onClose, patient, dentists = [], onSave }) {
+  const balanceDue = Number(patient?.balance_due || 0);
   const [form, setForm] = useState({
     dentist_id: "", 
     appointmentDate: getLocalToday(),
@@ -356,21 +357,6 @@ function FollowUpModal({ isOpen, onClose, patient, dentists = [], onSave }) {
           <div className="form-group full-width">
             <label>Notes</label>
             <textarea name="notes" value={form.notes} onChange={handleChange} rows="2"></textarea>
-          </div>
-        </div>
-
-        <div className="modal-actions">
-          <button type="button" onClick={onClose}>Cancel</button>
-          <button type="button" onClick={handleSubmit} disabled={isSaving} style={{ background: '#0ea5e9', color: 'white' }}>
-            {isSaving ? "Scheduling..." : "Schedule Follow-up"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default FollowUpModal;>
           </div>
         </div>
 
