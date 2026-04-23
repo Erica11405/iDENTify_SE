@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-const { getActorTenantScope, appendTenantWhereClauses, hasColumn } = require("../utils/accessControl");
+const { getActorTenantScope, appendTenantWhereClauses, hasColumn, toPositiveInt } = require("../utils/accessControl");
 
 function parseTimelineStartTime(value) {
   const raw = String(value || "").trim();
@@ -100,18 +100,27 @@ router.get("/record/:id", async (req, res) => {
     const supportsClinic = await hasColumn('treatment_timeline', 'clinic_id');
     const supportsBranch = await hasColumn('treatment_timeline', 'branch_id');
 
-    const whereClauses = ["id = ?"];
+    const whereClauses = ["t.id = ?"];
     const params = [req.params.id];
 
     appendTenantWhereClauses({
       whereClauses,
       params,
       scope: actorScope,
-      clinicExpression: supportsClinic ? "clinic_id" : null,
-      branchExpression: supportsBranch ? "branch_id" : null,
+      clinicExpression: supportsClinic ? "t.clinic_id" : null,
+      branchExpression: supportsBranch ? "t.branch_id" : null,
     });
 
-    const [rows] = await db.query(`SELECT * FROM treatment_timeline WHERE ${whereClauses.join(" AND ")} LIMIT 1`, params);
+    const query = `
+      SELECT t.*, c.name AS clinic_name, cb.name AS branch_name
+      FROM treatment_timeline t
+      LEFT JOIN clinics c ON c.id = t.clinic_id
+      LEFT JOIN clinic_branches cb ON cb.id = t.branch_id
+      WHERE ${whereClauses.join(" AND ")}
+      LIMIT 1
+    `;
+
+    const [rows] = await db.query(query, params);
     
     if (rows.length === 0) {
       return res.status(404).json({ message: "Record not found or access denied." });
@@ -141,11 +150,17 @@ router.get("/:patientId", async (req, res) => {
     const supportsClinic = await hasColumn('treatment_timeline', 'clinic_id');
     const supportsBranch = await hasColumn('treatment_timeline', 'branch_id');
 
-    let query = "SELECT * FROM treatment_timeline WHERE patient_id = ?";
+    let query = `
+      SELECT t.*, c.name AS clinic_name, cb.name AS branch_name
+      FROM treatment_timeline t
+      LEFT JOIN clinics c ON c.id = t.clinic_id
+      LEFT JOIN clinic_branches cb ON cb.id = t.branch_id
+      WHERE t.patient_id = ?
+    `;
     let params = [patientId];
 
     if (year) {
-        query += " AND record_year = ?";
+        query += " AND t.record_year = ?";
         params.push(year);
     }
 
@@ -154,15 +169,15 @@ router.get("/:patientId", async (req, res) => {
       whereClauses,
       params,
       scope: actorScope,
-      clinicExpression: supportsClinic ? "clinic_id" : null,
-      branchExpression: supportsBranch ? "branch_id" : null,
+      clinicExpression: supportsClinic ? "t.clinic_id" : null,
+      branchExpression: supportsBranch ? "t.branch_id" : null,
     });
 
     if (whereClauses.length > 0) {
       query += ` AND ${whereClauses.join(" AND ")}`;
     }
     
-    query += " ORDER BY id DESC";
+    query += " ORDER BY t.id DESC";
 
     const [rows] = await db.query(query, params);
     res.json(rows);

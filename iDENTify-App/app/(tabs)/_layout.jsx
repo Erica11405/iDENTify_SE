@@ -58,6 +58,12 @@ const Tabslayout = () => {
           ),
         }}
       />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
     </Tabs>
   );
 };

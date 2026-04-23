@@ -33,6 +33,7 @@ export const API = {
   services: `${API_BASE_URL}/api/services`,
   clinicsDiscover: `${API_BASE_URL}/api/clinics/discover`,
   patientReports: `${API_BASE_URL}/api/patient-reports`,
+  notifications: `${API_BASE_URL}/api/notifications`,
 };
 
 export const fetchPatientByEmail = async (email) => {

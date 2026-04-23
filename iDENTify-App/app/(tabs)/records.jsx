@@ -35,7 +35,15 @@ export default function RecordsScreen() {
       } catch (_e) { console.log("No family found"); }
 
       const promises = allPatientIds.map(id =>
-        fetch(`${API.records}/${id}`).then(r => r.json())
+        fetch(`${API.records}/${id}`)
+          .then(async r => {
+            if (!r.ok) return [];
+            return r.json();
+          })
+          .catch(err => {
+            console.error(`Error fetching records for patient ${id}:`, err);
+            return [];
+          })
       );
 
       const results = await Promise.all(promises);
@@ -69,6 +77,7 @@ export default function RecordsScreen() {
       if (Array.isArray(parsed)) {
         return parsed.map((svc) => (typeof svc === "object" ? svc.name : svc)).join(", ");
       }
+      if (typeof parsed === "string") return parsed;
     } catch (e) {
       // Not JSON, return as is
     }
@@ -97,8 +106,15 @@ export default function RecordsScreen() {
             </View>
 
             <View style={styles.infoBox}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.patientName}</Text>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{item.patientName}</Text>
+                </View>
+                {item.clinic_name && (
+                  <View style={[styles.badge, { backgroundColor: '#E0F2FE' }]}>
+                    <Text style={[styles.badgeText, { color: '#0369A1' }]}>{item.clinic_name}</Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.procedureName} numberOfLines={1}>{renderProcedures(item.procedure_text)}</Text>
               <Text style={styles.doctorName}>{item.provider}</Text>

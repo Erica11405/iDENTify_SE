@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const { getTenantLifecycleStatus, getLifecycleBlockMessage } = require("../utils/accessControl");
+const { createNotification } = require("../utils/notifications");
 
 const DEFAULT_DURATION_MINUTES = 30;
 const CANCELLATION_LOCK_MINUTES = 30;
@@ -1618,7 +1619,7 @@ router.put("/:id", async (req, res) => {
     const supportsAppointmentBranch = await hasAppointmentBranchColumn();
 
     const [currentRows] = await db.query(
-      `SELECT id, dentist_id, appointment_datetime, reason, end_datetime${supportsAppointmentClinic ? ", clinic_id" : ""}${supportsAppointmentBranch ? ", branch_id" : ""}
+      `SELECT id, patient_id, dentist_id, appointment_datetime, reason, end_datetime, status${supportsAppointmentClinic ? ", clinic_id" : ""}${supportsAppointmentBranch ? ", branch_id" : ""}
        FROM appointments
        WHERE id = ?
        LIMIT 1`,
@@ -1682,6 +1683,21 @@ router.put("/:id", async (req, res) => {
     }
 
     const nextStart = parsedStart || formatSqlDateTime(currentAppt.appointment_datetime);
+
+    // Trigger notification if rescheduled (time/date changed)
+    const isRescheduled = fields.timeStart && formatSqlDateTime(currentAppt.appointment_datetime) !== nextStart;
+    if (isRescheduled) {
+        const readableDate = new Date(nextStart).toLocaleString('en-US', { 
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', 
+            hour: 'numeric', minute: '2-digit', hour12: true 
+        });
+        await createNotification(
+            currentAppt.patient_id, 
+            'Appointment Rescheduled', 
+            `Your appointment has been rescheduled to ${readableDate}.`,
+            'rescheduled'
+        );
+    }
 
     const reasonSeed = Object.prototype.hasOwnProperty.call(fields, "procedure")
       ? fields.procedure
@@ -1875,6 +1891,14 @@ router.patch("/:id/approve", async (req, res) => {
       updateValues
     );
 
+    // Trigger notification for approval
+    await createNotification(
+        row.patient_id,
+        'Appointment Approved',
+        `Your appointment on ${new Date(row.appointment_datetime).toLocaleDateString()} has been approved.`,
+        'general'
+    );
+
     await db.query(
       `UPDATE walk_in_queue
        SET status = 'Scheduled'
@@ -1986,6 +2010,14 @@ router.patch("/:id/decline", async (req, res) => {
        SET ${updateClauses.join(", ")}
        WHERE id = ?`,
       updateValues
+    );
+
+    // Trigger notification for decline
+    await createNotification(
+        row.patient_id,
+        'Appointment Declined',
+        `Your appointment on ${new Date(row.appointment_datetime).toLocaleDateString()} has been declined. Reason: ${declineReason}`,
+        'declined'
     );
 
     await db.query(

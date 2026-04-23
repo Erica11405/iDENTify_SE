@@ -116,6 +116,14 @@ export default function RecordDetails() {
       <Text style={styles.sectionLabel}>Appointment Details</Text>
       <View style={styles.detailCard}>
         <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Clinic</Text>
+          <Text style={styles.detailValue}>{record.clinic_name || "N/A"}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Branch</Text>
+          <Text style={styles.detailValue}>{record.branch_name || "N/A"}</Text>
+        </View>
+        <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Appointed Dentist</Text>
           <Text style={styles.detailValue}>{getDentistDisplay()}</Text>
         </View>

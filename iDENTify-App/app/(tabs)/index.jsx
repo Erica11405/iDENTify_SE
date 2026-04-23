@@ -39,6 +39,7 @@ export default function HomeScreen() {
 	// Service Modal State
 	const [selectedService, setSelectedService] = useState(null);
 	const [modalVisible, setModalVisible] = useState(false);
+	const [unreadCount, setUnreadCount] = useState(0);
 
 	const loadData = useCallback(async () => {
 		if (!userEmail) return;
@@ -49,6 +50,17 @@ export default function HomeScreen() {
 			setPatient(patientData);
 
 			if (patientData) {
+				// --- FETCH NOTIFICATIONS ---
+				try {
+					const notifRes = await fetch(`${API.notifications}/${patientData.id}`);
+					if (notifRes.ok) {
+						const notifs = await notifRes.json();
+						setUnreadCount(notifs.filter(n => !n.is_read).length);
+					}
+				} catch (_e) {
+					console.log('Error fetching notifications');
+				}
+
 				// --- 1. FETCH FAMILY MEMBERS ---
 				let allIds = [patientData.id];
 				try {
@@ -63,15 +75,13 @@ export default function HomeScreen() {
 				}
 
 				// --- 2. FETCH APPOINTMENTS FOR EVERYONE ---
-				// We map each ID to a fetch promise, then run them in parallel
 				const promises = allIds.map(id =>
 					fetch(`${API.appointments}?patient_id=${id}`).then(r => r.json())
 				);
 
 				const results = await Promise.all(promises);
-				const allAppts = results.flat(); // Combine arrays
+				const allAppts = results.flat();
 
-				// Get start of today (Midnight)
 				const todayStart = new Date();
 				todayStart.setHours(0, 0, 0, 0);
 
@@ -80,7 +90,6 @@ export default function HomeScreen() {
 						const apptDate = parseDate(a.appointment_datetime);
 						const status = String(a.status || '').trim().toLowerCase();
 						const isInactive = ['done', 'cancelled', 'no-show', 'missed'].includes(status);
-						// Show appointments if they are Today or Future AND active
 						return apptDate >= todayStart && !isInactive;
 					})
 					.sort((a, b) => {
@@ -151,8 +160,6 @@ export default function HomeScreen() {
 		}
 	};
 
-	// [FIX] Determine Display Name
-	// Priority: 1. Database Patient Name, 2. Clerk User First Name, 3. "Guest"
 	const displayName = patient?.full_name
 		? patient.full_name.split(' ')[0]
 		: (user?.firstName || "Guest");
@@ -172,13 +179,27 @@ export default function HomeScreen() {
 						<Text style={styles.greeting}>Hello,</Text>
 						<Text style={styles.userName}>{displayName}</Text>
 					</View>
-					<TouchableOpacity
-						onPress={() => router.push("/profile")}
-						style={styles.profileButton}
-						activeOpacity={0.7}
-					>
-						<Ionicons name="person" size={24} color="#1B93D5" />
-					</TouchableOpacity>
+					<View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+						<TouchableOpacity
+							onPress={() => router.push("/notifications")}
+							style={styles.headerIconButton}
+							activeOpacity={0.7}
+						>
+							<Ionicons name="notifications" size={24} color="#1B93D5" />
+							{unreadCount > 0 && (
+								<View style={styles.notificationBadge}>
+									<Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+								</View>
+							)}
+						</TouchableOpacity>
+						<TouchableOpacity
+							onPress={() => router.push("/profile")}
+							style={styles.headerIconButton}
+							activeOpacity={0.7}
+						>
+							<Ionicons name="person" size={24} color="#1B93D5" />
+						</TouchableOpacity>
+					</View>
 				</View>
 
 				{/* UPCOMING APPOINTMENT */}
@@ -200,7 +221,6 @@ export default function HomeScreen() {
 								<Ionicons name="calendar" size={24} color="#1B93D5" />
 							</View>
 							<View style={{ flex: 1 }}>
-								{/* --- NEW: PATIENT LABEL IF NOT MYSELF --- */}
 								{patient && upcomingAppt.patient_id !== patient.id && (
 									<View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
 										<Ionicons name="person" size={12} color="rgba(255,255,255,0.8)" style={{ marginRight: 4 }} />
@@ -399,7 +419,41 @@ const styles = StyleSheet.create({
 	header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24, marginTop: 10 },
 	greeting: { fontSize: 16, color: "#64748B", fontWeight: "500" },
 	userName: { fontSize: 28, fontWeight: "800", color: "#1E293B", letterSpacing: -0.5 },
-	profileButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: "white", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+	headerIconButton: { 
+		width: 48, 
+		height: 48, 
+		borderRadius: 24, 
+		backgroundColor: "white", 
+		justifyContent: "center", 
+		alignItems: "center", 
+		borderWidth: 1, 
+		borderColor: "#E2E8F0", 
+		shadowColor: "#000", 
+		shadowOffset: { width: 0, height: 2 }, 
+		shadowOpacity: 0.05, 
+		shadowRadius: 4, 
+		elevation: 2,
+		position: 'relative'
+	},
+	notificationBadge: {
+		position: 'absolute',
+		top: -4,
+		right: -4,
+		backgroundColor: '#EF4444',
+		borderRadius: 10,
+		minWidth: 20,
+		height: 20,
+		justifyContent: 'center',
+		alignItems: 'center',
+		borderWidth: 2,
+		borderColor: 'white',
+		paddingHorizontal: 4
+	},
+	badgeText: {
+		color: 'white',
+		fontSize: 10,
+		fontWeight: 'bold'
+	},
 	sectionTitle: { fontSize: 18, fontWeight: "700", color: "#334155", marginBottom: 12, letterSpacing: -0.3 },
 	heroCard: { backgroundColor: "#1B93D5", borderRadius: 24, padding: 22, marginBottom: 28, shadowColor: "#1B93D5", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 8, position: 'relative', overflow: 'hidden' },
 	heroBackgroundCircle: { position: 'absolute', top: -50, right: -50, width: 200, height: 200, borderRadius: 100, backgroundColor: 'rgba(255,255,255,0.1)' },

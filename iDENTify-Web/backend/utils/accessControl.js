@@ -400,4 +400,5 @@ module.exports = {
   getActorTenantScope,
   appendTenantWhereClauses,
   hasColumn,
+  toPositiveInt,
 };

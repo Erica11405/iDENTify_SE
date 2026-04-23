@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-const { getActorTenantScope, appendTenantWhereClauses, hasColumn } = require("../utils/accessControl");
+const { getActorTenantScope, appendTenantWhereClauses, hasColumn, toPositiveInt } = require("../utils/accessControl");
 
 // Helper: Safely parse JSON from the database
 const safeJsonParse = (data, fallback) => {
@@ -12,12 +12,6 @@ const safeJsonParse = (data, fallback) => {
 
 // Helper: Convert undefined to null for MySQL
 const safeVal = (val) => val === undefined ? null : val;
-
-function toPositiveInt(value) {
-  const parsed = Number.parseInt(String(value || ""), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return parsed;
-}
 
 async function resolveClinicIdFromBranch(branchId) {
   const parsedBranchId = toPositiveInt(branchId);

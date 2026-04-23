@@ -25,6 +25,7 @@ const paymentsRoutes = require("./routes/payments");
 const clinicsRoutes = require("./routes/clinics");
 const superadminRequestsRoutes = require("./routes/superadmin_requests");
 const patientReportsRoutes = require("./routes/patient_reports");
+const notificationsRoutes = require("./routes/notifications");
 
 const app = express();
 
@@ -86,6 +87,7 @@ apiRouter.use("/payments", paymentsRoutes);
 apiRouter.use("/clinics", clinicsRoutes);
 apiRouter.use("/superadmin-requests", superadminRequestsRoutes);
 apiRouter.use("/patient-reports", patientReportsRoutes);
+apiRouter.use("/notifications", notificationsRoutes);
 
 // Apply the unified router to the app
 app.use("/api", apiRouter); 
