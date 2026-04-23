@@ -1,7 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { enforceAdminAccess, hasUsersApprovalStatusColumn } = require('../utils/accessControl');
+const { 
+  enforceAdminAccess, 
+  hasUsersApprovalStatusColumn,
+  getActorTenantScope,
+  appendTenantWhereClauses,
+  hasUsersClinicColumn
+} = require('../utils/accessControl');
 
 const ALLOWED_ROLES = new Set(['dentist', 'aide']);
 let hasDentistArchivedAtColumnCache = null;
@@ -71,6 +77,17 @@ router.get('/', async (req, res) => {
   const where = ["LOWER(u.role) IN ('dentist', 'aide')"];
   const params = [];
 
+  const actorScope = await getActorTenantScope(req);
+  const supportsClinic = await hasUsersClinicColumn();
+
+  appendTenantWhereClauses({
+    whereClauses: where,
+    params,
+    scope: actorScope,
+    clinicExpression: supportsClinic ? 'u.clinic_id' : null,
+    branchExpression: 'u.branch_id',
+  });
+
   if (roleFilter && roleFilter !== 'all') {
     if (!ALLOWED_ROLES.has(roleFilter)) {
       return res.status(400).json({ error: 'Invalid role filter.' });
@@ -92,6 +109,8 @@ router.get('/', async (req, res) => {
     const approvalStatusSelect = supportsApprovalStatus
       ? 'u.approval_status,'
       : "'approved' AS approval_status,";
+    
+    const clinicIdSelect = supportsClinic ? 'u.clinic_id,' : '';
 
     const [rows] = await db.query(
       `SELECT
@@ -102,6 +121,8 @@ router.get('/', async (req, res) => {
         LOWER(u.role) AS role,
         u.is_archived,
         u.is_verified,
+        ${clinicIdSelect}
+        u.branch_id,
         ${approvalStatusSelect}
         u.dentist_id,
         d.specialization AS dentist_specialization,
@@ -138,9 +159,27 @@ router.patch('/:id/archive', async (req, res) => {
   }
 
   try {
-    const [users] = await db.query('SELECT id, role, dentist_id FROM users WHERE id = ? LIMIT 1', [id]);
+    const actorScope = await getActorTenantScope(req);
+    const supportsClinic = await hasUsersClinicColumn();
+
+    const checkWhere = ['u.id = ?'];
+    const checkParams = [id];
+
+    appendTenantWhereClauses({
+      whereClauses: checkWhere,
+      params: checkParams,
+      scope: actorScope,
+      clinicExpression: supportsClinic ? 'u.clinic_id' : null,
+      branchExpression: 'u.branch_id',
+    });
+
+    const [users] = await db.query(
+      `SELECT u.id, u.role, u.dentist_id FROM users u WHERE ${checkWhere.join(' AND ')} LIMIT 1`, 
+      checkParams
+    );
+
     if (!users.length) {
-      return res.status(404).json({ error: 'User not found.' });
+      return res.status(404).json({ error: 'User not found or access denied.' });
     }
 
     const user = users[0];
@@ -175,9 +214,27 @@ router.patch('/:id/restore', async (req, res) => {
   }
 
   try {
-    const [users] = await db.query('SELECT id, role, dentist_id FROM users WHERE id = ? LIMIT 1', [id]);
+    const actorScope = await getActorTenantScope(req);
+    const supportsClinic = await hasUsersClinicColumn();
+
+    const checkWhere = ['u.id = ?'];
+    const checkParams = [id];
+
+    appendTenantWhereClauses({
+      whereClauses: checkWhere,
+      params: checkParams,
+      scope: actorScope,
+      clinicExpression: supportsClinic ? 'u.clinic_id' : null,
+      branchExpression: 'u.branch_id',
+    });
+
+    const [users] = await db.query(
+      `SELECT u.id, u.role, u.dentist_id FROM users u WHERE ${checkWhere.join(' AND ')} LIMIT 1`, 
+      checkParams
+    );
+
     if (!users.length) {
-      return res.status(404).json({ error: 'User not found.' });
+      return res.status(404).json({ error: 'User not found or access denied.' });
     }
 
     const user = users[0];

@@ -364,6 +364,8 @@ router.get('/me', async (req, res) => {
         name: actor.full_name || actor.email,
         role: actor.role,
         approval_status: normalizeApprovalStatus(actor.approval_status),
+        clinic_id: actor.clinic_id,
+        branch_id: actor.branch_id,
       },
       request,
     });

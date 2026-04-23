@@ -216,8 +216,15 @@ async function getActorUserRow(userId) {
   const parsedUserId = toPositiveInt(userId);
   if (!parsedUserId) return null;
 
+  const supportsClinic = await hasUsersClinicColumn();
+  const supportsBranch = await hasUsersBranchColumn();
+
+  const columns = ['id', 'email', 'full_name', 'role', 'is_archived', 'approval_status'];
+  if (supportsClinic) columns.push('clinic_id');
+  if (supportsBranch) columns.push('branch_id');
+
   const [rows] = await db.query(
-    `SELECT id, email, full_name, role, is_archived, approval_status
+    `SELECT ${columns.join(', ')}
      FROM users
      WHERE id = ?
      LIMIT 1`,
@@ -234,6 +241,8 @@ async function getActorUserRow(userId) {
     role: normalizeRole(row.role),
     is_archived: Number(row.is_archived || 0) === 1,
     approval_status: normalizeApprovalStatus(row.approval_status),
+    clinic_id: supportsClinic ? toPositiveInt(row.clinic_id) : null,
+    branch_id: supportsBranch ? toPositiveInt(row.branch_id) : null,
   };
 }
 
