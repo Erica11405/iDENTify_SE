@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import api from "../../api/apiClient"; 
+import useAppStore from "../../store/useAppStore";
 import "../../styles/pages/dentist/DentistSettings.css";
 
 const COMMON_FREQUENCY_OPTIONS = [
@@ -41,6 +42,7 @@ function sortDentistTypesByName(typeList) {
 }
 
 function DentistSettings({ showAideManagement = true }) {
+    const user = useAppStore((state) => state.user);
     const [activeTab, setActiveTab] = useState(showAideManagement ? "aides" : "services");
 
   // --- DENTAL AIDES STATE ---
@@ -50,7 +52,8 @@ function DentistSettings({ showAideManagement = true }) {
 
   // --- CLINIC SERVICES STATE ---
   const [services, setServices] = useState([]);
-  const [newService, setNewService] = useState({ name: "", minPrice: "", maxPrice: "", estimatedDuration: "" });
+  const [branches, setBranches] = useState([]);
+  const [newService, setNewService] = useState({ name: "", minPrice: "", maxPrice: "", estimatedDuration: "", branchIds: [] });
   const [editingServiceId, setEditingServiceId] = useState(null);
 
   // --- MEDICATIONS STATE ---
@@ -70,18 +73,24 @@ function DentistSettings({ showAideManagement = true }) {
                 const dentistTypePromise = showAideManagement
                         ? Promise.resolve([])
                         : api.getDentistTypes().catch(() => []);
+                
+                const branchesPromise = (user?.clinic_id)
+                        ? api.getClinicBranches(user.clinic_id).catch(() => [])
+                        : Promise.resolve([]);
 
-                const [staffList, servicesList, medsList, dentistTypeList] = await Promise.all([
+                const [staffList, servicesList, medsList, dentistTypeList, branchesList] = await Promise.all([
                         api.getDentists(),
                         api.getServices(),
                         api.getClinicMedications(),
                         dentistTypePromise,
+                        branchesPromise,
                 ]);
 
         const aidesOnly = staffList.filter(staff => staff.specialization === 'Dental Aide');
         setAides(aidesOnly);
         setServices(servicesList);
         setClinicMedications(medsList);
+        setBranches(branchesList);
 
                 if (!showAideManagement) {
                     setDentistTypes(sortDentistTypesByName(dentistTypeList));
@@ -92,7 +101,7 @@ function DentistSettings({ showAideManagement = true }) {
       }
     };
     loadData();
-  }, [showAideManagement]);
+  }, [showAideManagement, user?.clinic_id]);
 
     useEffect(() => {
         if (!showAideManagement && activeTab === "aides") {
@@ -180,22 +189,40 @@ function DentistSettings({ showAideManagement = true }) {
     if (Number(newService.minPrice) > Number(newService.maxPrice)) {
         return toast.error("Minimum price cannot be higher than the maximum price.");
     }
+    if (newService.branchIds.length === 0) {
+        return toast.error("Please select at least one branch for this service.");
+    }
 
     const payload = {
         name: newService.name,
         minPrice: newService.minPrice,
         maxPrice: newService.maxPrice,
-        estimated_duration: newService.estimatedDuration
+        estimated_duration: newService.estimatedDuration,
+        branchIds: newService.branchIds
     };
 
     try {
         if (editingServiceId) {
             await api.updateService(editingServiceId, payload);
-            setServices(services.map(s => s.id === editingServiceId ? { ...s, name: payload.name, min_price: payload.minPrice, max_price: payload.maxPrice, estimated_duration: payload.estimated_duration } : s));
+            setServices(services.map(s => s.id === editingServiceId ? { 
+                ...s, 
+                name: payload.name, 
+                min_price: payload.minPrice, 
+                max_price: payload.maxPrice, 
+                estimated_duration: payload.estimated_duration,
+                branch_ids: payload.branchIds
+            } : s));
             toast.success("Service updated successfully!");
         } else {
             const createdService = await api.createService(payload);
-            setServices([...services, { id: createdService.id, name: payload.name, min_price: payload.minPrice, max_price: payload.maxPrice, estimated_duration: payload.estimated_duration }]);
+            setServices([...services, { 
+                id: createdService.id, 
+                name: payload.name, 
+                min_price: payload.minPrice, 
+                max_price: payload.maxPrice, 
+                estimated_duration: payload.estimated_duration,
+                branch_ids: payload.branchIds
+            }]);
             toast.success("Service added successfully!");
         }
         cancelServiceEdit();
@@ -210,13 +237,14 @@ function DentistSettings({ showAideManagement = true }) {
           name: service.name,
           minPrice: service.min_price,
           maxPrice: service.max_price,
-          estimatedDuration: service.estimated_duration || ""
+          estimatedDuration: service.estimated_duration || "",
+          branchIds: service.branch_ids || []
       });
   };
 
   const cancelServiceEdit = () => {
       setEditingServiceId(null);
-      setNewService({ name: "", minPrice: "", maxPrice: "", estimatedDuration: "" });
+      setNewService({ name: "", minPrice: "", maxPrice: "", estimatedDuration: "", branchIds: [] });
   };
 
   const handleDeleteService = async (id) => {
@@ -479,6 +507,34 @@ function DentistSettings({ showAideManagement = true }) {
                             <input type="number" placeholder="1500" value={newService.maxPrice} onChange={(e) => setNewService({ ...newService, maxPrice: e.target.value })} />
                         </div>
                     </div>
+
+                    <div className="form-group" style={{ flex: '1 1 100%', marginTop: '10px' }}>
+                        <label>Available in Branches *</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', marginTop: '8px', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            {branches.length === 0 ? (
+                                <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No branches found.</span>
+                            ) : (
+                                branches.map(branch => (
+                                    <label key={branch.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: '#334155', fontWeight: '500' }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={newService.branchIds.includes(branch.id)}
+                                            onChange={(e) => {
+                                                const checked = e.target.checked;
+                                                setNewService(prev => ({
+                                                    ...prev,
+                                                    branchIds: checked 
+                                                        ? [...prev.branchIds, branch.id]
+                                                        : prev.branchIds.filter(id => id !== branch.id)
+                                                }));
+                                            }}
+                                        />
+                                        {branch.name}
+                                    </label>
+                                ))
+                            )}
+                        </div>
+                    </div>
                     
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '15px' }}>
                         {editingServiceId && <button type="button" style={cancelBtnStyle} onClick={cancelServiceEdit}>Cancel</button>}
@@ -490,9 +546,9 @@ function DentistSettings({ showAideManagement = true }) {
             <h3 className="table-title">Available Services & Pricing</h3>
             <div className="table-container">
                 <table className="settings-table">
-                <thead><tr><th>Service Name</th><th>Est. Duration</th><th>Price Range (PHP)</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Service Name</th><th>Est. Duration</th><th>Price Range (PHP)</th><th>Branches</th><th>Actions</th></tr></thead>
                 <tbody>
-                    {services.length === 0 ? (<tr><td colSpan="4" className="empty-state">No services have been added yet.</td></tr>) : (
+                    {services.length === 0 ? (<tr><td colSpan="5" className="empty-state">No services have been added yet.</td></tr>) : (
                         services.map((service) => (
                             <tr key={service.id} className={editingServiceId === service.id ? "row-highlight" : ""}>
                                 <td className="font-semibold">{service.name}</td>
@@ -501,6 +557,16 @@ function DentistSettings({ showAideManagement = true }) {
                                     <span className="price-badge">₱{service.min_price}</span>
                                     <span className="price-separator">to</span>
                                     <span className="price-badge">₱{service.max_price}</span>
+                                </td>
+                                <td>
+                                    {service.branch_ids && service.branch_ids.length > 0 ? (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                            {service.branch_ids.map(bid => {
+                                                const b = branches.find(branch => branch.id === bid);
+                                                return b ? <span key={bid} style={{ padding: '2px 6px', background: '#e0f2fe', color: '#0369a1', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600' }}>{b.name}</span> : null;
+                                            })}
+                                        </div>
+                                    ) : <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>No branches</span>}
                                 </td>
                                 <td>
                                     <div className="action-buttons">
