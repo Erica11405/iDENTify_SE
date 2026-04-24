@@ -450,14 +450,6 @@ function SuperAdminDashboard() {
                         )}
                     </div>
 
-                    <div className="settings-form-card dashboard-top-spacing-md">
-                        <h3>Appointments Per Dentist</h3>
-                        <p className="dashboard-muted-text">
-                            Current week: {chartData.rangeLabel}
-                        </p>
-                        <WeeklyBarChart chartData={chartData} />
-                    </div>
-
                     <div id="create-branch-section" className="settings-form-card dashboard-top-spacing-md dashboard-management-card">
                         <h3>Create Branch</h3>
                         <p className="dashboard-muted-text">Assign each branch to a clinic for cleaner tenant-level reporting.</p>
@@ -505,16 +497,6 @@ function SuperAdminDashboard() {
                             </div>
 
                             <div className="form-row">
-                                <div className="form-group">
-                                    <label htmlFor="branch-code">Branch Code (Optional)</label>
-                                    <input
-                                        id="branch-code"
-                                        type="text"
-                                        value={branchForm.code}
-                                        onChange={(event) => setBranchForm((prev) => ({ ...prev, code: event.target.value }))}
-                                        placeholder="e.g. BR-A1"
-                                    />
-                                </div>
                                 <div className="form-group flex-2">
                                     <label htmlFor="branch-street">Street *</label>
                                     <input

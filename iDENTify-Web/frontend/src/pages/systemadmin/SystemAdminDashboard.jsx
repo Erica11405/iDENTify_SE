@@ -227,52 +227,6 @@ function SystemAdminDashboard() {
         };
     }, [users]);
 
-    const chartData = useMemo(() => {
-        const { start, end } = getCurrentWeekRange();
-        const ignoredStatuses = new Set(['cancelled', 'no-show', 'missed', 'declined']);
-
-        const labelMap = new Map();
-        dentists.forEach((dentist) => {
-            labelMap.set(String(dentist.id), dentist.name || `${dentist.first_name || ''} ${dentist.last_name || ''}`.trim() || `Dentist #${dentist.id}`);
-        });
-
-        const counter = new Map();
-        appointments.forEach((appointment) => {
-            const dentistId = appointment?.dentist_id;
-            if (!dentistId) return;
-
-            const parsedDate = parseDateTime(appointment?.appointment_datetime);
-            if (!parsedDate) return;
-            if (parsedDate < start || parsedDate > end) return;
-
-            const status = normalizeStatus(appointment?.status);
-            if (ignoredStatuses.has(status)) return;
-
-            const key = String(dentistId);
-            counter.set(key, (counter.get(key) || 0) + 1);
-
-            if (!labelMap.has(key)) {
-                labelMap.set(key, appointment.dentist_name || `Dentist #${key}`);
-            }
-        });
-
-        const sortedEntries = [...labelMap.entries()]
-            .map(([id, name]) => ({
-                id,
-                name,
-                count: counter.get(id) || 0,
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name));
-
-        return {
-            labels: sortedEntries.map((item) => item.name),
-            appointments: sortedEntries.map((item) => item.count),
-            appointmentsLabel: 'Appointments',
-            singleSeries: true,
-            rangeLabel: formatRangeLabel(start, end),
-        };
-    }, [dentists, appointments]);
-
     const clinicBranchChartData = useMemo(() => {
         const rows = Array.isArray(clinicSummary?.branches_per_clinic) ? clinicSummary.branches_per_clinic : [];
 

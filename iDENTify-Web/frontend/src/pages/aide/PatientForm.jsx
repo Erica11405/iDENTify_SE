@@ -1503,7 +1503,7 @@ function PatientForm({ userRole }) {
                             <button 
                                 className="done-btn" 
                                 style={{ background: '#3498db' }} 
-                                onClick={() => navigate('/dentist/appointments')}
+                                onClick={() => setFollowUpModal({ isOpen: true, patient })}
                             >
                                 Schedule Follow-up
                             </button>

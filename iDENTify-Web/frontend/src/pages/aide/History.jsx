@@ -16,9 +16,6 @@ function History({ pageTitle = "Patient History", forcedDentistId = null }) {
     const dentists = useAppStore((state) => state.dentists);
     const appointments = useAppStore((state) => state.appointments);
 
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [itemToDelete, setItemToDelete] = useState(null);
-
     const [filters, setFilters] = useState({
         dentist: "all",
         procedure: "all",
@@ -184,25 +181,6 @@ function History({ pageTitle = "Patient History", forcedDentistId = null }) {
         });
     };
 
-    const handleDeleteClick = (item) => {
-        setItemToDelete(item);
-        setIsDeleteModalOpen(true);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!itemToDelete) return;
-        try {
-            await api.deleteQueue(itemToDelete.id);
-            toast.success("Removed record from history");
-        } catch (err) {
-            console.error("Failed to delete history item", err);
-            toast.error("Failed to delete");
-        } finally {
-            setIsDeleteModalOpen(false);
-            setItemToDelete(null);
-        }
-    };
-
     const formatDate = (dateObj) => {
         if (!dateObj) return "-";
         return dateObj.toLocaleDateString() + " " + dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -271,13 +249,6 @@ function History({ pageTitle = "Patient History", forcedDentistId = null }) {
                     </div>
                 )}
             </div>
-
-            <ConfirmationModal
-                isOpen={isDeleteModalOpen}
-                onClose={() => setIsDeleteModalOpen(false)}
-                onConfirm={handleConfirmDelete}
-                message={`Are you sure you want to delete the history record for ${itemToDelete?.name || 'this patient'}?`}
-            />
 
             <div className="history-table-container">
                 <table className="history-table">

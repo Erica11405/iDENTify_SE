@@ -69,6 +69,16 @@
   gap: 0.75rem;
 }
 
+@media (max-width: 480px) {
+  .payment-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .payment-preview-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .payment-grid label,
 .payment-proof-block label {
   display: flex;

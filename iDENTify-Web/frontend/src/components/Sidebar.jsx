@@ -17,31 +17,68 @@
 //     return 'Dental Aide';
 // }
 
-// function Sidebar({ role }) {
-//     const navigate = useNavigate();
-//     const { resetStore, user } = useAppStore();
-//     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-    
-//     // State to control the profile modal
-//     const [showProfileModal, setShowProfileModal] = useState(false);
+function Sidebar({ role }) {
+    const navigate = useNavigate();
+    const { resetStore, user } = useAppStore();
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-//     const handleLogout = () => {
-//         resetStore();
-//         navigate('/');
-//     };
+    // State to control the profile modal
+    const [showProfileModal, setShowProfileModal] = useState(false);
 
-//     return (
-//         <>
-//             <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
-                
-//                 {/* Header kept original: iDENTify left, button right */}
-//                 <div className="sidebar-header">
-//                     <span className="sidebar-title">iDENTify</span>
-                    
-//                     <button 
-//                         className="toggle-btn" 
-//                         onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-//                     >
+    const handleLogout = () => {
+        resetStore();
+        navigate('/');
+    };
+
+    const toggleMobileMenu = () => {
+        setIsMobileOpen(!isMobileOpen);
+    };
+
+    return (
+        <>
+            <button 
+                className="mobile-hamburger" 
+                onClick={toggleMobileMenu}
+                aria-label="Toggle Menu"
+                style={{
+                    position: 'fixed',
+                    top: '15px',
+                    left: '15px',
+                    zIndex: 1100,
+                    padding: '8px',
+                    background: '#fff',
+                    border: '1px solid #ddd',
+                    borderRadius: '6px',
+                    display: 'none' // Hidden by default, shown via CSS media query
+                }}
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#334e68" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+
+            {isMobileOpen && (
+                <div 
+                    className="sidebar-overlay" 
+                    onClick={() => setIsMobileOpen(false)}
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.5)',
+                        zIndex: 999
+                    }}
+                />
+            )}
+
+            <aside className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
+
+                {/* Header kept original: iDENTify left, button right */}
+                <div className="sidebar-header">
+                    <span className="sidebar-title">iDENTify</span>
+
+                    <button 
+                        className="toggle-btn" 
+                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                    >
 //                         {isSidebarCollapsed ? (
 //                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#334e68" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
 //                         ) : (

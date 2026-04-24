@@ -48,9 +48,25 @@ router.post('/', async (req, res) => {
     }
 });
 
-// 2. Get all reports (For Clinic Admin)
+// 2. Get all reports (For Clinic Admin / System Admin)
 router.get('/', async (req, res) => {
+    const role = String(req.headers['x-user-role'] || '').trim().toLowerCase();
+    const userId = req.headers['x-user-id'];
+
     try {
+        let whereClauses = [];
+        let params = [];
+
+        if (role === 'superadmin' && userId) {
+            const [userRows] = await db.query('SELECT clinic_id FROM users WHERE id = ? LIMIT 1', [userId]);
+            if (userRows.length && userRows[0].clinic_id) {
+                whereClauses.push('d.clinic_id = ?');
+                params.push(userRows[0].clinic_id);
+            }
+        }
+
+        const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
         const [rows] = await db.query(`
             SELECT 
                 pr.id, pr.reason, pr.status, pr.created_at,
@@ -61,8 +77,9 @@ router.get('/', async (req, res) => {
             LEFT JOIN patients p ON pr.patient_id = p.id
             LEFT JOIN dentists d ON pr.dentist_id = d.id
             LEFT JOIN clinic_branches cb ON pr.branch_id = cb.id
+            ${whereSql}
             ORDER BY pr.created_at DESC
-        `);
+        `, params);
         res.json(rows);
     } catch (err) {
         console.error("Error fetching reports:", err);

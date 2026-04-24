@@ -57,6 +57,19 @@
   font-weight: bold;
 }
 
+.form-group-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+}
+
+@media (max-width: 600px) {
+    .form-group-row {
+        flex-direction: column;
+        gap: 0;
+    }
+}
+
 .form-group input,
 .form-group textarea,
 .form-group select {

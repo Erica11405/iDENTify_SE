@@ -285,8 +285,8 @@ function PaymentModal({
                 <p style={{ marginTop: '10px', fontWeight: 'bold' }}>Additional Charges:</p>
                 {summary.additional_charges.map((charge, idx) => (
                   <div key={`charge-${idx}`} className="payment-service-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 10px', background: '#fff7ed', borderRadius: '4px', marginBottom: '5px', border: '1px solid #fed7aa' }}>
-                    <span className="payment-service-name">{charge.reason || 'Miscellaneous'}</span>
-                    <span className="payment-service-price">₱{charge.amount}</span>
+                    <span className="payment-service-name">{charge.name || 'Miscellaneous'}</span>
+                    <span className="payment-service-price">₱{Number(charge.price).toLocaleString()}</span>
                   </div>
                 ))}
               </>

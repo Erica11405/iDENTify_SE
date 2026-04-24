@@ -53,6 +53,42 @@
     color: var(--primary-color, #1B93D5);
     border-bottom: 3px solid var(--primary-color, #1B93D5);
 }
+
+@media (max-width: 768px) {
+    .settings-dashboard-container {
+        padding: 1rem;
+    }
+
+    .settings-tabs {
+        flex-direction: column;
+        gap: 0;
+        border-bottom: none;
+    }
+
+    .settings-tabs button {
+        text-align: left;
+        border-bottom: 1px solid #e2e8f0;
+        width: 100%;
+        padding: 0.75rem 0.25rem;
+    }
+
+    .settings-tabs button.active {
+        border-bottom: 1px solid var(--primary-color, #1B93D5);
+        background: #eff6ff;
+    }
+
+    .form-group, .flex-2 {
+        min-width: 100%;
+    }
+
+    .settings-inline-actions {
+        flex-direction: column;
+    }
+
+    .settings-inline-actions button {
+        width: 100%;
+    }
+}
   
 /* Forms inside settings */
 .settings-form-card {
