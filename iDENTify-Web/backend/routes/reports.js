@@ -830,10 +830,8 @@ router.get("/earnings", async (req, res) => {
         SUM(pt.amount_paid) as earnings
       FROM payment_transactions pt
       JOIN payment_records pr ON pr.id = pt.payment_record_id
-      LEFT JOIN walk_in_queue q ON q.id = pr.queue_id
-      LEFT JOIN appointments a ON a.id = pr.appointment_id
-      LEFT JOIN clinic_branches cb ON cb.id = COALESCE(q.branch_id, a.branch_id)
       ${paymentJoinSql.join('\n')}
+      LEFT JOIN clinic_branches cb ON cb.id = COALESCE(q.branch_id, a.branch_id)
       WHERE ${whereClauses.join(' AND ')}
       GROUP BY COALESCE(cb.name, 'Unknown Branch')
       ORDER BY earnings DESC`,
@@ -849,7 +847,7 @@ router.get("/earnings", async (req, res) => {
         earnings: Number(row.total_earnings || 0),
         transactions: row.transaction_count
       })),
-      branchBreakdown: actorContext.role === 'globaladmin' ? [] : branchBreakdownRows.map(row => ({
+      branchBreakdown: branchBreakdownRows.map(row => ({
         branch: row.branch_name,
         earnings: Number(row.earnings || 0)
       }))
@@ -1226,7 +1224,7 @@ router.get("/", async (req, res) => {
         newPatients: newPatients,
         avgTreatmentDuration: durationRes[0].avg_min ? `${Math.round(durationRes[0].avg_min)} min` : "0 min",
       },
-      dentistPerformance: actorContext.role === 'globaladmin' ? [] : dentistPerformance,
+      dentistPerformance: dentistPerformance,
       clinicPerformance: actorContext.role === 'globaladmin' ? clinicPerformance : [],
     });
 

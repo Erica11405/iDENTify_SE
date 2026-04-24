@@ -727,13 +727,23 @@ router.patch('/:clinicId/branches/:branchId/status', async (req, res) => {
 });
 
 router.patch('/:clinicId/branches/:branchId/archive', async (req, res) => {
-  if (!(await requireSystemAdmin(req, res))) return;
+  const access = await enforceAdminAccess(req, res, {
+    allowGlobalAdmin: true,
+    allowSuperAdmin: true,
+    requireApprovedSuperAdmin: true,
+  });
+  if (!access.ok) return;
 
   const clinicId = toOptionalPositiveInt(req.params.clinicId);
   const branchId = toOptionalPositiveInt(req.params.branchId);
 
   if (!clinicId || !branchId) {
     return res.status(400).json({ message: 'Invalid clinic or branch id.' });
+  }
+
+  // If Super Admin, ensure they only archive their own clinic's branch
+  if (access.role === 'superadmin' && access.clinicId !== clinicId) {
+    return res.status(403).json({ message: 'You can only archive branches within your own clinic.' });
   }
 
   try {
@@ -771,13 +781,23 @@ router.patch('/:clinicId/branches/:branchId/archive', async (req, res) => {
 });
 
 router.patch('/:clinicId/branches/:branchId/restore', async (req, res) => {
-  if (!(await requireSystemAdmin(req, res))) return;
+  const access = await enforceAdminAccess(req, res, {
+    allowGlobalAdmin: true,
+    allowSuperAdmin: true,
+    requireApprovedSuperAdmin: true,
+  });
+  if (!access.ok) return;
 
   const clinicId = toOptionalPositiveInt(req.params.clinicId);
   const branchId = toOptionalPositiveInt(req.params.branchId);
 
   if (!clinicId || !branchId) {
     return res.status(400).json({ message: 'Invalid clinic or branch id.' });
+  }
+
+  // If Super Admin, ensure they only restore their own clinic's branch
+  if (access.role === 'superadmin' && access.clinicId !== clinicId) {
+    return res.status(403).json({ message: 'You can only restore branches within your own clinic.' });
   }
 
   try {

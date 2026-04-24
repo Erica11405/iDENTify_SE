@@ -447,18 +447,48 @@ export const addPaymentInstallment = async (id, payload) => {
 };
 
 /* --- Reports Functions --- */
+export const getEarningsReport = async ({ startDate, endDate, date } = {}) => {
+    const params = new URLSearchParams();
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    if (date) params.set('date', date);
+    const query = params.toString();
+
+    const res = await fetch(`${API_BASE}/reports/earnings${query ? `?${query}` : ''}`, {
+        headers: { ...actorHeaders() },
+    });
+    return handleResponse(res);
+};
+
 export const getReports = async (dateOrOptions) => {
     const params = new URLSearchParams();
 
     if (typeof dateOrOptions === 'string') {
         if (dateOrOptions) params.set('date', dateOrOptions);
     } else if (dateOrOptions && typeof dateOrOptions === 'object') {
-        const { startDate, endDate, date } = dateOrOptions;
+        const { startDate, endDate, date, branch_id } = dateOrOptions;
         if (startDate) params.set('startDate', startDate);
         if (endDate) params.set('endDate', endDate);
         if (date) params.set('date', date);
+        if (branch_id) params.set('branch_id', branch_id);
     }
 
+    const query = params.toString();
+    const res = await fetch(`${API_BASE}/reports${query ? `?${query}` : ''}`, {
+        headers: { ...actorHeaders() },
+    });
+    return handleResponse(res);
+};
+
+export const getReportsSummary = async (startDate, endDate, branch_id) => {
+    const startStr = startDate instanceof Date ? startDate.toISOString().split('T')[0] : startDate;
+    const endStr = endDate instanceof Date ? endDate.toISOString().split('T')[0] : endDate;
+    
+    const params = new URLSearchParams();
+    if (startStr) params.set('startDate', startStr);
+    if (endStr) params.set('endDate', endStr);
+    if (branch_id) params.set('branch_id', branch_id);
+    
     const query = params.toString();
     const res = await fetch(`${API_BASE}/reports${query ? `?${query}` : ''}`, {
         headers: { ...actorHeaders() },
@@ -794,7 +824,7 @@ const api = {
     getAppointments, createAppointment, checkAppointmentLimit, updateAppointment, approveAppointment, declineAppointment,
     getAppointmentServiceItems, updateAppointmentServiceItems,
     getPayments, getPaymentById, getPaymentByQueueId, getUnpaidPaymentMatches, createPaymentRecord, updatePaymentRecord, addPaymentInstallment,
-    getReports, getServicePopularityReport, getDentistPatientsForReport, getDentistReportSummary, get,
+    getReports, getEarningsReport, getReportsSummary, getServicePopularityReport, getDentistPatientsForReport, getDentistReportSummary, get,
     getServices, createService, updateService, deleteService,
     getClinicMedications, createClinicMedication, updateClinicMedication, deleteClinicMedication,
     getDentistTypes, createDentistType, updateDentistType, deleteDentistType,

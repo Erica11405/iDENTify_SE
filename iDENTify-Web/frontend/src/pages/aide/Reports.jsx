@@ -19,8 +19,9 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
 
   const user = useAppStore((state) => state.user);
   const userRole = String(user?.role || '').trim().toLowerCase();
-  const isGlobalAdmin = userRole === 'globaladmin';
-  const isSuperAdmin = userRole === 'superadmin';
+  const isGlobalAdmin = userRole === 'globaladmin' || userRole === 'global_admin';
+  const isSuperAdmin = userRole === 'superadmin' || userRole === 'super_admin';
+  const isAide = userRole === 'aide' || userRole === 'staff';
 
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
@@ -45,10 +46,18 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
   useEffect(() => {
     if (user?.clinic_id) {
       apiClient.getClinicBranches(user.clinic_id)
-        .then(data => setBranches(Array.isArray(data) ? data : []))
+        .then(data => {
+            const list = Array.isArray(data) ? data : [];
+            setBranches(list);
+            
+            // If user has a branch_id and is not admin/superadmin, lock them to it
+            if (user?.branch_id && !isSuperAdmin && !isGlobalAdmin) {
+                setSelectedBranchId(String(user.branch_id));
+            }
+        })
         .catch(err => console.error('Failed to load branches', err));
     }
-  }, [user?.clinic_id]);
+  }, [user?.clinic_id, user?.branch_id, userRole, isSuperAdmin, isGlobalAdmin]);
 
   const handleRangeChange = (type) => {
     setRangeType(type);
@@ -73,14 +82,19 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
 
     const fetchReports = async () => {
       try {
-        const params = { startDate: startStr, endDate: endStr };
-        if (selectedBranchId) {
-          params.branch_id = selectedBranchId;
+        // Strict branch resolution: non-admins MUST use their assigned branch
+        let branchId = '';
+        if (isSuperAdmin || isGlobalAdmin) {
+            branchId = selectedBranchId;
+        } else {
+            branchId = user?.branch_id || '';
         }
-        const data = await apiClient.getReportsSummary(startDate, endDate, selectedBranchId);
-        // api.loadReports is a helper that syncs to store, but it might not return clinicPerformance
-        // So we manually handle it here if needed or update the store helper.
-        // Assuming we update the store or handle locally:
+
+        const params = { startDate: startStr, endDate: endStr };
+        if (branchId) {
+          params.branch_id = branchId;
+        }
+        const data = await apiClient.getReportsSummary(startDate, endDate, branchId);
         setClinicPerformance(data.clinicPerformance || []);
         await api.loadReports(params);
       } catch (err) {
@@ -90,7 +104,7 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
     
     fetchReports();
     api.loadDentists().catch(err => console.error("Load dentists failed", err));
-  }, [startDate, endDate, selectedBranchId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, selectedBranchId, user?.branch_id, userRole, isSuperAdmin, isGlobalAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatApptTime = (value) => {
     if (!value) return "-";
@@ -323,7 +337,7 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
         </div>
 
         <div className="reports-controls">
-          {branches.length > 0 && (
+          {(isSuperAdmin || isGlobalAdmin) && branches.length > 0 && (
             <div className="date-picker-container">
               <span className="small-label">Branch</span>
               <select
