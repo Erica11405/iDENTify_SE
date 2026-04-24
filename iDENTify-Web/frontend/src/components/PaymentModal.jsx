@@ -35,11 +35,12 @@ function formatDateTime(value) {
     day: "2-digit",
     hour: "numeric",
     minute: "2-digit",
+    second: "2-digit",
     hour12: true,
   }).formatToParts(parsed);
 
   const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${lookup.year}-${lookup.month}-${lookup.day} ${lookup.hour}:${lookup.minute} ${(lookup.dayPeriod || "").toUpperCase()}`.trim();
+  return `${lookup.year}-${lookup.month}-${lookup.day} ${lookup.hour}:${lookup.minute}:${lookup.second} ${(lookup.dayPeriod || "").toUpperCase()}`.trim();
 }
 
 function formatMethodLabel(value) {
@@ -278,6 +279,18 @@ function PaymentModal({
                 </div>
               );
             }) : <span className="payment-service-empty">No services listed.</span>}
+            
+            {summary.additional_charges && summary.additional_charges.length > 0 && (
+              <>
+                <p style={{ marginTop: '10px', fontWeight: 'bold' }}>Additional Charges:</p>
+                {summary.additional_charges.map((charge, idx) => (
+                  <div key={`charge-${idx}`} className="payment-service-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 10px', background: '#fff7ed', borderRadius: '4px', marginBottom: '5px', border: '1px solid #fed7aa' }}>
+                    <span className="payment-service-name">{charge.reason || 'Miscellaneous'}</span>
+                    <span className="payment-service-price">₱{charge.amount}</span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
 

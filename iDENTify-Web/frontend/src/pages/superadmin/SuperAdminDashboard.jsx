@@ -587,7 +587,6 @@ function SuperAdminDashboard() {
                                     <thead>
                                         <tr>
                                             <th>Branch</th>
-                                            <th>Code</th>
                                             <th>Address</th>
                                             <th>Status</th>
                                             <th>Actions</th>
@@ -596,7 +595,7 @@ function SuperAdminDashboard() {
                                     <tbody>
                                         {selectedClinicBranches.length === 0 ? (
                                             <tr>
-                                                <td colSpan={5} className="empty-state">No branches found for this clinic.</td>
+                                                <td colSpan={4} className="empty-state">No branches found for this clinic.</td>
                                             </tr>
                                         ) : (
                                             selectedClinicBranches.map((branch) => {
@@ -604,7 +603,6 @@ function SuperAdminDashboard() {
                                                 return (
                                                     <tr key={branch.id}>
                                                         <td className="font-semibold">{branch.name}</td>
-                                                        <td>{branch.code || '-'}</td>
                                                         <td>{branch.address || '-'}</td>
                                                         <td>
                                                             <span className={`status-pill ${active ? 'active' : 'archived'}`}>

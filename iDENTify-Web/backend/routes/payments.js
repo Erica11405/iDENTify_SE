@@ -787,4 +787,110 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+router.get("/:id", async (req, res) => {
+  const paymentId = toOptionalInt(req.params.id);
+  if (!paymentId) return res.status(400).json({ message: "Invalid payment id." });
+
+  const connection = await db.getConnection();
+  try {
+    const actorScope = await getActorTenantScope(req);
+    const supportsClinic = await hasColumn('payment_records', 'clinic_id');
+    const supportsBranch = await hasColumn('payment_records', 'branch_id');
+
+    const whereClauses = ["id = ?"];
+    const params = [paymentId];
+
+    appendTenantWhereClauses({
+      whereClauses,
+      params,
+      scope: actorScope,
+      clinicExpression: supportsClinic ? "clinic_id" : null,
+      branchExpression: supportsBranch ? "branch_id" : null,
+    });
+
+    const [rows] = await connection.query(
+      `SELECT id FROM payment_records WHERE ${whereClauses.join(" AND ")} LIMIT 1`,
+      params
+    );
+
+    if (!rows.length) return res.status(404).json({ message: "Payment record not found." });
+
+    const record = await fetchPaymentRecord(connection, paymentId);
+    const transactions = await fetchPaymentTransactions(connection, paymentId);
+    res.json({ ...record, transactions });
+  } catch (error) {
+    console.error("Error fetching payment record:", error);
+    res.status(500).json({ message: "Failed to load payment details." });
+  } finally {
+    connection.release();
+  }
+});
+
+router.post("/:id/installments", async (req, res) => {
+  const paymentMutationGuard = canMutatePayments(req);
+  if (!paymentMutationGuard.allowed) {
+    return res.status(403).json({ message: paymentMutationGuard.message });
+  }
+
+  const paymentId = toOptionalInt(req.params.id);
+  const { amount_paid_now, payment_method, cash_received, proof_name, proof_data, is_deposit } = req.body;
+
+  const paidNow = toMoney(amount_paid_now, { allowZero: false });
+  const method = normalizeMethod(payment_method);
+
+  if (!paymentId || paidNow === null || !method) {
+    return res.status(400).json({ message: "Missing required installment details." });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const actorScope = await getActorTenantScope(req);
+    const [rows] = await connection.query("SELECT * FROM payment_records WHERE id = ? FOR UPDATE", [paymentId]);
+    if (!rows.length) {
+      await connection.rollback();
+      return res.status(404).json({ message: "Payment record not found." });
+    }
+    const current = rows[0];
+
+    const resolvedTenant = await resolvePaymentTenant(connection, { queueId: current.queue_id, appointmentId: current.appointment_id, dentistId: current.dentist_id, actorScope });
+    if (resolvedTenant.hasViolation) {
+        await connection.rollback();
+        return res.status(403).json({ message: "Access denied." });
+    }
+
+    const newAmountPaid = roundMoney(Number(current.amount_paid) + paidNow);
+    const newBalanceDue = roundMoney(Math.max(Number(current.total_due) - newAmountPaid, 0));
+    
+    // Use is_deposit from request if provided, otherwise keep current
+    const nextIsDeposit = (is_deposit !== undefined) ? (normalizeBoolean(is_deposit) ? 1 : 0) : current.is_deposit;
+
+    await connection.query(
+      `UPDATE payment_records 
+       SET amount_paid = ?, balance_due = ?, is_deposit = ?, payment_status = ?, updated_at = NOW() 
+       WHERE id = ?`,
+      [newAmountPaid, newBalanceDue, nextIsDeposit, getPaymentStatus(newBalanceDue), paymentId]
+    );
+
+    const cReceived = method === "cash" ? toMoney(cash_received, { allowZero: true }) : null;
+    const change = method === "cash" ? roundMoney((cReceived || 0) - paidNow) : null;
+
+    await connection.query(
+      `INSERT INTO payment_transactions (payment_record_id, payment_method, amount_paid, cash_received, change_amount, proof_name, proof_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [paymentId, method, paidNow, cReceived, change, proof_name || null, proof_data || null]
+    );
+
+    await connection.commit();
+    const record = await fetchPaymentRecord(connection, paymentId);
+    res.status(201).json(record);
+  } catch (error) {
+    await connection.rollback();
+    console.error("Error adding installment:", error);
+    res.status(500).json({ message: "Failed to add installment." });
+  } finally {
+    connection.release();
+  }
+});
+
 module.exports = router;

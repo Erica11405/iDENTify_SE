@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import '../styles/components/EditDentistModal.css'; 
 import api from '../api/apiClient';
 import toast from 'react-hot-toast';

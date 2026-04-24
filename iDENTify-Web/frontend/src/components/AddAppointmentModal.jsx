@@ -487,28 +487,6 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
             </div>
           </div>
 
-          {/* --- ADDRESS FIELDS --- */}
-          <div className="form-group-row" style={{ display: 'flex', gap: '10px' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Street *</label>
-              <input name="street" type="text" value={form.street} onChange={handleChange} placeholder="Street" readOnly={patientType === "old"} style={patientType === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Barangay *</label>
-              <input name="barangay" type="text" value={form.barangay} onChange={handleChange} placeholder="Barangay" readOnly={patientType === "old"} style={patientType === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
-            </div>
-          </div>
-          <div className="form-group-row" style={{ display: 'flex', gap: '10px' }}>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>City *</label>
-              <input name="city" type="text" value={form.city} onChange={handleChange} placeholder="City" readOnly={patientType === "old"} style={patientType === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
-            </div>
-            <div className="form-group" style={{ flex: 1 }}>
-              <label>Province *</label>
-              <input name="province" type="text" value={form.province} onChange={handleChange} placeholder="Province" readOnly={patientType === "old"} style={patientType === "old" ? { backgroundColor: '#f1f5f9', color: '#64748b', cursor: 'not-allowed' } : {}} />
-            </div>
-          </div>
-
           {/* --- DENTIST & DATE --- */}
           <div className="form-group-row" style={{ display: 'flex', gap: '10px' }}>
             <div className="form-group" style={{ flex: 1 }}>

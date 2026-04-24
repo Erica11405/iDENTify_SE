@@ -32,6 +32,7 @@ function formatDateTime(value) {
   return `${parsed.toLocaleDateString("en-PH", { timeZone: "Asia/Manila" })} ${parsed.toLocaleTimeString("en-PH", {
     hour: "numeric",
     minute: "2-digit",
+    second: "2-digit",
     timeZone: "Asia/Manila",
   })}`;
 }
@@ -143,6 +144,7 @@ function Payments({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [paymentRows, setPaymentRows] = useState([]);
+  const [allServices, setAllServices] = useState([]);
 
   const [rangeType, setRangeType] = useState("monthly");
   const [startDate, setStartDate] = useState(() => {
@@ -172,11 +174,15 @@ function Payments({
     setLoading(true);
     setError("");
     try {
-      const rows = await apiClient.getPayments({
-        startDate: toDateParam(startDate),
-        endDate: toDateParam(endDate),
-      });
+      const [rows, servicesData] = await Promise.all([
+        apiClient.getPayments({
+          startDate: toDateParam(startDate),
+          endDate: toDateParam(endDate),
+        }),
+        apiClient.getServices()
+      ]);
       setPaymentRows(Array.isArray(rows) ? rows : []);
+      setAllServices(Array.isArray(servicesData) ? servicesData : []);
     } catch (err) {
       setError(err.message || "Failed to load payment records.");
     } finally {
@@ -238,9 +244,10 @@ function Payments({
   const dentistOptions = useMemo(() => buildNormalizedOptions((paymentRows || []).map((row) => row.dentist_name)), [paymentRows]);
 
   const serviceOptions = useMemo(() => {
-    const services = (paymentRows || []).flatMap((row) => normalizeServices(row.services || row.services_text));
-    return buildNormalizedOptions(services);
-  }, [paymentRows]);
+    const fromRows = (paymentRows || []).flatMap((row) => normalizeServices(row.services || row.services_text));
+    const fromMaster = (allServices || []).map(s => s.name);
+    return buildNormalizedOptions([...fromRows, ...fromMaster]);
+  }, [paymentRows, allServices]);
 
   const statusOptions = useMemo(() => buildNormalizedOptions((paymentRows || []).map((row) => row.payment_status)), [paymentRows]);
 
