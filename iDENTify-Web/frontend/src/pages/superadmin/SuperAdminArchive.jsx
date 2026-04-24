@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../api/apiClient';
+import useAppStore from '../../store/useAppStore';
 import '../../styles/pages/dentist/DentistSettings.css';
 
 const ROLE_OPTIONS = [

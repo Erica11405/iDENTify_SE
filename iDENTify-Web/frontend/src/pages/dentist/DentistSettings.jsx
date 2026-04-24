@@ -509,15 +509,43 @@ function DentistSettings({ showAideManagement = true }) {
                     </div>
 
                     <div className="form-group" style={{ flex: '1 1 100%', marginTop: '10px' }}>
-                        <label>Available in Branches *</label>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', marginTop: '8px', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <label style={{ marginBottom: 0 }}>Available in Branches *</label>
+                            {branches.length > 0 && (
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '0.8rem', color: '#64748b' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        style={{ width: '13px', height: '13px' }}
+                                        checked={newService.branchIds.length === branches.length && branches.length > 0}
+                                        onChange={(e) => {
+                                            const checked = e.target.checked;
+                                            setNewService(prev => ({
+                                                ...prev,
+                                                branchIds: checked ? branches.map(b => b.id) : []
+                                            }));
+                                        }}
+                                    />
+                                    Select All
+                                </label>
+                            )}
+                        </div>
+                        <div style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(4, 1fr)', 
+                            gap: '12px', 
+                            padding: '12px', 
+                            background: '#f8fafc', 
+                            borderRadius: '8px', 
+                            border: '1px solid #e2e8f0' 
+                        }}>
                             {branches.length === 0 ? (
-                                <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No branches found.</span>
+                                <span style={{ color: '#94a3b8', fontSize: '0.9rem', gridColumn: 'span 4' }}>No branches found.</span>
                             ) : (
                                 branches.map(branch => (
-                                    <label key={branch.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: '#334155', fontWeight: '500' }}>
+                                    <label key={branch.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: '#334155', fontWeight: '500' }}>
                                         <input 
                                             type="checkbox" 
+                                            style={{ width: '14px', height: '14px' }}
                                             checked={newService.branchIds.includes(branch.id)}
                                             onChange={(e) => {
                                                 const checked = e.target.checked;
@@ -529,7 +557,13 @@ function DentistSettings({ showAideManagement = true }) {
                                                 }));
                                             }}
                                         />
-                                        {branch.name}
+                                        <span style={{ 
+                                            whiteSpace: 'nowrap', 
+                                            overflow: 'hidden', 
+                                            textOverflow: 'ellipsis' 
+                                        }} title={branch.name}>
+                                            {branch.name}
+                                        </span>
                                     </label>
                                 ))
                             )}

@@ -537,14 +537,16 @@ export const getDentistReportSummary = async (dentistId, { startDate, endDate } 
 
 /* --- Dynamic Services Functions --- */
 export const getServices = async () => {
-    const res = await fetch(`${API_BASE}/services`);
+    const res = await fetch(`${API_BASE}/services`, {
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
 export const createService = async (payload) => {
     const res = await fetch(`${API_BASE}/services`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
     return handleResponse(res);
@@ -553,14 +555,17 @@ export const createService = async (payload) => {
 export const updateService = async (id, payload) => {
     const res = await fetch(`${API_BASE}/services/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: jsonHeaders(),
         body: JSON.stringify(payload),
     });
     return handleResponse(res);
 };
 
 export const deleteService = async (id) => {
-    const res = await fetch(`${API_BASE}/services/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_BASE}/services/${id}`, { 
+        method: 'DELETE',
+        headers: { ...actorHeaders() },
+    });
     return handleResponse(res);
 };
 
