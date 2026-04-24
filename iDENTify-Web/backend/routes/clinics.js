@@ -211,7 +211,7 @@ router.get('/discover', async (_req, res) => {
     );
 
     const [branchRows] = await db.query(
-      `SELECT id, clinic_id, name
+      `SELECT id, clinic_id, name${branchSupport.address ? ', address' : ''}
        FROM clinic_branches
        WHERE ${branchStatusExpr} = 'Active'
        ORDER BY name ASC`
@@ -226,6 +226,7 @@ router.get('/discover', async (_req, res) => {
       branchesByClinic.get(clinicId).push({
         id: branch.id,
         name: branch.name,
+        address: branch.address || null,
       });
     });
 
