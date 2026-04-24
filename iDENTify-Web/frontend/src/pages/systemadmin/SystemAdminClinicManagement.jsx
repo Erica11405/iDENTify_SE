@@ -192,7 +192,6 @@ function SystemAdminClinicManagement() {
 										<tr>
 											<th>Clinic</th>
 											<th>Status</th>
-											<th>Archived At</th>
 											<th>Actions</th>
 										</tr>
 									</thead>
@@ -213,7 +212,6 @@ function SystemAdminClinicManagement() {
 															{displayStatus}
 														</span>
 													</td>
-													<td>{formatDateTime(clinic.archived_at)}</td>
 													<td>
 														<div className="systemadmin-actions-inline">
 															<button
@@ -259,7 +257,6 @@ function SystemAdminClinicManagement() {
 											<th>Branch</th>
 											<th>Address</th>
 											<th>Status</th>
-											<th>Archived At</th>
 										</tr>
 									</thead>
 									<tbody>
@@ -272,7 +269,6 @@ function SystemAdminClinicManagement() {
 													<td>{branch.name}</td>
 													<td>{branch.address || '-'}</td>
 													<td>{displayStatus}</td>
-													<td>{formatDateTime(branch.archived_at)}</td>
 												</tr>
 											);
 										})}

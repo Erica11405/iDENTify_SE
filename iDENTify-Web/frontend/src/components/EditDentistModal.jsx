@@ -61,8 +61,8 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
     return ['superadmin', 'clinic admin', 'globaladmin', 'clinicadmin', 'systemadmin'].includes(role);
   }, [actorContext]);
 
-  const clinics = []; // TODO: Fetch clinics if needed
-  const branches = []; // TODO: Fetch branches if needed
+  const [clinics, setClinics] = useState([]);
+  const [branches, setBranches] = useState([]);
 
   // Pre-fill the form with the dentist's existing data
   const [formData, setFormData] = useState({
@@ -77,8 +77,38 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
     lunch: dentist?.lunch || { start: "12:00", end: "13:00" },
     breaks: dentist?.breaks || [],
     leaveDays: dentist?.leaveDays || [],
-    status: dentist?.status || "Available"
+    status: dentist?.status || "Available",
+    clinic_id: dentist?.clinic_id || '',
+    branch_id: dentist?.branch_id || ''
   });
+
+  useEffect(() => {
+    const loadClinics = async () => {
+      try {
+        const data = await api.getClinics({ includeInactive: true });
+        setClinics(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to load clinics:", err);
+      }
+    };
+    loadClinics();
+  }, []);
+
+  useEffect(() => {
+    if (!formData.clinic_id) {
+      setBranches([]);
+      return;
+    }
+    const loadBranches = async () => {
+      try {
+        const data = await api.getClinicBranches(formData.clinic_id, { includeInactive: true });
+        setBranches(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to load branches:", err);
+      }
+    };
+    loadBranches();
+  }, [formData.clinic_id]);
 
   const [specDraft, setSpecDraft] = useState("");
 
@@ -188,7 +218,39 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
 
         <form onSubmit={handleSubmit} className="modal-form">
           <div className="form-section">
-            <h3>Personal Details</h3>
+            <h3 style={{ color: '#2563eb', borderBottom: '2px solid #e0f2fe', paddingBottom: '5px', marginBottom: '15px' }}>
+              Assignment & Personal Details
+            </h3>
+
+            {isAdmin && (
+              <div className="form-row" style={{ backgroundColor: '#f8fafc', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #e2e8f0' }}>
+                <div className="form-group">
+                  <label style={{ fontWeight: 'bold', color: '#1e293b' }}>Assigned Clinic</label>
+                  <select 
+                    name="clinic_id" 
+                    value={formData.clinic_id || ''} 
+                    onChange={(e) => setFormData(prev => ({ ...prev, clinic_id: e.target.value, branch_id: '' }))}
+                    style={{ border: '2px solid #cbd5e1' }}
+                  >
+                    <option value="">Select Clinic</option>
+                    {clinics.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label style={{ fontWeight: 'bold', color: '#1e293b' }}>Assigned Branch</label>
+                  <select 
+                    name="branch_id" 
+                    value={formData.branch_id || ''} 
+                    onChange={handleChange}
+                    style={{ border: '2px solid #cbd5e1' }}
+                  >
+                    <option value="">Select Branch</option>
+                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+
             <div className="form-row">
               <div className="form-group">
                 <label>First Name</label>
@@ -237,33 +299,6 @@ const EditDentistModal = ({ dentist, dentistTypeOptions = [], onClose, onSuccess
               <label>Email</label>
               <input name="email" type="email" value={formData.email} onChange={handleChange} required />
             </div>
-
-            {isAdmin && (
-              <div className="form-row" style={{ marginTop: '15px' }}>
-                <div className="form-group">
-                  <label>Assigned Clinic</label>
-                  <select 
-                    name="clinic_id" 
-                    value={formData.clinic_id || ''} 
-                    onChange={(e) => setFormData(prev => ({ ...prev, clinic_id: e.target.value, branch_id: '' }))}
-                  >
-                    <option value="">Select Clinic</option>
-                    {clinics.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Assigned Branch</label>
-                  <select 
-                    name="branch_id" 
-                    value={formData.branch_id || ''} 
-                    onChange={handleChange}
-                  >
-                    <option value="">Select Branch</option>
-                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
-                </div>
-              </div>
-            )}
           </div>
 
           <hr className="divider" />

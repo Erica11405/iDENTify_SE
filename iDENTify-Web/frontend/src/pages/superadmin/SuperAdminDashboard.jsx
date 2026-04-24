@@ -314,13 +314,17 @@ function SuperAdminDashboard() {
         setClinicActionNotice({ type: '', message: '' });
 
         try {
-            const created = await api.createClinicBranch(clinicId, {
-                name,
-                code: code || undefined,
+            const fullAddress = [
                 street,
                 barangay,
                 city,
-                province,
+                province
+            ].map(s => String(s || '').trim()).filter(Boolean).join(', ');
+
+            const created = await api.createClinicBranch(clinicId, {
+                name,
+                code: code || undefined,
+                address: fullAddress,
             });
 
             const targetClinicId = String(clinicId);
@@ -398,9 +402,21 @@ function SuperAdminDashboard() {
 
     return (
         <section className="settings-dashboard-container">
-            <div className="settings-header-section">
-                <h2>Clinic Admin Dashboard</h2>
-                <p>System-level overview for users, clinics, and booking operations.</p>
+            <div className="settings-header-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h2>Clinic Admin Dashboard</h2>
+                    <p>System-level overview for users, clinics, and booking operations.</p>
+                </div>
+                <button 
+                    className="add-dentist-btn" 
+                    onClick={() => {
+                        const element = document.getElementById('create-branch-section');
+                        if (element) element.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    style={{ backgroundColor: '#2563eb' }}
+                >
+                    + Add Branch
+                </button>
             </div>
 
             {loading ? <p className="dashboard-inline-loading">Loading dashboard...</p> : null}
@@ -452,7 +468,7 @@ function SuperAdminDashboard() {
                         <WeeklyBarChart chartData={chartData} />
                     </div>
 
-                    <div className="settings-form-card dashboard-top-spacing-md dashboard-management-card">
+                    <div id="create-branch-section" className="settings-form-card dashboard-top-spacing-md dashboard-management-card">
                         <h3>Create Branch</h3>
                         <p className="dashboard-muted-text">Assign each branch to a clinic for cleaner tenant-level reporting.</p>
                         <form onSubmit={handleCreateBranch}>

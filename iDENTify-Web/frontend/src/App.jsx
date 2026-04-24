@@ -41,6 +41,7 @@ import SystemAdminDashboard from './pages/systemadmin/SystemAdminDashboard';
 import SystemAdminApprovals from './pages/systemadmin/SystemAdminApprovals';
 import SystemAdminClinicManagement from './pages/systemadmin/SystemAdminClinicManagement';
 import SystemAdminArchive from './pages/systemadmin/SystemAdminArchive';
+import SystemAdminReports from './pages/systemadmin/SystemAdminReports';
 
 function requiresPasswordChange(user) {
     if (!user || typeof user !== 'object') {
@@ -120,7 +121,7 @@ function App() {
                         <Route path="/history" element={<DentistHistory />} />
                         <Route path="/payments" element={<DentistPayments />} />
                         <Route path="/reports" element={<DentistReports />} />
-                        <Route path="/patients/:id" element={<PatientForm />} />
+                        <Route path="/patients/:id" element={<PatientForm userRole={user.role} />} />
                         <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </>
                 )}
@@ -133,7 +134,7 @@ function App() {
                         <Route path="/admin/settings" element={<SystemAdminClinicManagement />} />
                         <Route path="/admin/archive" element={<SystemAdminArchive />} />
                         <Route path="/admin/users" element={<Navigate to="/admin/dashboard" replace />} />
-                        <Route path="/admin/reports" element={<Navigate to="/admin/dashboard" replace />} />
+                        <Route path="/admin/reports" element={<SystemAdminReports />} />
                         <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
                     </>
                 )}
@@ -158,7 +159,7 @@ function App() {
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/patients" element={<Patients />} />
                         <Route path="/patients/new" element={<PatientForm />} />
-                        <Route path="/patients/:id" element={<PatientForm />} />
+                        <Route path="/patients/:id" element={<PatientForm userRole={user.role} />} />
                         <Route path="/appointments" element={<Appointments />} />
                         <Route path="/walk-in" element={<Queue />} />
                         <Route path="/queue" element={<Navigate to="/walk-in" replace />} />

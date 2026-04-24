@@ -260,6 +260,10 @@ function Sidebar({ role }) {
                                 <img src={QueueIcon} alt="Approvals" />
                                 <span>Approvals</span>
                             </NavLink>
+                            <NavLink to="/admin/reports" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={ReportIcon} alt="Reports" />
+                                <span>Reports</span>
+                            </NavLink>
                             <NavLink to="/admin/settings" className={({ isActive }) => isActive ? 'active' : ''}>
                                 <img src={AppointmentIcon} alt="Clinic Management" />
                                 <span>Clinic Management</span>

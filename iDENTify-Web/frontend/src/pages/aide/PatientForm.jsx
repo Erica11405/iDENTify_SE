@@ -5,6 +5,7 @@ import "../../styles/pages/aide/PatientForm.css";
 import XrayViewer from "../../components/XrayViewer";
 import MedicalAlertBanner from "../../components/MedicalAlertBanner";
 import PaymentModal from "../../components/PaymentModal";
+import FollowUpModal from "../../components/FollowUpModal";
 import useApi from "../../hooks/useApi";
 import apiClient from "../../api/apiClient"; 
 import useAppStore from "../../store/useAppStore";

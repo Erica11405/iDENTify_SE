@@ -17,6 +17,7 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [sentEmail, setSentEmail] = useState('');
+  const [dentistTypes, setDentistTypes] = useState([]);
   
   const [formData, setFormData] = useState({
     first_name: '',
@@ -31,6 +32,18 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
     leaveDays: [],
     status: "Available"
   });
+
+  useEffect(() => {
+    const loadTypes = async () => {
+      try {
+        const types = await api.getDentistTypes();
+        setDentistTypes(Array.isArray(types) ? types : []);
+      } catch (err) {
+        console.error("Failed to load dentist types:", err);
+      }
+    };
+    loadTypes();
+  }, []);
 
   const [specDraft, setSpecDraft] = useState("");
 
@@ -211,12 +224,19 @@ const AddDentistModal = ({ onClose, onSuccess }) => {
                     style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
                   >
                     <option value="">Add Specialization</option>
-                    <option value="General Dentist">General Dentist</option>
-                    <option value="Orthodontist">Orthodontist</option>
-                    <option value="Periodontist">Periodontist</option>
-                    <option value="Oral Surgeon">Oral Surgeon</option>
-                    <option value="Endodontist">Endodontist</option>
-                    <option value="Pediatric Dentist">Pediatric Dentist</option>
+                    {dentistTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                    {dentistTypes.length === 0 && (
+                      <>
+                        <option value="General Dentist">General Dentist</option>
+                        <option value="Orthodontist">Orthodontist</option>
+                        <option value="Periodontist">Periodontist</option>
+                        <option value="Oral Surgeon">Oral Surgeon</option>
+                        <option value="Endodontist">Endodontist</option>
+                        <option value="Pediatric Dentist">Pediatric Dentist</option>
+                      </>
+                    )}
                   </select>
                   <button type="button" className="btn-small-add" onClick={addSpecialization} style={{ padding: '0 15px', background: '#3498db', color: 'white', border: 'none', borderRadius: '4px' }}>Add</button>
                 </div>

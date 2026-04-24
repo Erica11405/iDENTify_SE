@@ -54,7 +54,7 @@ router.get('/', async (req, res) => {
         const [rows] = await db.query(`
             SELECT 
                 pr.id, pr.reason, pr.status, pr.created_at,
-                p.name AS patient_name, p.full_name AS patient_full_name,
+                p.full_name AS patient_name, p.full_name AS patient_full_name,
                 d.id AS dentist_id, d.name AS dentist_name, d.is_suspended,
                 cb.name AS branch_name
             FROM patient_reports pr

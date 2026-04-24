@@ -340,14 +340,6 @@ function SystemAdminDashboard() {
                     ) : null}
 
                     <div className="settings-form-card dashboard-top-spacing-md">
-                        <h3>Appointments Per Dentist</h3>
-                        <p className="dashboard-muted-text">
-                            Current week: {chartData.rangeLabel}
-                        </p>
-                        <WeeklyBarChart chartData={chartData} />
-                    </div>
-
-                    <div className="settings-form-card dashboard-top-spacing-md">
                         <h3>Branches Per Clinic</h3>
                         <p className="dashboard-muted-text">
                             Clinic footprint based on current branch assignments.

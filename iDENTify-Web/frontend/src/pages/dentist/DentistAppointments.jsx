@@ -257,15 +257,6 @@ function DentistAppointments() {
                           >
                             Review Chart
                           </button>
-                          <button
-                            className="follow-up-btn"
-                            onClick={() => {
-                              const patientData = patients.find(p => p.id === appt.patient_id) || { id: appt.patient_id, name: appt.patient_name || appt.patient };
-                              setFollowUpModal({ isOpen: true, patient: patientData });
-                            }}
-                          >
-                            Follow-up
-                          </button>
                         </div>
                       </td>
                     </tr>
