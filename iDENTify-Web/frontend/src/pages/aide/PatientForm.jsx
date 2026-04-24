@@ -118,8 +118,11 @@ function PatientForm({ userRole }) {
 	const location = useLocation();
 	const api = useApi();
 
-    const isDentistReviewing = userRole === 'dentist';
     const user = useAppStore((state) => state.user);
+    const actualRole = String(user?.role || userRole || '').trim().toLowerCase();
+    const isDentist = actualRole === 'dentist';
+    const isAide = actualRole === 'aide';
+    const isDentistReviewing = isDentist;
 	const queue = useAppStore((state) => state.queue || []);
 	const allAppointments = useAppStore((state) => state.appointments || []);
 	const dentists = useAppStore((state) => state.dentists || []);
@@ -1229,51 +1232,55 @@ function PatientForm({ userRole }) {
 								<h3 className="section-title">Prepared By</h3>
                                 <input className="pill-input-input" value={user?.name || "Dental Aide"} readOnly style={{ backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', cursor: 'not-allowed', width: '250px', fontWeight: '500' }} />
 							</div>
-							<div className="vital-signs">
-								<h3 className="section-title">Vital Signs (Year {selectedYear})</h3>
-								<div className="vital-row" style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-									<div className="vital-field" style={{ flex: '1 1 120px' }}>
-										<label>BP</label>
-										<input className="pill-input-input" placeholder="120/80" value={vitals.bp || ""} onChange={(e) => updateVitals("bp", e.target.value)} disabled={isVisitReadOnly} />
-									</div>
-									<div className="vital-field" style={{ flex: '1 1 120px' }}>
-										<label>Pulse</label>
-										<input className="pill-input-input" placeholder="72" value={vitals.pulse || ""} onChange={(e) => updateVitals("pulse", e.target.value)} disabled={isVisitReadOnly} />
-									</div>
-									<div className="vital-field" style={{ flex: '1 1 140px' }}>
-										<label>Temp</label>
-										<div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-											<input type="number" step="0.1" className="pill-input-input" placeholder="36.5" value={getTempNumericValue()} onChange={(e) => handleTempNumberChange(e.target.value)} disabled={isVisitReadOnly} style={{ flex: 1 }} />
-											<select className="pill-input-input" style={{ width: '60px', textAlign: 'center' }} value={tempUnit} onChange={(e) => handleUnitToggle(e.target.value)} disabled={isVisitReadOnly}>
-												<option value="C">°C</option>
-												<option value="F">°F</option>
-											</select>
-										</div>
-									</div>
-								</div>
-							</div>
+							{!isAide && (
+                                <div className="vital-signs">
+                                    <h3 className="section-title">Vital Signs (Year {selectedYear})</h3>
+                                    <div className="vital-row" style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                                        <div className="vital-field" style={{ flex: '1 1 120px' }}>
+                                            <label>BP</label>
+                                            <input className="pill-input-input" placeholder="120/80" value={vitals.bp || ""} onChange={(e) => updateVitals("bp", e.target.value)} disabled={isVisitReadOnly} />
+                                        </div>
+                                        <div className="vital-field" style={{ flex: '1 1 120px' }}>
+                                            <label>Pulse</label>
+                                            <input className="pill-input-input" placeholder="72" value={vitals.pulse || ""} onChange={(e) => updateVitals("pulse", e.target.value)} disabled={isVisitReadOnly} />
+                                        </div>
+                                        <div className="vital-field" style={{ flex: '1 1 140px' }}>
+                                            <label>Temp</label>
+                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <input type="number" step="0.1" className="pill-input-input" placeholder="36.5" value={getTempNumericValue()} onChange={(e) => handleTempNumberChange(e.target.value)} disabled={isVisitReadOnly} style={{ flex: 1 }} />
+                                                <select className="pill-input-input" style={{ width: '60px', textAlign: 'center' }} value={tempUnit} onChange={(e) => handleUnitToggle(e.target.value)} disabled={isVisitReadOnly}>
+                                                    <option value="C">°C</option>
+                                                    <option value="F">°F</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 						</div>
 					</section>
 				</div>
 
-				<section style={{ marginTop: '20px', padding: '15px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-					<h3 className="section-title">Medical Alerts & Allergies (Global)</h3>
-					{!isVisitReadOnly && (
-                        <div className="medical-alert-input-group">
-                            <input className="pill-input-input" placeholder="Type allergy (e.g. Asthma, Penicillin)" value={alertInput} onChange={(e) => setAlertInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddAlert()} />
-                            <button className="small-btn" style={{ background: '#ef4444', minWidth: '60px' }} onClick={handleAddAlert}>+ Add</button>
+				{!isAide && (
+                    <section style={{ marginTop: '20px', padding: '15px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <h3 className="section-title">Medical Alerts & Allergies (Global)</h3>
+                        {!isVisitReadOnly && (
+                            <div className="medical-alert-input-group">
+                                <input className="pill-input-input" placeholder="Type allergy (e.g. Asthma, Penicillin)" value={alertInput} onChange={(e) => setAlertInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddAlert()} />
+                                <button className="small-btn" style={{ background: '#ef4444', minWidth: '60px' }} onClick={handleAddAlert}>+ Add</button>
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: '20px', marginTop: isVisitReadOnly ? '10px' : '0' }}>
+                            {(patient.medicalAlerts && patient.medicalAlerts.length > 0) ? (
+                                patient.medicalAlerts.map((alert, i) => (
+                                    <span key={i} className="alert-chip">{alert}{!isVisitReadOnly && <button onClick={() => handleRemoveAlert(alert)}>×</button>}</span>
+                                ))
+                            ) : ( <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.9rem' }}>No active alerts.</span> )}
                         </div>
-                    )}
-					<div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: '20px', marginTop: isVisitReadOnly ? '10px' : '0' }}>
-						{(patient.medicalAlerts && patient.medicalAlerts.length > 0) ? (
-							patient.medicalAlerts.map((alert, i) => (
-								<span key={i} className="alert-chip">{alert}{!isVisitReadOnly && <button onClick={() => handleRemoveAlert(alert)}>×</button>}</span>
-							))
-						) : ( <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.9rem' }}>No active alerts.</span> )}
-					</div>
-				</section>
+                    </section>
+                )}
 
-				{recommendations.length > 0 && (
+				{!isAide && recommendations.length > 0 && (
 					<div style={{ marginTop: '20px', padding: '15px', background: '#fff7ed', borderLeft: '4px solid #f97316', borderRadius: '4px' }}>
 						<h4 style={{ margin: '0 0 10px 0', color: '#c2410c' }}>Automated Recommendations (Year {selectedYear})</h4>
 						<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1287,23 +1294,25 @@ function PatientForm({ userRole }) {
 					</div>
 				)}
 
-				<section className="oral-section">
-					<h3 className="section-title">Oral Health Condition</h3>
-					<div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
-						{yearsList.map(year => ( <button key={year} onClick={() => handleYearChange(year)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', backgroundColor: selectedYear === year ? '#2563eb' : '#e2e8f0', color: selectedYear === year ? 'white' : '#475569', boxShadow: selectedYear === year ? '0 2px 4px rgba(37,99,235,0.3)' : 'none', transition: 'all 0.2s' }}>Year {year}</button> ))}
-						{!isHistoryView && <button onClick={handleAddYear} style={{ padding: '8px 12px', borderRadius: '20px', border: '2px dashed #cbd5e1', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', backgroundColor: 'transparent', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Add Next Year">+</button>}
-					</div>
-					<div className="status-palette">
-						{["issue", "planned", "completed"].map((status) => ( <button key={status} className={`status-pill${activeStatus === status ? " active" : ""}`} onClick={() => !isChartReadOnly && setActiveStatus(status)} disabled={isChartReadOnly}><span className={`status-dot ${status}`}></span>{status === "issue" ? "Issue (red)" : status === "planned" ? "Planned (blue)" : "Completed (green)"}</button> ))}
-					</div>
-					<div className="tooth-chart-container">
-						<div className="tooth-inner-panel">
-							<div className="tc-group"><div className="tc-row-header">Top Layer (Treatment / Condition)</div>{renderBoxRow(0)}{renderBoxRow(1)}</div>
-							<div className="tc-group"><div className="tc-row-header"></div>{renderCircleGroup(upperConditionRows, 0)}{renderCircleGroup(lowerConditionRows, 26)}</div>
-							<div className="tc-group"><div className="tc-row-header">Bottom Layer (Condition / Treatment)</div>{renderBoxRow(2)}{renderBoxRow(3)}</div>
-						</div>
-					</div>
-				</section>
+				{!isAide && (
+                    <section className="oral-section">
+                        <h3 className="section-title">Oral Health Condition</h3>
+                        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {yearsList.map(year => ( <button key={year} onClick={() => handleYearChange(year)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', backgroundColor: selectedYear === year ? '#2563eb' : '#e2e8f0', color: selectedYear === year ? 'white' : '#475569', boxShadow: selectedYear === year ? '0 2px 4px rgba(37,99,235,0.3)' : 'none', transition: 'all 0.2s' }}>Year {year}</button> ))}
+                            {!isHistoryView && <button onClick={handleAddYear} style={{ padding: '8px 12px', borderRadius: '20px', border: '2px dashed #cbd5e1', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', backgroundColor: 'transparent', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Add Next Year">+</button>}
+                        </div>
+                        <div className="status-palette">
+                            {["issue", "planned", "completed"].map((status) => ( <button key={status} className={`status-pill${activeStatus === status ? " active" : ""}`} onClick={() => !isChartReadOnly && setActiveStatus(status)} disabled={isChartReadOnly}><span className={`status-dot ${status}`}></span>{status === "issue" ? "Issue (red)" : status === "planned" ? "Planned (blue)" : "Completed (green)"}</button> ))}
+                        </div>
+                        <div className="tooth-chart-container">
+                            <div className="tooth-inner-panel">
+                                <div className="tc-group"><div className="tc-row-header">Top Layer (Treatment / Condition)</div>{renderBoxRow(0)}{renderBoxRow(1)}</div>
+                                <div className="tc-group"><div className="tc-row-header"></div>{renderCircleGroup(upperConditionRows, 0)}{renderCircleGroup(lowerConditionRows, 26)}</div>
+                                <div className="tc-group"><div className="tc-row-header">Bottom Layer (Condition / Treatment)</div>{renderBoxRow(2)}{renderBoxRow(3)}</div>
+                            </div>
+                        </div>
+                    </section>
+                )}
 
 				<section className="timeline-section" style={{ padding: '20px', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '2rem' }}>
 					<h3 className="section-title" style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginBottom: '20px' }}>
@@ -1338,56 +1347,60 @@ function PatientForm({ userRole }) {
                                             renderOption={(item) => (
                                                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                                                     <span>{item.name}</span>
-                                                    <span style={{ fontSize: "0.8rem", color: "#64748b" }}>{item.price}</span>
+                                                    {!isDentist && <span style={{ fontSize: "0.8rem", color: "#64748b" }}>{item.price}</span>}
                                                 </div>
                                             )}
                                         />
                                     </div>
-                                    <input 
-                                        type="number" 
-                                        className="pill-input-input" 
-                                        placeholder="Price" 
-                                        value={currentServicePrice} 
-                                        onChange={(e) => setCurrentServicePrice(e.target.value)} 
-                                        style={{ width: '80px' }}
-                                    />
+                                    {!isDentist && (
+                                        <input 
+                                            type="number" 
+                                            className="pill-input-input" 
+                                            placeholder="Price" 
+                                            value={currentServicePrice} 
+                                            onChange={(e) => setCurrentServicePrice(e.target.value)} 
+                                            style={{ width: '80px' }}
+                                        />
+                                    )}
                                     <button onClick={handleAddTimelineService} className="small-btn" style={{ width: "auto", padding: '0 15px', height: "38px", background: '#2563eb' }}>+ Add</button>
                                 </div>
 							</div>
 
-                            <div className="form-group" style={{ gridColumn: '1 / -1', borderTop: '1px dashed #cbd5e1', paddingTop: '15px', marginTop: '10px' }}>
-								<label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '5px' }}>Additional Charges (e.g. Anesthesia)</label>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    <input 
-                                        type="text" 
-                                        className="pill-input-input" 
-                                        placeholder="Charge Name" 
-                                        value={currentChargeName} 
-                                        onChange={(e) => setCurrentChargeName(e.target.value)} 
-                                        style={{ flex: 2 }}
-                                    />
-                                    <input 
-                                        type="number" 
-                                        className="pill-input-input" 
-                                        placeholder="Amount" 
-                                        value={currentChargePrice} 
-                                        onChange={(e) => setCurrentChargePrice(e.target.value)} 
-                                        style={{ width: '100px' }}
-                                    />
-                                    <button onClick={handleAddCharge} className="small-btn" style={{ width: "auto", padding: '0 15px', height: "38px", background: '#64748b' }}>+ Add</button>
-                                </div>
-                                {additionalCharges.length > 0 && (
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
-                                        {additionalCharges.map((charge) => (
-                                            <div key={charge.name} style={{ background: "#f1f5f9", color: "#475569", padding: "6px 12px", borderRadius: "8px", fontSize: "0.85rem", border: '1px solid #cbd5e1', display: "inline-flex", alignItems: "center", gap: "8px", fontWeight: '500' }}>
-                                                <span>{charge.name}</span>
-                                                <span style={{ fontWeight: 'bold' }}>₱{Number(charge.price).toLocaleString()}</span>
-                                                <button onClick={() => handleRemoveCharge(charge.name)} style={{ border: "none", background: "none", cursor: "pointer", fontWeight: '900', color: "#64748b", padding: '0 5px' }}>×</button>
-                                            </div>
-                                        ))}
+                            {!isDentist && (
+                                <div className="form-group" style={{ gridColumn: '1 / -1', borderTop: '1px dashed #cbd5e1', paddingTop: '15px', marginTop: '10px' }}>
+                                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '5px' }}>Additional Charges (e.g. Anesthesia)</label>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <input 
+                                            type="text" 
+                                            className="pill-input-input" 
+                                            placeholder="Charge Name" 
+                                            value={currentChargeName} 
+                                            onChange={(e) => setCurrentChargeName(e.target.value)} 
+                                            style={{ flex: 2 }}
+                                        />
+                                        <input 
+                                            type="number" 
+                                            className="pill-input-input" 
+                                            placeholder="Amount" 
+                                            value={currentChargePrice} 
+                                            onChange={(e) => setCurrentChargePrice(e.target.value)} 
+                                            style={{ width: '100px' }}
+                                        />
+                                        <button onClick={handleAddCharge} className="small-btn" style={{ width: "auto", padding: '0 15px', height: "38px", background: '#64748b' }}>+ Add</button>
                                     </div>
-                                )}
-							</div>
+                                    {additionalCharges.length > 0 && (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
+                                            {additionalCharges.map((charge) => (
+                                                <div key={charge.name} style={{ background: "#f1f5f9", color: "#475569", padding: "6px 12px", borderRadius: "8px", fontSize: "0.85rem", border: '1px solid #cbd5e1', display: "inline-flex", alignItems: "center", gap: "8px", fontWeight: '500' }}>
+                                                    <span>{charge.name}</span>
+                                                    <span style={{ fontWeight: 'bold' }}>₱{Number(charge.price).toLocaleString()}</span>
+                                                    <button onClick={() => handleRemoveCharge(charge.name)} style={{ border: "none", background: "none", cursor: "pointer", fontWeight: '900', color: "#64748b", padding: '0 5px' }}>×</button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="form-group">
                                 <button className="small-btn" onClick={addTimelineEntry} style={{ background: '#10b981', height: '38px', padding: '0 20px', fontWeight: 'bold' }}>Save Entry</button>
@@ -1399,22 +1412,26 @@ function PatientForm({ userRole }) {
                                         {selectedTimelineServices.map((svc) => (
                                             <div key={svc.name} style={{ background: "#eff6ff", color: "#2563eb", padding: "6px 12px", borderRadius: "8px", fontSize: "0.85rem", border: '1px solid #dbeafe', display: "inline-flex", alignItems: "center", gap: "8px", fontWeight: '500' }}>
                                                 <span>{svc.name}</span>
-                                                <input 
-                                                    type="number" 
-                                                    value={svc.price} 
-                                                    onChange={(e) => {
-                                                        const newPrice = e.target.value;
-                                                        setSelectedTimelineServices(prev => prev.map(s => s.name === svc.name ? { ...s, price: parseFloat(newPrice) || 0 } : s));
-                                                    }}
-                                                    style={{ width: '80px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #93c5fd', outline: 'none' }}
-                                                />
+                                                {!isDentist && (
+                                                    <input 
+                                                        type="number" 
+                                                        value={svc.price} 
+                                                        onChange={(e) => {
+                                                            const newPrice = e.target.value;
+                                                            setSelectedTimelineServices(prev => prev.map(s => s.name === svc.name ? { ...s, price: parseFloat(newPrice) || 0 } : s));
+                                                        }}
+                                                        style={{ width: '80px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #93c5fd', outline: 'none' }}
+                                                    />
+                                                )}
                                                 <button onClick={() => handleRemoveTimelineService(svc.name)} style={{ border: "none", background: "none", cursor: "pointer", fontWeight: '900', color: "#2563eb", padding: '0 5px' }}>×</button>
                                             </div>
                                         ))}
                                     </div>
-                                    <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#1e293b', marginTop: '10px' }}>
-                                        Total: ₱{selectedTimelineServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0).toLocaleString()}
-                                    </div>
+                                    {!isDentist && (
+                                        <div style={{ fontWeight: 'bold', fontSize: '1rem', color: '#1e293b', marginTop: '10px' }}>
+                                            Total: ₱{selectedTimelineServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0).toLocaleString()}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 						</div>
@@ -1445,35 +1462,37 @@ function PatientForm({ userRole }) {
 					</div>
 				</section>
 
-				<section className="medication-section">
-					<h3 className="section-title">Medication (Year {selectedYear})</h3>
-					{!isVisitReadOnly && (
-						<div className="medication-form">
-							<div style={{ position: 'relative' }}>
-								<SearchableInput 
-                                    options={clinicMedicationsList || []} 
-                                    value={medicationForm.medicine} 
-                                    onChange={(val) => updateMedicationForm("medicine", val)} 
-                                    placeholder="Medicine (e.g. Amoxicillin)" 
-                                />
-							</div>
-							<input className="pill-input-input" placeholder="Dosage (e.g., 500mg)" value={medicationForm.dosage} onChange={(e) => updateMedicationForm("dosage", e.target.value)} />
-							<select className="pill-input-input" value={medicationForm.frequency} onChange={(e) => updateMedicationForm("frequency", e.target.value)}>
-								<option value="" disabled>Select Frequency</option>
-								{medicationFrequencyOptions.map((option) => (
-									<option key={option} value={option}>{option}</option>
-								))}
-							</select>
-							<input className="pill-input-input" placeholder="Notes" value={medicationForm.notes} onChange={(e) => updateMedicationForm("notes", e.target.value)} />
-							<div className="medication-actions"><button className="small-btn" onClick={addMedication}>Add</button></div>
-						</div>
-					)}
-					<div className="medication-list">
-						{(medications || []).length === 0 ? <div className="muted-text">No medications listed.</div> : (medications || []).map((m) => (
-							<div key={m.id} className="medication-entry"><strong>{m.medicine}</strong> — {m.dosage || ""} — {m.frequency || ""}<div className="muted-text">{m.notes}</div>{!isVisitReadOnly && <div className="medication-entry-actions"><button className="small-btn danger" onClick={() => deleteMedication(m.id)}>Delete</button></div>}</div>
-						))}
-					</div>
-				</section>
+				{!isAide && (
+                    <section className="medication-section">
+                        <h3 className="section-title">Medication (Year {selectedYear})</h3>
+                        {!isVisitReadOnly && (
+                            <div className="medication-form">
+                                <div style={{ position: 'relative' }}>
+                                    <SearchableInput 
+                                        options={clinicMedicationsList || []} 
+                                        value={medicationForm.medicine} 
+                                        onChange={(val) => updateMedicationForm("medicine", val)} 
+                                        placeholder="Medicine (e.g. Amoxicillin)" 
+                                    />
+                                </div>
+                                <input className="pill-input-input" placeholder="Dosage (e.g., 500mg)" value={medicationForm.dosage} onChange={(e) => updateMedicationForm("dosage", e.target.value)} />
+                                <select className="pill-input-input" value={medicationForm.frequency} onChange={(e) => updateMedicationForm("frequency", e.target.value)}>
+                                    <option value="" disabled>Select Frequency</option>
+                                    {medicationFrequencyOptions.map((option) => (
+                                        <option key={option} value={option}>{option}</option>
+                                    ))}
+                                </select>
+                                <input className="pill-input-input" placeholder="Notes" value={medicationForm.notes} onChange={(e) => updateMedicationForm("notes", e.target.value)} />
+                                <div className="medication-actions"><button className="small-btn" onClick={addMedication}>Add</button></div>
+                            </div>
+                        )}
+                        <div className="medication-list">
+                            {(medications || []).length === 0 ? <div className="muted-text">No medications listed.</div> : (medications || []).map((m) => (
+                                <div key={m.id} className="medication-entry"><strong>{m.medicine}</strong> — {m.dosage || ""} — {m.frequency || ""}<div className="muted-text">{m.notes}</div>{!isVisitReadOnly && <div className="medication-entry-actions"><button className="small-btn danger" onClick={() => deleteMedication(m.id)}>Delete</button></div>}</div>
+                            ))}
+                        </div>
+                    </section>
+                )}
 
 				<section className="upload-section">
 					<h3 className="section-title">Patient Gallery (Year {selectedYear})</h3>
@@ -1507,9 +1526,15 @@ function PatientForm({ userRole }) {
                             >
                                 Schedule Follow-up
                             </button>
-                            <button className="done-btn" onClick={handleSaveAll} disabled={isSaving}>
-                                {isSaving ? "Saving..." : "Save"}
-                            </button>
+                            {isDentist ? (
+                                <button className="done-btn" onClick={saveClinicalProgress} disabled={isSaving} style={{ background: '#10b981' }}>
+                                    {isSaving ? "Saving..." : "Save Progress"}
+                                </button>
+                            ) : (
+                                <button className="done-btn" onClick={handleSaveAll} disabled={isSaving}>
+                                    {isSaving ? "Saving..." : "Save & Bill"}
+                                </button>
+                            )}
                         </>
                     ) : (
                         <div style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>

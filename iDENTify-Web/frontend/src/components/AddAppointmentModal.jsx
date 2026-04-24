@@ -56,7 +56,7 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // --- COMPONENT ---
 function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
   // 1. PATIENT TOGGLE & SEARCH STATE
-  const [patientType, setPatientType] = useState("new"); // "new" or "old"
+  const patientType = "old"; 
 
   // Search State
   const [searchQuery, setSearchQuery] = useState("");
@@ -328,14 +328,8 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
     e.preventDefault();
     if (availability.isFull) return toast.error("Daily limit reached.");
 
-    let finalName = form.patient_name;
-    if (patientType === "new") {
-      if (!form.first_name || !form.last_name) return toast.error("First and Last name are required.");
-      finalName = `${form.first_name} ${form.middle_name ? form.middle_name + ' ' : ''}${form.last_name}`.trim();
-    } else {
-      // ADDED: Strict check to ensure an old patient was actually selected
-      if (!form.patient_name || !form.patient_id) return toast.error("Please search and select an existing patient.");
-    }
+    // ADDED: Strict check to ensure an old patient was actually selected
+    if (!form.patient_name || !form.patient_id) return toast.error("Please search and select an existing patient.");
 
     if (!form.dentist_id) return toast.error("Please select a dentist.");
     if (!form.appointmentDate) return toast.error("Please select a date.");
@@ -349,13 +343,13 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
 
       await onSave({
         ...form,
-        patient_name: finalName,
+        patient_name: form.patient_name,
         procedure: procedureString,
         services: selectedServices,
         estimated_duration_minutes: selectedDurationMinutes,
         dentist_id: Number(form.dentist_id),
         timeStart: fullTimeStart,
-        isNewPatient: patientType === "new"
+        isNewPatient: false
       });
       setSelectedServices([]);
     } catch (error) {
@@ -372,72 +366,42 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
       <div className="modal" style={{ maxWidth: '600px', width: '100%' }}>
         <h2>Add Appointment</h2>
 
-        {/* --- TOGGLE TABS --- */}
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-          <button
-            type="button"
-            onClick={() => { setPatientType("new"); setForm(prev => ({...prev, patient_id: null, patient_name: ""})); }}
-            style={{
-              flex: 1, padding: '10px', borderRadius: '8px', border: 'none',
-              background: patientType === "new" ? '#2563eb' : '#e2e8f0',
-              color: patientType === "new" ? 'white' : '#64748b',
-              fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s'
-            }}
-          >
-            New Patient
-          </button>
-          <button
-            type="button"
-            onClick={() => setPatientType("old")}
-            style={{
-              flex: 1, padding: '10px', borderRadius: '8px', border: 'none',
-              background: patientType === "old" ? '#2563eb' : '#e2e8f0',
-              color: patientType === "old" ? 'white' : '#64748b',
-              fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s'
-            }}
-          >
-            Existing Record
-          </button>
-        </div>
-
-        {/* --- SEARCH SECTION (Only for OLD) --- */}
-        {patientType === "old" && (
-          <div style={{ marginBottom: '20px', padding: '15px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                placeholder="Search name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-              />
-              <button type="button" onClick={handleSearch} disabled={isSearching} style={{ padding: '8px 15px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                {isSearching ? '...' : 'Search'}
-              </button>
-            </div>
-            {searchResults.length > 0 && (
-              <ul style={{ maxHeight: '150px', overflowY: 'auto', marginTop: '10px', background: 'white', border: '1px solid #eee', listStyle: 'none', padding: 0 }}>
-                {searchResults.map(p => (
-                  <li
-                    key={p.id}
-                    onClick={() => handleSelectOldPatient(p)}
-                    style={{ padding: '8px', borderBottom: '1px solid #f1f1f1', cursor: 'pointer', fontSize: '0.9rem' }}
-                    onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
-                    onMouseOut={(e) => e.currentTarget.style.background = 'white'}
-                  >
-                    <strong>{p.full_name}</strong> <span style={{ color: '#666' }}>(Born: {p.birthdate ? p.birthdate.split('T')[0] : 'N/A'})</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {form.patient_name && (
-              <div style={{ marginTop: '10px', color: '#059669', fontWeight: 'bold' }}>
-                Selected: {form.patient_name}
-              </div>
-            )}
+        {/* --- SEARCH SECTION --- */}
+        <div style={{ marginBottom: '20px', padding: '15px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="text"
+              placeholder="Search existing patient name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+            />
+            <button type="button" onClick={handleSearch} disabled={isSearching} style={{ padding: '8px 15px', background: '#0ea5e9', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+              {isSearching ? '...' : 'Search'}
+            </button>
           </div>
-        )}
+          {searchResults.length > 0 && (
+            <ul style={{ maxHeight: '150px', overflowY: 'auto', marginTop: '10px', background: 'white', border: '1px solid #eee', listStyle: 'none', padding: 0 }}>
+              {searchResults.map(p => (
+                <li
+                  key={p.id}
+                  onClick={() => handleSelectOldPatient(p)}
+                  style={{ padding: '8px', borderBottom: '1px solid #f1f1f1', cursor: 'pointer', fontSize: '0.9rem' }}
+                  onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'white'}
+                >
+                  <strong>{p.full_name}</strong> <span style={{ color: '#666' }}>(Born: {p.birthdate ? p.birthdate.split('T')[0] : 'N/A'})</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {form.patient_name && (
+            <div style={{ marginTop: '10px', color: '#059669', fontWeight: 'bold' }}>
+              Selected: {form.patient_name}
+            </div>
+          )}
+        </div>
 
         <form onSubmit={handleSubmit}>
           {/* --- SPLIT NAME INPUTS --- */}

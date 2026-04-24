@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db'); 
+const { getActorTenantScope } = require('../utils/accessControl');
 
 async function hasDefaultFrequencyColumn() {
     const [rows] = await db.query("SHOW COLUMNS FROM clinic_medications LIKE 'default_frequency'");
@@ -12,22 +13,32 @@ function normalizeOptionalText(value) {
     return text.length > 0 ? text : null;
 }
 
-// GET all clinic medications
+// GET all clinic medications (Isolated)
 router.get('/', async (req, res) => {
     try {
+        const scope = await getActorTenantScope(req);
         const includeFrequency = await hasDefaultFrequencyColumn();
-        const query = includeFrequency
-            ? 'SELECT id, name, default_dosage, default_frequency FROM clinic_medications ORDER BY name ASC'
-            : "SELECT id, name, default_dosage, '' AS default_frequency FROM clinic_medications ORDER BY name ASC";
+        
+        let query = includeFrequency
+            ? 'SELECT id, name, default_dosage, default_frequency FROM clinic_medications'
+            : "SELECT id, name, default_dosage, '' AS default_frequency FROM clinic_medications";
 
-        const [rows] = await db.query(query);
+        let params = [];
+        if (scope.scoped && scope.clinicId) {
+            query += ' WHERE clinic_id = ?';
+            params.push(scope.clinicId);
+        }
+
+        query += ' ORDER BY name ASC';
+
+        const [rows] = await db.query(query, params);
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// ADD a new clinic medication
+// ADD a new clinic medication (Isolated)
 router.post('/', async (req, res) => {
     const name = normalizeOptionalText(req.body?.name);
     const defaultDosage = normalizeOptionalText(req.body?.default_dosage);
@@ -38,15 +49,20 @@ router.post('/', async (req, res) => {
     }
 
     try {
+        const scope = await getActorTenantScope(req);
+        if (scope.scoped && !scope.clinicId) {
+            return res.status(403).json({ error: "Clinic context required." });
+        }
+
         const includeFrequency = await hasDefaultFrequencyColumn();
         const [result] = includeFrequency
             ? await db.query(
-                'INSERT INTO clinic_medications (name, default_dosage, default_frequency) VALUES (?, ?, ?)',
-                [name, defaultDosage, defaultFrequency]
+                'INSERT INTO clinic_medications (name, default_dosage, default_frequency, clinic_id) VALUES (?, ?, ?, ?)',
+                [name, defaultDosage, defaultFrequency, scope.clinicId || null]
             )
             : await db.query(
-                'INSERT INTO clinic_medications (name, default_dosage) VALUES (?, ?)', 
-                [name, defaultDosage]
+                'INSERT INTO clinic_medications (name, default_dosage, clinic_id) VALUES (?, ?, ?)', 
+                [name, defaultDosage, scope.clinicId || null]
             );
 
         res.status(201).json({

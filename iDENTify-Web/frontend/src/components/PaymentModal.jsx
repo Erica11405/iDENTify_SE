@@ -275,21 +275,18 @@ function PaymentModal({
               return (
                 <div key={idx} className="payment-service-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 10px', background: '#f8fafc', borderRadius: '4px', marginBottom: '5px' }}>
                   <span className="payment-service-name">{name}</span>
-                  {price > 0 && <span className="payment-service-price">₱{price}</span>}
+                  {price > 0 && <span className="payment-service-price">₱{Number(price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
                 </div>
               );
             }) : <span className="payment-service-empty">No services listed.</span>}
             
             {summary.additional_charges && summary.additional_charges.length > 0 && (
-              <>
-                <p style={{ marginTop: '10px', fontWeight: 'bold' }}>Additional Charges:</p>
-                {summary.additional_charges.map((charge, idx) => (
-                  <div key={`charge-${idx}`} className="payment-service-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 10px', background: '#fff7ed', borderRadius: '4px', marginBottom: '5px', border: '1px solid #fed7aa' }}>
-                    <span className="payment-service-name">{charge.name || 'Miscellaneous'}</span>
-                    <span className="payment-service-price">₱{Number(charge.price).toLocaleString()}</span>
-                  </div>
-                ))}
-              </>
+              summary.additional_charges.map((charge, idx) => (
+                <div key={`charge-${idx}`} className="payment-service-item" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 10px', background: '#f8fafc', borderRadius: '4px', marginBottom: '5px' }}>
+                  <span className="payment-service-name">{charge.name || 'Miscellaneous'}</span>
+                  <span className="payment-service-price">₱{Number(charge.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              ))
             )}
           </div>
         </div>

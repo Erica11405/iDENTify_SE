@@ -2,7 +2,13 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db'); 
 const bcrypt = require('bcrypt');
-const { enforceAdminAccess } = require('../utils/accessControl');
+const { 
+  enforceAdminAccess, 
+  getActorTenantScope, 
+  appendTenantWhereClauses,
+  hasColumn,
+  toPositiveInt
+} = require('../utils/accessControl');
 const { sendEmail } = require('../utils/mailer');
 
 // Helper to convert undefined to null to prevent MySQL crashes
@@ -16,225 +22,6 @@ const safeJsonParse = (data, fallback) => {
     return fallback;
   }
 };
-
-let hasMiddleNameColumnCache = null;
-let hasIsArchivedColumnCache = null;
-let hasPasswordChangeRequiredColumnCache = null;
-let hasUsersClinicColumnCache = null;
-let hasUsersBranchColumnCache = null;
-
-async function hasMiddleNameColumn() {
-  if (hasMiddleNameColumnCache !== null) {
-    return hasMiddleNameColumnCache;
-  }
-
-  try {
-    const [rows] = await db.query("SHOW COLUMNS FROM dentists LIKE 'middle_name'");
-    hasMiddleNameColumnCache = rows.length > 0;
-  } catch (_err) {
-    hasMiddleNameColumnCache = false;
-  }
-
-  return hasMiddleNameColumnCache;
-}
-
-async function hasIsArchivedColumn() {
-  if (hasIsArchivedColumnCache !== null) {
-    return hasIsArchivedColumnCache;
-  }
-
-  try {
-    const [rows] = await db.query("SHOW COLUMNS FROM dentists LIKE 'is_archived'");
-    hasIsArchivedColumnCache = rows.length > 0;
-  } catch (_err) {
-    hasIsArchivedColumnCache = false;
-  }
-
-  return hasIsArchivedColumnCache;
-}
-
-async function hasPasswordChangeRequiredColumn() {
-  if (hasPasswordChangeRequiredColumnCache !== null) {
-    return hasPasswordChangeRequiredColumnCache;
-  }
-
-  try {
-    const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'password_change_required'");
-    hasPasswordChangeRequiredColumnCache = rows.length > 0;
-  } catch (_err) {
-    hasPasswordChangeRequiredColumnCache = false;
-  }
-
-  return hasPasswordChangeRequiredColumnCache;
-}
-
-async function hasUsersClinicColumn() {
-  if (hasUsersClinicColumnCache !== null) {
-    return hasUsersClinicColumnCache;
-  }
-
-  try {
-    const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'clinic_id'");
-    hasUsersClinicColumnCache = rows.length > 0;
-  } catch (_err) {
-    hasUsersClinicColumnCache = false;
-  }
-
-  return hasUsersClinicColumnCache;
-}
-
-async function hasUsersBranchColumn() {
-  if (hasUsersBranchColumnCache !== null) {
-    return hasUsersBranchColumnCache;
-  }
-
-  try {
-    const [rows] = await db.query("SHOW COLUMNS FROM users LIKE 'branch_id'");
-    hasUsersBranchColumnCache = rows.length > 0;
-  } catch (_err) {
-    hasUsersBranchColumnCache = false;
-  }
-
-  return hasUsersBranchColumnCache;
-}
-
-function normalizeActorRole(req) {
-  const normalized = String(req.headers['x-user-role'] || '').trim().toLowerCase();
-  if (normalized === 'super_admin') return 'superadmin';
-  if (normalized === 'global_admin') return 'globaladmin';
-  return normalized;
-}
-
-function actorDentistId(req) {
-  const parsed = Number.parseInt(String(req.headers['x-user-dentist-id'] || ''), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return parsed;
-}
-
-function actorUserId(req) {
-  const parsed = Number.parseInt(String(req.headers['x-user-id'] || ''), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return parsed;
-}
-
-function toPositiveInt(value) {
-  const parsed = Number.parseInt(String(value || ''), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return parsed;
-}
-
-function hasTenantScopeViolation(scope, clinicId, branchId) {
-  if (!scope?.scoped) return null;
-
-  if (scope.clinicId && clinicId && Number(scope.clinicId) !== Number(clinicId)) {
-    return 'You can only manage users within your assigned clinic.';
-  }
-
-  if (scope.branchId && branchId && Number(scope.branchId) !== Number(branchId)) {
-    return 'You can only manage users within your assigned branch.';
-  }
-
-  return null;
-}
-
-async function resolveClinicIdFromBranch(branchId) {
-  const parsedBranchId = toPositiveInt(branchId);
-  if (!parsedBranchId) return null;
-
-  try {
-    const [rows] = await db.query(
-      `SELECT clinic_id FROM clinic_branches WHERE id = ? LIMIT 1`,
-      [parsedBranchId]
-    );
-    if (!rows.length) return null;
-    return toPositiveInt(rows[0]?.clinic_id);
-  } catch (_err) {
-    return null;
-  }
-}
-
-async function getActorTenantScope(req) {
-  const role = normalizeActorRole(req);
-  const userId = actorUserId(req);
-
-  if (!userId) {
-    return {
-      role,
-      userId: null,
-      clinicId: null,
-      branchId: null,
-      scoped: false,
-    };
-  }
-
-  const supportsUsersClinic = await hasUsersClinicColumn();
-  const supportsUsersBranch = await hasUsersBranchColumn();
-  if (!supportsUsersClinic && !supportsUsersBranch) {
-    return {
-      role,
-      userId,
-      clinicId: null,
-      branchId: null,
-      scoped: false,
-    };
-  }
-
-  const selectColumns = [];
-  if (supportsUsersClinic) selectColumns.push('clinic_id');
-  if (supportsUsersBranch) selectColumns.push('branch_id');
-
-  try {
-    const [rows] = await db.query(
-      `SELECT ${selectColumns.join(', ')} FROM users WHERE id = ? LIMIT 1`,
-      [userId]
-    );
-
-    const row = rows[0] || {};
-    const clinicId = supportsUsersClinic ? toPositiveInt(row.clinic_id) : null;
-    const branchId = supportsUsersBranch ? toPositiveInt(row.branch_id) : null;
-
-    if (role === 'globaladmin') {
-      return {
-        role,
-        userId,
-        clinicId,
-        branchId,
-        scoped: false,
-      };
-    }
-
-    const scopedRoles = new Set(['superadmin', 'dentist', 'aide']);
-    const scoped = scopedRoles.has(role) && Boolean(clinicId || branchId);
-
-    return {
-      role,
-      userId,
-      clinicId,
-      branchId,
-      scoped,
-    };
-  } catch (_err) {
-    return {
-      role,
-      userId,
-      clinicId: null,
-      branchId: null,
-      scoped: false,
-    };
-  }
-}
-
-function parseJsonOrFallback(value, fallback) {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value === 'string') {
-    try {
-      return JSON.parse(value);
-    } catch (_err) {
-      return fallback;
-    }
-  }
-  return value;
-}
 
 function generateTemporaryPassword(length = 12) {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
@@ -252,41 +39,38 @@ function composeStaffName(firstName, middleName, lastName) {
     .join(' ') || 'Unnamed Staff';
 }
 
-// GET ALL DENTISTS / STAFF (Updated with filtering)
+// GET ALL DENTISTS / STAFF (Updated with strict filtering)
 router.get('/', async (req, res) => {
   try {
     const { type } = req.query;
     const actorScope = await getActorTenantScope(req);
-    const supportsUsersClinic = await hasUsersClinicColumn();
-    const supportsUsersBranch = await hasUsersBranchColumn();
-    const needsOwnerJoin = actorScope.scoped && (
-      (actorScope.clinicId && supportsUsersClinic) ||
-      (actorScope.branchId && supportsUsersBranch)
-    );
+    
+    // Check for column support
+    const supportsIsArchived = await hasColumn('dentists', 'is_archived');
+    const supportsUsersClinic = await hasColumn('users', 'clinic_id');
+    const supportsUsersBranch = await hasColumn('users', 'branch_id');
 
     const whereClauses = [];
     const params = [];
 
-    if (await hasIsArchivedColumn()) {
-      whereClauses.push('COALESCE(is_archived, 0) = 0');
+    if (supportsIsArchived) {
+      whereClauses.push('COALESCE(d.is_archived, 0) = 0');
     }
 
     if (actorScope.scoped) {
-      if (actorScope.clinicId && supportsUsersClinic) {
-        whereClauses.push('owner.clinic_id = ?');
-        params.push(actorScope.clinicId);
-      }
-
-      if (actorScope.branchId && supportsUsersBranch) {
-        whereClauses.push('owner.branch_id = ?');
-        params.push(actorScope.branchId);
-      }
+      appendTenantWhereClauses({
+        whereClauses,
+        params,
+        scope: actorScope,
+        clinicExpression: supportsUsersClinic ? 'owner.clinic_id' : null,
+        branchExpression: supportsUsersBranch ? 'owner.branch_id' : null,
+      });
     }
     
     if (type === 'dentist') {
-      whereClauses.push("specialization != 'Dental Aide'");
+      whereClauses.push("d.specialization != 'Dental Aide'");
     } else if (type === 'aide') {
-      whereClauses.push("specialization = 'Dental Aide'");
+      whereClauses.push("d.specialization = 'Dental Aide'");
     }
 
     let query = 'SELECT d.*';
@@ -352,8 +136,9 @@ router.post('/', async (req, res) => {
     if (!access.ok) return;
 
     const actorScope = await getActorTenantScope(req);
-    const supportsUsersClinic = await hasUsersClinicColumn();
-    const supportsUsersBranch = await hasUsersBranchColumn();
+    const supportsUsersClinic = await hasColumn('users', 'clinic_id');
+    const supportsUsersBranch = await hasColumn('users', 'branch_id');
+    const supportsMiddleName = await hasColumn('dentists', 'middle_name');
 
     let assignedClinicId = toPositiveInt(clinic_id);
     let assignedBranchId = toPositiveInt(branch_id);
@@ -362,17 +147,9 @@ router.post('/', async (req, res) => {
       // FORCE the assignment to the actor's scope to prevent mismatch errors
       assignedClinicId = actorScope.clinicId;
       assignedBranchId = actorScope.branchId;
-    } else if (!assignedClinicId && assignedBranchId) {
-      assignedClinicId = await resolveClinicIdFromBranch(assignedBranchId);
-    }
-
-    const tenantViolation = hasTenantScopeViolation(actorScope, assignedClinicId, assignedBranchId);
-    if (tenantViolation) {
-      return res.status(403).json({ error: tenantViolation });
     }
 
     const fullName = composeStaffName(first_name, middle_name, last_name);
-    const supportsMiddleName = await hasMiddleNameColumn();
     
     if (email) {
        const [existingUser] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
@@ -425,7 +202,7 @@ router.post('/', async (req, res) => {
       const plainPassword = generatedPassword;
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(plainPassword, salt);
-      const supportsPasswordChangeRequired = await hasPasswordChangeRequiredColumn();
+      const supportsPasswordChangeRequired = await hasColumn('users', 'password_change_required');
       
       let userRole = 'dentist';
       if (role) {
@@ -491,7 +268,6 @@ router.post('/', async (req, res) => {
         });
       } catch (mailErr) {
         console.error("Failed to send credentials email:", mailErr);
-        // We don't fail the whole request if email fails, but we might want to tell the user
       }
     }
 
@@ -512,24 +288,56 @@ router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const { first_name, middle_name, last_name, specialization, phone, email, days, operatingHours, lunch, breaks, leaveDays, status } = req.body;
   try {
-    const actorRole = normalizeActorRole(req);
-    const actorDentist = actorDentistId(req);
-    const supportsMiddleName = await hasMiddleNameColumn();
+    const actorScope = await getActorTenantScope(req);
+    const supportsMiddleName = await hasColumn('dentists', 'middle_name');
+    const supportsUsersClinic = await hasColumn('users', 'clinic_id');
+    const supportsUsersBranch = await hasColumn('users', 'branch_id');
 
-    if (actorRole !== 'dentist' && actorRole !== 'superadmin' && actorRole !== 'globaladmin') {
+    if (actorScope.role !== 'dentist' && actorScope.role !== 'superadmin' && actorScope.role !== 'globaladmin') {
       return res.status(403).json({ error: 'You are not allowed to update staff records.' });
     }
 
-    if (actorRole === 'superadmin' || actorRole === 'globaladmin') {
+    // CHECK TENANT SCOPE for the target dentist
+    const checkWhere = ['d.id = ?'];
+    const checkParams = [id];
+    if (actorScope.scoped) {
+        appendTenantWhereClauses({
+            whereClauses: checkWhere,
+            params: checkParams,
+            scope: actorScope,
+            clinicExpression: 'owner.clinic_id',
+            branchExpression: 'owner.branch_id'
+        });
+    }
+
+    const [existingRows] = await db.query(`
+        SELECT d.*, owner.clinic_id, owner.branch_id 
+        FROM dentists d 
+        LEFT JOIN (
+          SELECT dentist_id, MAX(clinic_id) AS clinic_id, MAX(branch_id) AS branch_id
+          FROM users
+          GROUP BY dentist_id
+        ) owner ON owner.dentist_id = d.id
+        WHERE ${checkWhere.join(' AND ')} LIMIT 1
+    `, checkParams);
+
+    if (existingRows.length === 0) return res.status(404).json({ message: 'Staff member not found or access denied.' });
+
+    if (actorScope.role === 'dentist' && actorScope.userId) {
+       // Dentists can only edit themselves
+       const [userRow] = await db.query('SELECT dentist_id FROM users WHERE id = ?', [actorScope.userId]);
+       if (!userRow.length || Number(userRow[0].dentist_id) !== Number(id)) {
+           return res.status(403).json({ error: 'Dentists can only edit their own profile.' });
+       }
+    }
+
+    if (actorScope.role === 'superadmin' || actorScope.role === 'globaladmin') {
       const access = await enforceAdminAccess(req, res, {
         allowGlobalAdmin: true,
         allowSuperAdmin: true,
         requireApprovedSuperAdmin: true,
       });
       if (!access.ok) return;
-
-      const supportsUsersClinic = await hasUsersClinicColumn();
-      const supportsUsersBranch = await hasUsersBranchColumn();
 
       if (supportsUsersClinic || supportsUsersBranch) {
         const updates = [];
@@ -552,14 +360,7 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    const [existingRows] = await db.query('SELECT * FROM dentists WHERE id = ? LIMIT 1', [id]);
-    if (existingRows.length === 0) return res.status(404).json({ message: 'Staff member not found' });
-
-    if (actorRole === 'dentist' && actorDentist && Number(actorDentist) !== Number(id)) {
-      return res.status(403).json({ error: 'Dentists can only edit their own schedule profile.' });
-    }
-
-    const canEditSchedule = actorRole === 'dentist';
+    const canEditSchedule = actorScope.role === 'dentist' || actorScope.role === 'superadmin' || actorScope.role === 'globaladmin';
 
     const currentStaff = existingRows[0];
     const nextFirstName = Object.prototype.hasOwnProperty.call(req.body, 'first_name') ? first_name : currentStaff.first_name;
@@ -596,7 +397,6 @@ router.put('/:id', async (req, res) => {
       : [safeVal(nextFirstName), safeVal(nextLastName), fullName, safeVal(nextSpecialization), safeVal(nextPhone), safeVal(nextEmail), JSON.stringify(nextDays || []), JSON.stringify(nextOperatingHours || {}), JSON.stringify(nextLunch || {}), JSON.stringify(nextBreaks || []), JSON.stringify(nextLeaveDays || []), nextStatus || 'Available', id];
     
     const [result] = await db.query(sql, values);
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Staff member not found' });
     res.json({ message: 'Staff updated successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -614,8 +414,32 @@ router.delete('/:id', async (req, res) => {
     });
     if (!access.ok) return;
 
+    const actorScope = await getActorTenantScope(req);
+    const checkWhere = ['d.id = ?'];
+    const checkParams = [id];
+    if (actorScope.scoped) {
+        appendTenantWhereClauses({
+            whereClauses: checkWhere,
+            params: checkParams,
+            scope: actorScope,
+            clinicExpression: 'owner.clinic_id',
+            branchExpression: 'owner.branch_id'
+        });
+    }
+
+    const [existing] = await db.query(`
+        SELECT d.id FROM dentists d 
+        LEFT JOIN (
+          SELECT dentist_id, MAX(clinic_id) AS clinic_id, MAX(branch_id) AS branch_id
+          FROM users
+          GROUP BY dentist_id
+        ) owner ON owner.dentist_id = d.id
+        WHERE ${checkWhere.join(' AND ')} LIMIT 1
+    `, checkParams);
+
+    if (existing.length === 0) return res.status(404).json({ message: 'Staff member not found or access denied.' });
+
     const [result] = await db.query('DELETE FROM dentists WHERE id = ?', [id]);
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Staff member not found' });
     await db.query('DELETE FROM users WHERE dentist_id = ?', [id]);
     res.json({ message: 'Staff deleted successfully' });
   } catch (err) {

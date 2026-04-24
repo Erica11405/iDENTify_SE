@@ -12,6 +12,7 @@ function Dashboard() {
   const navigate = useNavigate();
   const api = useApi();
   const user = useAppStore((s) => s.user);
+  const userClinicId = user?.clinic_id;
   const userBranchId = user?.branch_id;
   const queue = useAppStore((s) => s.queue);
   const appointments = useAppStore((s) => s.appointments);
@@ -58,10 +59,15 @@ function Dashboard() {
     const dayIndex = today.getDay(); 
     const todayKey = today.toLocaleDateString('en-CA'); 
 
-    // FILTER OUT DENTAL AIDES AND OTHER BRANCHES
+    // FILTER OUT DENTAL AIDES AND OTHER CLINICS/BRANCHES
     const actualDentists = dentists
       .filter(d => d.specialization !== 'Dental Aide' && d.role !== 'aide')
-      .filter(d => !userBranchId || Number(d.branch_id) === Number(userBranchId));
+      .filter(d => {
+        if (!userClinicId) return true; // Global Admin
+        const matchClinic = Number(d.clinic_id) === Number(userClinicId);
+        const matchBranch = !userBranchId || Number(d.branch_id) === Number(userBranchId);
+        return matchClinic && matchBranch;
+      });
 
     return actualDentists.map((dentist) => {
       let scheduleStatus = "Available";
@@ -91,7 +97,7 @@ function Dashboard() {
 
       return { ...dentist, computedStatus: liveStatus };
     });
-  }, [dentists, queue]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dentists, queue, userClinicId, userBranchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 2. TODAY'S APPOINTMENTS 
   const todaysAppointmentsEnriched = useMemo(() => {
@@ -101,8 +107,9 @@ function Dashboard() {
       .filter(a => {
         if (!a.appointment_datetime) return false;
         const dateMatch = new Date(a.appointment_datetime).toLocaleDateString('en-CA') === todayKey;
+        const clinicMatch = !userClinicId || Number(a.clinic_id) === Number(userClinicId);
         const branchMatch = !userBranchId || Number(a.branch_id) === Number(userBranchId);
-        return dateMatch && branchMatch;
+        return dateMatch && clinicMatch && branchMatch;
       })
       .sort((a, b) => toMinutes(a.timeStart) - toMinutes(b.timeStart))
       .map((appt) => ({
@@ -112,11 +119,24 @@ function Dashboard() {
         displayDentist: dentists.find((d) => d.id === appt.dentist_id)?.name || appt.dentist_name || "Unassigned",
         displayProcedure: appt.procedure || appt.reason || 'N/A'
       }));
-  }, [appointments, patients, dentists]);
+  }, [appointments, patients, dentists, userClinicId, userBranchId]);
 
   // 3. STATS CALCULATIONS
-  const branchAppointments = useMemo(() => appointments.filter(a => !userBranchId || Number(a.branch_id) === Number(userBranchId)), [appointments, userBranchId]);
-  const branchQueue = useMemo(() => queue.filter(q => !userBranchId || Number(q.branch_id) === Number(userBranchId)), [queue, userBranchId]);
+  const branchAppointments = useMemo(() => {
+    return appointments.filter(a => {
+        const matchClinic = !userClinicId || Number(a.clinic_id) === Number(userClinicId);
+        const matchBranch = !userBranchId || Number(a.branch_id) === Number(userBranchId);
+        return matchClinic && matchBranch;
+    });
+  }, [appointments, userClinicId, userBranchId]);
+
+  const branchQueue = useMemo(() => {
+    return queue.filter(q => {
+        const matchClinic = !userClinicId || Number(q.clinic_id) === Number(userClinicId);
+        const matchBranch = !userBranchId || Number(q.branch_id) === Number(userBranchId);
+        return matchClinic && matchBranch;
+    });
+  }, [queue, userClinicId, userBranchId]);
 
   const totalAppointments = branchAppointments.length;
   const nextPatient = branchQueue.find(q => q.status === 'Waiting' || q.status === 'Checked-In');
@@ -137,13 +157,13 @@ function Dashboard() {
       const dayKey = d.toLocaleDateString('en-CA');
       labels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
 
-      const countAppts = appointments.filter(a => {
+      const countAppts = branchAppointments.filter(a => {
         if (!a.appointment_datetime) return false;
         return new Date(a.appointment_datetime).toLocaleDateString('en-CA') === dayKey;
       }).length;
       appointmentsData.push(countAppts);
 
-      const countWalkins = queue.filter(q => {
+      const countWalkins = branchQueue.filter(q => {
         if (q.source !== 'walk-in') return false;
         const t = q.time_added || q.checkedInTime;
         return t && new Date(t).toLocaleDateString('en-CA') === dayKey;
@@ -152,7 +172,7 @@ function Dashboard() {
     }
 
     return { labels, checkups: walkinsData, appointments: appointmentsData };
-  }, [appointments, queue]);
+  }, [branchAppointments, branchQueue]);
 
   return (
     <div className="dashboard-page">
@@ -283,12 +303,66 @@ function Dashboard() {
       <AddWalkInModal
         isOpen={isAddWalkInOpen}
         onClose={() => setIsAddWalkInOpen(false)}
-        onAddPatient={async () => { /* logic remains standard */ }}
+        onAddPatient={async (data) => {
+          try {
+            let patientId = data.patientId;
+
+            // If it's a new patient, create the record first
+            if (data.isNewPatient && !patientId) {
+              const newPatient = await api.createPatient({
+                first_name: data.first_name,
+                middle_name: data.middle_name,
+                last_name: data.last_name,
+                full_name: data.full_name,
+                birthdate: data.birthdate,
+                sex: data.sex,
+                contact_number: data.contact,
+                source: 'walk-in'
+              });
+              patientId = newPatient.id;
+            }
+
+            if (!patientId) {
+              throw new Error("Patient record could not be resolved.");
+            }
+
+            await api.addQueue({
+              patient_id: patientId,
+              first_name: data.first_name,
+              middle_name: data.middle_name,
+              last_name: data.last_name,
+              birthdate: data.birthdate,
+              sex: data.sex,
+              contact: data.contact,
+              dentist_id: data.assignedDentistId,
+              notes: data.notes,
+              source: 'walk-in',
+              status: 'Checked-In'
+            });
+            toast.success("Walk-in added successfully!");
+            api.loadQueue();
+          } catch (err) {
+            console.error("Failed to add walk-in", err);
+            toast.error(err.message || "Failed to add walk-in.");
+          }
+        }}
       />
       
       <AddAppointmentModal 
         isOpen={isAddAppointmentOpen} 
-        onClose={() => setIsAddAppointmentOpen(false)} 
+        onClose={() => setIsAddAppointmentOpen(false)}
+        dentists={dentists}
+        onSave={async (data) => {
+          try {
+            await api.createAppointment(data);
+            toast.success("Appointment added successfully!");
+            api.loadAppointments();
+            setIsAddAppointmentOpen(false);
+          } catch (err) {
+            console.error("Failed to add appointment", err);
+            toast.error(err.message || "Failed to add appointment.");
+          }
+        }}
       />
     </div>
   );

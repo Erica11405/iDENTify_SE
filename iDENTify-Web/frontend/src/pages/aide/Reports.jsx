@@ -18,8 +18,14 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
   const [rangeType, setRangeType] = useState('daily'); // daily, weekly, monthly, yearly, custom
 
   const user = useAppStore((state) => state.user);
+  const userRole = String(user?.role || '').trim().toLowerCase();
+  const isGlobalAdmin = userRole === 'globaladmin';
+  const isSuperAdmin = userRole === 'superadmin';
+
   const [branches, setBranches] = useState([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
+  
+  const [clinicPerformance, setClinicPerformance] = useState([]);
 
   // Modal and Patient Data States
   const [patientsModalOpen, setPatientsModalOpen] = useState(false);
@@ -28,7 +34,7 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
   const [patientsLoading, setPatientsLoading] = useState(false);
   const [patientsError, setPatientsError] = useState(null);
 
-  const hasData = !!(dailySummary && dentistPerformance);
+  const hasData = !!(dailySummary && (dentistPerformance || clinicPerformance));
   const summary = {
     patientsSeen: dailySummary?.patientsSeen || 0,
     proceduresDone: dailySummary?.proceduresDone || 0,
@@ -71,6 +77,11 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
         if (selectedBranchId) {
           params.branch_id = selectedBranchId;
         }
+        const data = await apiClient.getReportsSummary(startDate, endDate, selectedBranchId);
+        // api.loadReports is a helper that syncs to store, but it might not return clinicPerformance
+        // So we manually handle it here if needed or update the store helper.
+        // Assuming we update the store or handle locally:
+        setClinicPerformance(data.clinicPerformance || []);
         await api.loadReports(params);
       } catch (err) {
         console.error("Load reports failed", err);

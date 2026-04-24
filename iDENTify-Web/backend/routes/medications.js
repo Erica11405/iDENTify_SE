@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const { getActorTenantScope } = require('../utils/accessControl');
 const missingTreatmentIdColumnMessage = "Database schema is missing medications.treatment_id. Apply the latest backend SQL migration.";
 
 // NEW ROUTE: Fetch medications by specific treatment session
@@ -11,7 +12,16 @@ router.get("/record/:treatment_id", async (req, res) => {
   }
 
   try {
-    const [rows] = await db.query("SELECT * FROM medications WHERE treatment_id = ? ORDER BY id DESC", [treatmentId]);
+    const scope = await getActorTenantScope(req);
+    let query = "SELECT * FROM medications WHERE treatment_id = ?";
+    let params = [treatmentId];
+
+    if (scope.scoped && scope.clinicId) {
+        query += " AND clinic_id = ?";
+        params.push(scope.clinicId);
+    }
+
+    const [rows] = await db.query(query + " ORDER BY id DESC", params);
     res.json(rows);
   } catch (err) {
     if (err && err.code === "ER_BAD_FIELD_ERROR") {
@@ -25,6 +35,7 @@ router.get("/:patient_id", async (req, res) => {
   try {
     const { patient_id } = req.params;
     const year = req.query.year || req.query.record_year;
+    const scope = await getActorTenantScope(req);
 
     let query = "SELECT * FROM medications WHERE patient_id = ?";
     const params = [patient_id];
@@ -32,6 +43,11 @@ router.get("/:patient_id", async (req, res) => {
     if (year) {
       query += " AND record_year = ?";
       params.push(year);
+    }
+
+    if (scope.scoped && scope.clinicId) {
+        query += " AND clinic_id = ?";
+        params.push(scope.clinicId);
     }
 
     const [rows] = await db.query(query, params);
@@ -48,13 +64,18 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "patient_id and medicine are required." });
     }
 
+    const scope = await getActorTenantScope(req);
+    if (scope.scoped && !scope.clinicId) {
+        return res.status(403).json({ error: "Clinic context required." });
+    }
+
     const parsedTreatmentId = Number.parseInt(String(treatment_id || ""), 10);
     const safeTreatmentId = Number.isFinite(parsedTreatmentId) && parsedTreatmentId > 0 ? parsedTreatmentId : null;
 
     const [result] = await db.query(
-      `INSERT INTO medications (patient_id, treatment_id, medicine, dosage, frequency, notes, record_year)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [patient_id, safeTreatmentId, medicine, dosage, frequency, notes, record_year || 1]
+      `INSERT INTO medications (patient_id, treatment_id, medicine, dosage, frequency, notes, record_year, clinic_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [patient_id, safeTreatmentId, medicine, dosage, frequency, notes, record_year || 1, scope.clinicId || null]
     );
     const [rows] = await db.query("SELECT * FROM medications WHERE id = ?", [result.insertId]);
     res.status(201).json(rows[0]);

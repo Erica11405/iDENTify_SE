@@ -849,7 +849,7 @@ router.get("/earnings", async (req, res) => {
         earnings: Number(row.total_earnings || 0),
         transactions: row.transaction_count
       })),
-      branchBreakdown: branchBreakdownRows.map(row => ({
+      branchBreakdown: actorContext.role === 'globaladmin' ? [] : branchBreakdownRows.map(row => ({
         branch: row.branch_name,
         earnings: Number(row.earnings || 0)
       }))
@@ -1179,6 +1179,44 @@ router.get("/", async (req, res) => {
         dentist.treatmentDistribution = distributionMap[dentist.id] || {};
     });
 
+    let clinicPerformance = [];
+    if (actorContext.role === 'globaladmin') {
+        const [clinicPerfRes] = await db.query(`
+            SELECT 
+                c.id, c.name,
+                COUNT(DISTINCT h.record_id) AS patientsHandled,
+                COUNT(DISTINCT h.patient_id) AS uniquePatients,
+                COALESCE(AVG(h.duration_minutes), 0) AS avgTimePerPatient
+            FROM clinics c
+            LEFT JOIN clinic_branches cb ON c.id = cb.clinic_id
+            LEFT JOIN (
+                SELECT
+                    a.id AS record_id,
+                    a.patient_id,
+                    a.branch_id,
+                    TIMESTAMPDIFF(MINUTE, a.appointment_datetime, a.end_datetime) AS duration_minutes
+                FROM appointments a
+                WHERE DATE(a.appointment_datetime) BETWEEN ? AND ?
+                  AND a.status IN ('Done', 'Completed')
+
+                UNION ALL
+
+                SELECT
+                    q.id AS record_id,
+                    q.patient_id,
+                    q.branch_id,
+                    NULL AS duration_minutes
+                FROM walk_in_queue q
+                WHERE DATE(q.time_added) BETWEEN ? AND ?
+                  AND q.source = 'walk-in'
+                  AND q.status IN ('Done', 'Completed')
+            ) h ON cb.id = h.branch_id
+            GROUP BY c.id, c.name
+            ORDER BY patientsHandled DESC
+        `, [start, end, start, end]);
+        clinicPerformance = clinicPerfRes;
+    }
+
     res.json({
       startDate: start,
       endDate: end,
@@ -1188,7 +1226,8 @@ router.get("/", async (req, res) => {
         newPatients: newPatients,
         avgTreatmentDuration: durationRes[0].avg_min ? `${Math.round(durationRes[0].avg_min)} min` : "0 min",
       },
-      dentistPerformance,
+      dentistPerformance: actorContext.role === 'globaladmin' ? [] : dentistPerformance,
+      clinicPerformance: actorContext.role === 'globaladmin' ? clinicPerformance : [],
     });
 
   } catch (err) {
@@ -1366,8 +1405,10 @@ router.get("/services/popularity", async (req, res) => {
     res.json({
       startDate: start,
       endDate: end,
-      dentistId: effectiveDentistId || null,
-      totals,
+      dentistId: actorContext.role === 'globaladmin' ? null : (effectiveDentistId || null),
+      totals: actorContext.role === 'globaladmin' 
+        ? { appointments: totals.appointments, walkIns: totals.walkIns, overall: totals.overall } 
+        : totals,
       services,
     });
   } catch (error) {
