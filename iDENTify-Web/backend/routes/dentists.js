@@ -42,7 +42,7 @@ function composeStaffName(firstName, middleName, lastName) {
 // GET ALL DENTISTS / STAFF (Updated with strict filtering)
 router.get('/', async (req, res) => {
   try {
-    const { type } = req.query;
+    const { type, clinic_id, branch_id } = req.query;
     const actorScope = await getActorTenantScope(req);
     
     // Check for column support
@@ -57,6 +57,7 @@ router.get('/', async (req, res) => {
       whereClauses.push('COALESCE(d.is_archived, 0) = 0');
     }
 
+    // Apply actor-based tenant scoping
     if (actorScope.scoped) {
       appendTenantWhereClauses({
         whereClauses,
@@ -65,6 +66,19 @@ router.get('/', async (req, res) => {
         clinicExpression: supportsUsersClinic ? 'owner.clinic_id' : null,
         branchExpression: supportsUsersBranch ? 'owner.branch_id' : null,
       });
+    }
+
+    // NEW: Also apply explicit query parameter filters (useful for mobile app/patient booking)
+    const qClinicId = toPositiveInt(clinic_id);
+    const qBranchId = toPositiveInt(branch_id);
+
+    if (qClinicId && supportsUsersClinic) {
+      whereClauses.push('owner.clinic_id = ?');
+      params.push(qClinicId);
+    }
+    if (qBranchId && supportsUsersBranch) {
+      whereClauses.push('owner.branch_id = ?');
+      params.push(qBranchId);
     }
     
     if (type === 'dentist') {

@@ -172,7 +172,12 @@ export default function SelectDoctor() {
   useEffect(() => {
     const fetchDoctors = async () => {
       try {
-        const res = await fetch(API.dentists);
+        const params = new URLSearchParams();
+        if (clinicId) params.append('clinic_id', String(clinicId));
+        if (branchId) params.append('branch_id', String(branchId));
+        
+        const url = `${API.dentists}?${params.toString()}`;
+        const res = await fetch(url);
         const data = await res.json();
 
         if (!Array.isArray(data)) {
@@ -186,10 +191,7 @@ export default function SelectDoctor() {
           const role = doc.role ? String(doc.role).trim().toLowerCase() : "";
           const spec = (doc.specialization || doc.specialty || "").trim().toLowerCase();
 
-          const matchClinic = !clinicId || String(doc.clinic_id) === String(clinicId);
-          const matchBranch = !branchId || String(doc.branch_id) === String(branchId);
-
-          return status !== "off" && spec !== "dental aide" && role !== "aide" && matchClinic && matchBranch;
+          return status !== "off" && spec !== "dental aide" && role !== "aide";
         });
 
         setDoctors(activeDoctors);
@@ -202,7 +204,7 @@ export default function SelectDoctor() {
     };
 
     fetchDoctors();
-  }, []);
+  }, [clinicId, branchId]);
 
   const handleAssignDoctor = (doctor) => {
     if (!activeService) return;
