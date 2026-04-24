@@ -11,6 +11,8 @@ import { useNavigate } from "react-router-dom";
 function Dashboard() {
   const navigate = useNavigate();
   const api = useApi();
+  const user = useAppStore((s) => s.user);
+  const userBranchId = user?.branch_id;
   const queue = useAppStore((s) => s.queue);
   const appointments = useAppStore((s) => s.appointments);
   const dentists = useAppStore((s) => s.dentists);
@@ -56,8 +58,10 @@ function Dashboard() {
     const dayIndex = today.getDay(); 
     const todayKey = today.toLocaleDateString('en-CA'); 
 
-    // FILTER OUT DENTAL AIDES
-    const actualDentists = dentists.filter(d => d.specialization !== 'Dental Aide' && d.role !== 'aide');
+    // FILTER OUT DENTAL AIDES AND OTHER BRANCHES
+    const actualDentists = dentists
+      .filter(d => d.specialization !== 'Dental Aide' && d.role !== 'aide')
+      .filter(d => !userBranchId || Number(d.branch_id) === Number(userBranchId));
 
     return actualDentists.map((dentist) => {
       let scheduleStatus = "Available";
@@ -96,7 +100,9 @@ function Dashboard() {
     return appointments
       .filter(a => {
         if (!a.appointment_datetime) return false;
-        return new Date(a.appointment_datetime).toLocaleDateString('en-CA') === todayKey;
+        const dateMatch = new Date(a.appointment_datetime).toLocaleDateString('en-CA') === todayKey;
+        const branchMatch = !userBranchId || Number(a.branch_id) === Number(userBranchId);
+        return dateMatch && branchMatch;
       })
       .sort((a, b) => toMinutes(a.timeStart) - toMinutes(b.timeStart))
       .map((appt) => ({
@@ -109,10 +115,13 @@ function Dashboard() {
   }, [appointments, patients, dentists]);
 
   // 3. STATS CALCULATIONS
-  const totalAppointments = appointments.length;
-  const nextPatient = queue.find(q => q.status === 'Waiting' || q.status === 'Checked-In');
-  const patientsInBilling = queue.filter(q => q.status === 'Payment / Billing').length;
-  const cancelledCount = appointments.filter(a => a.status === 'Cancelled' || a.status === 'No-Show' || a.status === 'Missed').length;
+  const branchAppointments = useMemo(() => appointments.filter(a => !userBranchId || Number(a.branch_id) === Number(userBranchId)), [appointments, userBranchId]);
+  const branchQueue = useMemo(() => queue.filter(q => !userBranchId || Number(q.branch_id) === Number(userBranchId)), [queue, userBranchId]);
+
+  const totalAppointments = branchAppointments.length;
+  const nextPatient = branchQueue.find(q => q.status === 'Waiting' || q.status === 'Checked-In');
+  const patientsInBilling = branchQueue.filter(q => q.status === 'Payment / Billing').length;
+  const cancelledCount = branchAppointments.filter(a => a.status === 'Cancelled' || a.status === 'No-Show' || a.status === 'Missed').length;
   const cancellationRate = totalAppointments > 0 ? Math.round((cancelledCount / totalAppointments) * 100) : 0;
 
   // 4. CHART DATA LOGIC
@@ -156,15 +165,15 @@ function Dashboard() {
           <h3 className="dashboard-subtitle">Patients Currently in Clinic</h3>
           <div className="clinic-stats">
             <div className="stat-item">
-              <span className="stat-value">{queue.filter(q => q.status === 'Checked-In').length}</span>
+              <span className="stat-value">{branchQueue.filter(q => q.status === 'Checked-In').length}</span>
               <span className="stat-label">Checked-in</span>
             </div>
             <div className="stat-item">
-              <span className="stat-value">{queue.filter(q => q.status === 'Waiting').length}</span>
+              <span className="stat-value">{branchQueue.filter(q => q.status === 'Waiting').length}</span>
               <span className="stat-label">Waiting</span>
             </div>
             <div className="stat-item">
-              <span className="stat-value">{queue.filter(q => inTreatmentStatuses.includes(q.status)).length}</span>
+              <span className="stat-value">{branchQueue.filter(q => inTreatmentStatuses.includes(q.status)).length}</span>
               <span className="stat-label">In Treatment</span>
             </div>
             <div className="stat-item">

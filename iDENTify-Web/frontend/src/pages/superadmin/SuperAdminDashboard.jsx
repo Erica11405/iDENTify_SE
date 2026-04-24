@@ -407,16 +407,6 @@ function SuperAdminDashboard() {
                     <h2>Clinic Admin Dashboard</h2>
                     <p>System-level overview for users, clinics, and booking operations.</p>
                 </div>
-                <button 
-                    className="add-dentist-btn" 
-                    onClick={() => {
-                        const element = document.getElementById('create-branch-section');
-                        if (element) element.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    style={{ backgroundColor: '#2563eb' }}
-                >
-                    + Add Branch
-                </button>
             </div>
 
             {loading ? <p className="dashboard-inline-loading">Loading dashboard...</p> : null}

@@ -20,7 +20,10 @@ export default function EditProfile() {
   const [bday, setBday] = useState("");
   const [dateObject, setDateObject] = useState(new Date());
   const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [street, setStreet] = useState("");
+  const [barangay, setBarangay] = useState("");
+  const [city, setCity] = useState("");
+  const [province, setProvince] = useState("");
   const [email, setEmail] = useState("");
   const [displayAge, setDisplayAge] = useState("");
 
@@ -67,7 +70,10 @@ export default function EditProfile() {
 
           setSex(data.gender || "");
           setPhone(data.contact_number || "");
-          setAddress(data.address || "");
+          setStreet(data.street || "");
+          setBarangay(data.barangay || "");
+          setCity(data.city || "");
+          setProvince(data.province || "");
           setEmail(data.email || userEmail);
           setMedicalAlerts(data.medical_alerts || []);
           setXrays(data.xrays || []);
@@ -129,7 +135,10 @@ export default function EditProfile() {
       gender: sex,
       birthdate: bday,
       contact_number: phone,
-      address: address,
+      street: street,
+      barangay: barangay,
+      city: city,
+      province: province,
       email: email,
       medicalAlerts: medicalAlerts,
       xrays: xrays,
@@ -241,8 +250,17 @@ export default function EditProfile() {
         <Text style={styles.label}>Email Address</Text>
         <TextInput style={[styles.input, { backgroundColor: '#F1F5F9' }]} value={email} editable={false} placeholder="Email" placeholderTextColor="#9CA3AF" />
 
-        <Text style={styles.label}>Address</Text>
-        <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="Full Address" placeholderTextColor="#9CA3AF" />
+        <Text style={styles.label}>Street</Text>
+        <TextInput style={styles.input} value={street} onChangeText={setStreet} placeholder="Street" placeholderTextColor="#9CA3AF" />
+
+        <Text style={styles.label}>Barangay</Text>
+        <TextInput style={styles.input} value={barangay} onChangeText={setBarangay} placeholder="Barangay" placeholderTextColor="#9CA3AF" />
+
+        <Text style={styles.label}>City</Text>
+        <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="City" placeholderTextColor="#9CA3AF" />
+
+        <Text style={styles.label}>Province</Text>
+        <TextInput style={styles.input} value={province} onChangeText={setProvince} placeholder="Province" placeholderTextColor="#9CA3AF" />
       </View>
 
       <TouchableOpacity style={styles.saveButton} onPress={saveChanges} disabled={loading}>

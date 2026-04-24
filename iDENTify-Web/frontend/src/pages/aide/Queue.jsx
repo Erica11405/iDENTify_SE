@@ -18,6 +18,8 @@ const dentistAvailabilityMinutes = {
 function Queue() {
   const navigate = useNavigate();
   const api = useApi();
+  const user = useAppStore((s) => s.user);
+  const userBranchId = user?.branch_id;
   const queue = useAppStore((state) => state.queue || []);
   const patients = useAppStore((state) => state.patients || []);
   const dentists = useAppStore((state) => state.dentists || []);
@@ -181,6 +183,7 @@ function Queue() {
   const queueWithDetails = useMemo(
     () => {
       const sortedForNumbering = [...queue]
+        .filter(q => !userBranchId || Number(q.branch_id) === Number(userBranchId))
         .filter((q) => !["Done", "Cancelled", "No-Show"].includes(String(q.status || "")))
         .sort((a, b) => {
             const timeA = a.time_added ? new Date(String(a.time_added).replace(' ', 'T')).getTime() : 0;
@@ -194,6 +197,7 @@ function Queue() {
       });
 
       return queue
+        .filter(q => !userBranchId || Number(q.branch_id) === Number(userBranchId))
         .filter((item) => !["Done", "Cancelled", "No-Show"].includes(String(item.status || "")))
         .map((item, index) => {
           const patient = patients.find((p) => String(p.id) === String(item.patient_id));

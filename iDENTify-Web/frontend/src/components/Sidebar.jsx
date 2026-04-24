@@ -307,7 +307,11 @@ function Sidebar({ role }) {
                                 <span>Dashboard</span>
                             </NavLink>
                             <NavLink to="/appointments" className={({ isActive }) => isActive ? 'active' : ''}>
-                                <img src={AppointmentIcon} alt="Patients" />
+                                <img src={AppointmentIcon} alt="Appointments" />
+                                <span>Appointments</span>
+                            </NavLink>
+                            <NavLink to="/patients" className={({ isActive }) => isActive ? 'active' : ''}>
+                                <img src={DentistIcon} alt="Patients" />
                                 <span>Patients</span>
                             </NavLink>
                             <NavLink to="/history" className={({ isActive }) => isActive ? 'active' : ''}>

@@ -138,7 +138,7 @@ export default function SelectBranchScreen() {
 
               <View style={styles.infoContainer}>
                 <Text style={styles.cardTitle}>{branch.name}</Text>
-                <Text style={styles.cardSubtitle}>Continue to service selection</Text>
+                <Text style={styles.cardSubtitle}>{branch.address || branch.location || 'Continue to service selection'}</Text>
               </View>
 
               <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />

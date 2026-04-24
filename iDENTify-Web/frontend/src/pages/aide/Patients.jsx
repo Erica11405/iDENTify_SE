@@ -6,8 +6,24 @@ import "../../styles/pages/aide/Patients.css";
 
 function Patients() {
   const navigate = useNavigate();
-  const { patients, appointments, queue } = useAppStore((state) => state);
-  const { loadPatients, loadAppointments, loadQueue, loading, error } = useApi();
+  const { patients, appointments, queue, user, dentists } = useAppStore((state) => state);
+  const { loadPatients, loadAppointments, loadQueue, loading, error, loadDentists } = useApi();
+
+  const myDentistId = useMemo(() => {
+    if (user?.role !== 'dentist') return null;
+    if (user.dentist_id) return Number(user.dentist_id);
+
+    const matched = (dentists || []).find((dentist) => {
+        if (String(dentist.user_id || "") === String(user.id || "")) return true;
+        const dEmail = String(dentist.email || "").trim().toLowerCase();
+        const uEmail = String(user.email || "").trim().toLowerCase();
+        if (dEmail && dEmail === uEmail) return true;
+        if (dentist.name && user.name && String(dentist.name).trim() === String(user.name).trim()) return true;
+        return false;
+    });
+
+    return matched?.id ? Number(matched.id) : Number(user.id || 0);
+  }, [user, dentists]);
 
   // Independent search states for the two sections
   const [todaySearch, setTodaySearch] = useState("");
@@ -15,7 +31,7 @@ function Patients() {
 
   useEffect(() => {
     // Load all data needed to calculate "Patients Today" and "Last Procedure"
-    Promise.all([loadPatients(), loadAppointments(), loadQueue()]).catch((err) => {
+    Promise.all([loadPatients(), loadAppointments(), loadQueue(), loadDentists()]).catch((err) => {
       console.error("Failed to load patient data", err);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -38,17 +54,25 @@ function Patients() {
     const todayStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
     // 1. Identify IDs from Appointments Today
-    const apptIds = appointments
-      .filter((a) => a.appointment_datetime && a.appointment_datetime.startsWith(todayStr))
-      .map((a) => a.patient_id);
+    let apptsToday = appointments
+      .filter((a) => a.appointment_datetime && a.appointment_datetime.startsWith(todayStr));
+    
+    if (user?.role === 'dentist') {
+        apptsToday = apptsToday.filter(a => Number(a.dentist_id) === Number(myDentistId));
+    }
+    const apptIds = apptsToday.map((a) => a.patient_id);
 
     // 2. Identify IDs from Queue Today (Walk-ins)
-    const queueIds = queue
+    let queueToday = queue
       .filter((q) => {
         const t = q.time_added || q.checkedInTime;
         return t && t.startsWith(todayStr);
-      })
-      .map((q) => q.patient_id);
+      });
+    
+    if (user?.role === 'dentist') {
+        queueToday = queueToday.filter(q => Number(q.dentist_id) === Number(myDentistId));
+    }
+    const queueIds = queueToday.map((q) => q.patient_id);
 
     const todaySet = new Set([...apptIds, ...queueIds]);
     let list = patients.filter((p) => todaySet.has(p.id));
@@ -59,17 +83,26 @@ function Patients() {
       list = list.filter((p) => p.name.toLowerCase().includes(lower));
     }
     return list;
-  }, [patients, appointments, queue, todaySearch]);
+  }, [patients, appointments, queue, todaySearch, user?.role, myDentistId]);
 
   // --- FILTER 2: All Patients ---
   const allPatientsList = useMemo(() => {
     let list = patients;
+
+    if (user?.role === 'dentist') {
+        list = list.filter(p => {
+            const isBooked = appointments.some(a => Number(a.patient_id) === Number(p.id) && Number(a.dentist_id) === Number(myDentistId));
+            const isTreated = queue.some(q => Number(q.patient_id) === Number(p.id) && Number(q.dentist_id) === Number(myDentistId));
+            return isBooked || isTreated;
+        });
+    }
+
     if (allSearch.trim()) {
       const lower = allSearch.toLowerCase();
       list = list.filter((p) => p.name.toLowerCase().includes(lower));
     }
     return list;
-  }, [patients, allSearch]);
+  }, [patients, allSearch, user?.role, myDentistId, appointments, queue]);
 
   const getDisplayAge = (patient) => {
     const birthdate = patient?.birthdate || patient?.birthday;

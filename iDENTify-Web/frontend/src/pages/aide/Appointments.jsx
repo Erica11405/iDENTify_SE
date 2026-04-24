@@ -33,6 +33,8 @@ function toSqlDateTime(value = new Date()) {
 function Appointments() {
   const api = useApi();
   const navigate = useNavigate();
+  const user = useAppStore((state) => state.user);
+  const userBranchId = user?.branch_id;
 
   const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
 
@@ -91,7 +93,9 @@ function Appointments() {
       if (filters.time === "afternoon") timeMatch = startMinutes >= 12 * 60 && startMinutes < 17 * 60;
       if (filters.time === "evening") timeMatch = startMinutes >= 17 * 60;
 
-      return dentistMatch && statusMatch && procedureMatch && timeMatch;
+      const branchMatch = !userBranchId || Number(appt.branch_id) === Number(userBranchId);
+
+      return dentistMatch && statusMatch && procedureMatch && timeMatch && branchMatch;
     });
 
     return {

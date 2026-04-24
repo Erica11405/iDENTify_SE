@@ -186,7 +186,10 @@ export default function SelectDoctor() {
           const role = doc.role ? String(doc.role).trim().toLowerCase() : "";
           const spec = (doc.specialization || doc.specialty || "").trim().toLowerCase();
 
-          return status !== "off" && spec !== "dental aide" && role !== "aide";
+          const matchClinic = !clinicId || String(doc.clinic_id) === String(clinicId);
+          const matchBranch = !branchId || String(doc.branch_id) === String(branchId);
+
+          return status !== "off" && spec !== "dental aide" && role !== "aide" && matchClinic && matchBranch;
         });
 
         setDoctors(activeDoctors);

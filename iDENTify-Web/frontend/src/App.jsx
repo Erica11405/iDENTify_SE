@@ -119,6 +119,7 @@ function App() {
                         <Route path="/dashboard" element={<DentistDashboard />} />
                         <Route path="/appointments" element={<DentistAppointments />} />
                         <Route path="/history" element={<DentistHistory />} />
+                        <Route path="/patients" element={<Patients />} />
                         <Route path="/payments" element={<DentistPayments />} />
                         <Route path="/reports" element={<DentistReports />} />
                         <Route path="/patients/:id" element={<PatientForm userRole={user.role} />} />

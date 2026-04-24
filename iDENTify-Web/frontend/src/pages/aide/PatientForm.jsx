@@ -126,6 +126,7 @@ function PatientForm({ userRole }) {
 
 	const [patient, setPatient] = useState(null);
 	const [selectedDentistId, setSelectedDentistId] = useState("");
+	const [followUpModal, setFollowUpModal] = useState({ isOpen: false, patient: null });
 
 	const [yearsList, setYearsList] = useState([1]);
     
