@@ -1232,31 +1232,29 @@ function PatientForm({ userRole }) {
 								<h3 className="section-title">Prepared By</h3>
                                 <input className="pill-input-input" value={user?.name || "Dental Aide"} readOnly style={{ backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', cursor: 'not-allowed', width: '250px', fontWeight: '500' }} />
 							</div>
-							{!isAide && (
-                                <div className="vital-signs">
-                                    <h3 className="section-title">Vital Signs (Year {selectedYear})</h3>
-                                    <div className="vital-row" style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                                        <div className="vital-field" style={{ flex: '1 1 120px' }}>
-                                            <label>BP</label>
-                                            <input className="pill-input-input" placeholder="120/80" value={vitals.bp || ""} onChange={(e) => updateVitals("bp", e.target.value)} disabled={isVisitReadOnly} />
-                                        </div>
-                                        <div className="vital-field" style={{ flex: '1 1 120px' }}>
-                                            <label>Pulse</label>
-                                            <input className="pill-input-input" placeholder="72" value={vitals.pulse || ""} onChange={(e) => updateVitals("pulse", e.target.value)} disabled={isVisitReadOnly} />
-                                        </div>
-                                        <div className="vital-field" style={{ flex: '1 1 140px' }}>
-                                            <label>Temp</label>
-                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                <input type="number" step="0.1" className="pill-input-input" placeholder="36.5" value={getTempNumericValue()} onChange={(e) => handleTempNumberChange(e.target.value)} disabled={isVisitReadOnly} style={{ flex: 1 }} />
-                                                <select className="pill-input-input" style={{ width: '60px', textAlign: 'center' }} value={tempUnit} onChange={(e) => handleUnitToggle(e.target.value)} disabled={isVisitReadOnly}>
-                                                    <option value="C">°C</option>
-                                                    <option value="F">°F</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+							<div className="vital-signs">
+								<h3 className="section-title">Vital Signs (Year {selectedYear})</h3>
+								<div className="vital-row" style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+									<div className="vital-field" style={{ flex: '1 1 120px' }}>
+										<label>BP</label>
+										<input className="pill-input-input" placeholder="120/80" value={vitals.bp || ""} onChange={(e) => updateVitals("bp", e.target.value)} disabled={isVisitReadOnly} />
+									</div>
+									<div className="vital-field" style={{ flex: '1 1 120px' }}>
+										<label>Pulse</label>
+										<input className="pill-input-input" placeholder="72" value={vitals.pulse || ""} onChange={(e) => updateVitals("pulse", e.target.value)} disabled={isVisitReadOnly} />
+									</div>
+									<div className="vital-field" style={{ flex: '1 1 140px' }}>
+										<label>Temp</label>
+										<div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+											<input type="number" step="0.1" className="pill-input-input" placeholder="36.5" value={getTempNumericValue()} onChange={(e) => handleTempNumberChange(e.target.value)} disabled={isVisitReadOnly} style={{ flex: 1 }} />
+											<select className="pill-input-input" style={{ width: '60px', textAlign: 'center' }} value={tempUnit} onChange={(e) => handleUnitToggle(e.target.value)} disabled={isVisitReadOnly}>
+												<option value="C">°C</option>
+												<option value="F">°F</option>
+											</select>
+										</div>
+									</div>
+								</div>
+							</div>
 						</div>
 					</section>
 				</div>
