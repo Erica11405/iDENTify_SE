@@ -67,7 +67,7 @@ function resolveDashboardMessage(error, fallback = 'Failed to load dashboard dat
 }
 
 function SuperAdminDashboard() {
-    const user = useAppStore((state) => state.user);
+    const { user } = useAppStore();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [users, setUsers] = useState([]);

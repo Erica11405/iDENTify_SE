@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import "../styles/components/EditAppointmentModal.css";
 import { dentalServices } from "../data/services";
 import api from "../api/apiClient";
+import useAppStore from "../store/useAppStore";
 
 // --- HELPERS ---
 function formatTime12Hour(time24) {

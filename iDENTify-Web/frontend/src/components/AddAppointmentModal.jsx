@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import toast from "react-hot-toast";
 import "../styles/components/AddWalkInModal.css"; 
 import api from "../api/apiClient";
+import useAppStore from "../store/useAppStore";
 
 // --- HELPERS ---
 function formatTime12Hour(time24) {

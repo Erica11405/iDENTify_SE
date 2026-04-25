@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import toast from "react-hot-toast";
 import "../../styles/pages/aide/Dashboard.css";
 import WeeklyBarChart from "../../components/WeeklyBarChart.jsx";
 import ServicePopularityChartCard from "../../components/ServicePopularityChartCard";
@@ -11,13 +12,9 @@ import { useNavigate } from "react-router-dom";
 function Dashboard() {
   const navigate = useNavigate();
   const api = useApi();
-  const user = useAppStore((s) => s.user);
+  const { user, queue, appointments, dentists, patients } = useAppStore();
   const userClinicId = user?.clinic_id;
   const userBranchId = user?.branch_id;
-  const queue = useAppStore((s) => s.queue);
-  const appointments = useAppStore((s) => s.appointments);
-  const dentists = useAppStore((s) => s.dentists);
-  const patients = useAppStore((s) => s.patients);
   
   const [isAddWalkInOpen, setIsAddWalkInOpen] = useState(false);
   const [isAddAppointmentOpen, setIsAddAppointmentOpen] = useState(false);
