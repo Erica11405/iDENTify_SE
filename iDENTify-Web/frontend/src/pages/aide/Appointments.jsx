@@ -212,7 +212,6 @@ function Appointments() {
                           >
                             Start
                           </button>
-                          <button className="delete-btn" onClick={() => handleDelete(a)}>Delete</button>
                         </div>
                       </td>
                     )}
@@ -329,8 +328,12 @@ function Appointments() {
         status: 'Checked-In',
         notes: appt.procedure || appt.reason || '',
       });
+      
+      // Also update the appointment status itself
+      await api.updateAppointment(appt.id, { status: 'Checked-In' });
+      
       toast.success('Patient checked in and added to queue.');
-      await api.loadQueue();
+      await Promise.all([api.loadQueue(), api.loadAppointments()]);
     } catch (error) {
       toast.error(error?.message || 'Failed to check in.');
     }

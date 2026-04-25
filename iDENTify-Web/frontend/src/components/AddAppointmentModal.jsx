@@ -55,6 +55,22 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // --- COMPONENT ---
 function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
+  const user = useAppStore(state => state.user);
+  
+  // Filter dentists to only those in the same branch as the aide (if aide is scoped)
+  const filteredDentists = useMemo(() => {
+    return dentists.filter(d => {
+        const isStaff = d.specialization !== 'Dental Aide' && d.role !== 'aide';
+        if (!isStaff) return false;
+        
+        // If user (aide) has a branch, only show dentists in that branch
+        if (user?.branch_id && d.branch_id) {
+            return Number(d.branch_id) === Number(user.branch_id);
+        }
+        return true;
+    });
+  }, [dentists, user?.branch_id]);
+
   // 1. PATIENT TOGGLE & SEARCH STATE
   const patientType = "old"; 
 
@@ -457,9 +473,7 @@ function AddAppointmentModal({ isOpen, onClose, dentists = [], onSave }) {
               <label>Dentist</label>
               <select name="dentist_id" value={form.dentist_id || ""} onChange={handleChange}>
                 <option value="">Select dentist</option>
-                {dentists
-                  .filter(d => d.specialization !== 'Dental Aide' && d.role !== 'aide')
-                  .map((d) => (
+                {filteredDentists.map((d) => (
                   <option key={d.id} value={d.id} disabled={d.status === "Off"}>
                     {d.name} {d.status === "Off" ? "(Off)" : d.status === "Busy" ? "(Busy)" : ""}
                   </option>

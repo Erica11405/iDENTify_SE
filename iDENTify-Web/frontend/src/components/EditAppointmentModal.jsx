@@ -56,6 +56,22 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function EditAppointmentModal({ appointment, initialContact, initialAge, initialSex, onSave, onCancel, dentists = [] }) {
   if (!appointment) return null;
+  
+  const user = useAppStore(state => state.user);
+
+  // Filter dentists to only those in the same branch as the aide (if aide is scoped)
+  const filteredDentists = useMemo(() => {
+    return dentists.filter(d => {
+        const isStaff = d.specialization !== 'Dental Aide' && d.role !== 'aide';
+        if (!isStaff) return false;
+        
+        // If user (aide) has a branch, only show dentists in that branch
+        if (user?.branch_id && d.branch_id) {
+            return Number(d.branch_id) === Number(user.branch_id);
+        }
+        return true;
+    });
+  }, [dentists, user?.branch_id]);
 
   const isReassign = appointment._action === 'reassign';
 
@@ -423,7 +439,7 @@ function EditAppointmentModal({ appointment, initialContact, initialAge, initial
               onChange={handleChange}
             >
               <option value="">Select Dentist</option>
-              {dentists.map((d) => (
+              {filteredDentists.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name} {d.status === "Off" ? "(Off)" : ""}
                 </option>
