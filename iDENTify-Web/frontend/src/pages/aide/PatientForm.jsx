@@ -1261,26 +1261,24 @@ function PatientForm({ userRole }) {
 					</section>
 				</div>
 
-				{!isAide && (
-                    <section style={{ marginTop: '20px', padding: '15px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <h3 className="section-title">Medical Alerts & Allergies (Global)</h3>
-                        {!isVisitReadOnly && (
-                            <div className="medical-alert-input-group">
-                                <input className="pill-input-input" placeholder="Type allergy (e.g. Asthma, Penicillin)" value={alertInput} onChange={(e) => setAlertInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddAlert()} />
-                                <button className="small-btn" style={{ background: '#ef4444', minWidth: '60px' }} onClick={handleAddAlert}>+ Add</button>
-                            </div>
-                        )}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: '20px', marginTop: isVisitReadOnly ? '10px' : '0' }}>
-                            {(patient.medicalAlerts && patient.medicalAlerts.length > 0) ? (
-                                patient.medicalAlerts.map((alert, i) => (
-                                    <span key={i} className="alert-chip">{alert}{!isVisitReadOnly && <button onClick={() => handleRemoveAlert(alert)}>×</button>}</span>
-                                ))
-                            ) : ( <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.9rem' }}>No active alerts.</span> )}
-                        </div>
-                    </section>
-                )}
+				<section style={{ marginTop: '20px', padding: '15px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+					<h3 className="section-title">Medical Alerts & Allergies (Global)</h3>
+					{!isVisitReadOnly && (
+						<div className="medical-alert-input-group">
+							<input className="pill-input-input" placeholder="Type allergy (e.g. Asthma, Penicillin)" value={alertInput} onChange={(e) => setAlertInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddAlert()} />
+							<button className="small-btn" style={{ background: '#ef4444', minWidth: '60px' }} onClick={handleAddAlert}>+ Add</button>
+						</div>
+					)}
+					<div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: '20px', marginTop: isVisitReadOnly ? '10px' : '0' }}>
+						{(patient.medicalAlerts && patient.medicalAlerts.length > 0) ? (
+							patient.medicalAlerts.map((alert, i) => (
+								<span key={i} className="alert-chip">{alert}{!isVisitReadOnly && <button onClick={() => handleRemoveAlert(alert)}>×</button>}</span>
+							))
+						) : ( <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.9rem' }}>No active alerts.</span> )}
+					</div>
+				</section>
 
-				{!isAide && recommendations.length > 0 && (
+				{recommendations.length > 0 && (
 					<div style={{ marginTop: '20px', padding: '15px', background: '#fff7ed', borderLeft: '4px solid #f97316', borderRadius: '4px' }}>
 						<h4 style={{ margin: '0 0 10px 0', color: '#c2410c' }}>Automated Recommendations (Year {selectedYear})</h4>
 						<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1294,25 +1292,23 @@ function PatientForm({ userRole }) {
 					</div>
 				)}
 
-				{!isAide && (
-                    <section className="oral-section">
-                        <h3 className="section-title">Oral Health Condition</h3>
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
-                            {yearsList.map(year => ( <button key={year} onClick={() => handleYearChange(year)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', backgroundColor: selectedYear === year ? '#2563eb' : '#e2e8f0', color: selectedYear === year ? 'white' : '#475569', boxShadow: selectedYear === year ? '0 2px 4px rgba(37,99,235,0.3)' : 'none', transition: 'all 0.2s' }}>Year {year}</button> ))}
-                            {!isHistoryView && <button onClick={handleAddYear} style={{ padding: '8px 12px', borderRadius: '20px', border: '2px dashed #cbd5e1', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', backgroundColor: 'transparent', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Add Next Year">+</button>}
-                        </div>
-                        <div className="status-palette">
-                            {["issue", "planned", "completed"].map((status) => ( <button key={status} className={`status-pill${activeStatus === status ? " active" : ""}`} onClick={() => !isChartReadOnly && setActiveStatus(status)} disabled={isChartReadOnly}><span className={`status-dot ${status}`}></span>{status === "issue" ? "Issue (red)" : status === "planned" ? "Planned (blue)" : "Completed (green)"}</button> ))}
-                        </div>
-                        <div className="tooth-chart-container">
-                            <div className="tooth-inner-panel">
-                                <div className="tc-group"><div className="tc-row-header">Top Layer (Treatment / Condition)</div>{renderBoxRow(0)}{renderBoxRow(1)}</div>
-                                <div className="tc-group"><div className="tc-row-header"></div>{renderCircleGroup(upperConditionRows, 0)}{renderCircleGroup(lowerConditionRows, 26)}</div>
-                                <div className="tc-group"><div className="tc-row-header">Bottom Layer (Condition / Treatment)</div>{renderBoxRow(2)}{renderBoxRow(3)}</div>
-                            </div>
-                        </div>
-                    </section>
-                )}
+				<section className="oral-section">
+					<h3 className="section-title">Oral Health Condition</h3>
+					<div style={{ display: 'flex', gap: '10px', marginBottom: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
+						{yearsList.map(year => ( <button key={year} onClick={() => handleYearChange(year)} style={{ padding: '8px 16px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem', backgroundColor: selectedYear === year ? '#2563eb' : '#e2e8f0', color: selectedYear === year ? 'white' : '#475569', boxShadow: selectedYear === year ? '0 2px 4px rgba(37,99,235,0.3)' : 'none', transition: 'all 0.2s' }}>Year {year}</button> ))}
+						{!isHistoryView && <button onClick={handleAddYear} style={{ padding: '8px 12px', borderRadius: '20px', border: '2px dashed #cbd5e1', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', backgroundColor: 'transparent', color: '#64748b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Add Next Year">+</button>}
+					</div>
+					<div className="status-palette">
+						{["issue", "planned", "completed"].map((status) => ( <button key={status} className={`status-pill${activeStatus === status ? " active" : ""}`} onClick={() => !isChartReadOnly && setActiveStatus(status)} disabled={isChartReadOnly}><span className={`status-dot ${status}`}></span>{status === "issue" ? "Issue (red)" : status === "planned" ? "Planned (blue)" : "Completed (green)"}</button> ))}
+					</div>
+					<div className="tooth-chart-container">
+						<div className="tooth-inner-panel">
+							<div className="tc-group"><div className="tc-row-header">Top Layer (Treatment / Condition)</div>{renderBoxRow(0)}{renderBoxRow(1)}</div>
+							<div className="tc-group"><div className="tc-row-header"></div>{renderCircleGroup(upperConditionRows, 0)}{renderCircleGroup(lowerConditionRows, 26)}</div>
+							<div className="tc-group"><div className="tc-row-header">Bottom Layer (Condition / Treatment)</div>{renderBoxRow(2)}{renderBoxRow(3)}</div>
+						</div>
+					</div>
+				</section>
 
 				<section className="timeline-section" style={{ padding: '20px', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '2rem' }}>
 					<h3 className="section-title" style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '10px', marginBottom: '20px' }}>
