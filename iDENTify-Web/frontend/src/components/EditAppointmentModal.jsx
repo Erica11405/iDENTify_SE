@@ -56,9 +56,8 @@ function computeAgeFromBirthdate(value) {
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function EditAppointmentModal({ appointment, initialContact, initialAge, initialSex, onSave, onCancel, dentists = [] }) {
-  if (!appointment) return null;
-  
   const user = useAppStore(state => state.user);
+  if (!appointment) return null;
 
   // Filter dentists to only those in the same branch as the aide (if aide is scoped)
   const filteredDentists = useMemo(() => {
