@@ -708,3 +708,127 @@
   border-radius: 10px;
   cursor: pointer;
 }
+
+/* =========================================
+   PRINT STYLES (Medical Document Export)
+   ========================================= */
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+
+  /* Hide sidebar and navigation elements */
+  nav, 
+  .sidebar,
+  .form-actions-bottom,
+  .form-header button,
+  .status-palette,
+  .medical-alert-input-group,
+  .timeline-form-compact,
+  .medication-form,
+  .upload-section input[type="file"],
+  .side-panel-backdrop,
+  .context-menu,
+  .patient-form-tabs,
+  .review-banner,
+  .back-btn,
+  header {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .patient-form-page {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  .patient-form-card {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Formal Medical Header */
+  .patient-form-card::before {
+    content: "iDENTify Dental Clinic Management System\nMedical Record Summary";
+    display: block;
+    text-align: center;
+    font-size: 18pt;
+    font-weight: bold;
+    margin-bottom: 20pt;
+    border-bottom: 2pt solid #000;
+    padding-bottom: 10pt;
+    white-space: pre-wrap;
+  }
+
+  .patients-header {
+    text-align: center;
+    font-size: 16pt !important;
+    margin-bottom: 15pt !important;
+  }
+
+  .section-title {
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+    margin-top: 15pt;
+    font-size: 13pt !important;
+    color: black !important;
+  }
+
+  .patient-info-fields,
+  .vital-row,
+  .timeline-item-card,
+  .medication-entry,
+  .tooth-chart-container,
+  .tooth-inner-panel {
+    border: 1px solid #000 !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+
+  .alert-chip {
+    border: 1px solid #000 !important;
+    background: #f8f8f8 !important;
+    color: black !important;
+  }
+
+  .alert-chip button {
+    display: none !important;
+  }
+
+  /* Ensure colors show up in PDF */
+  .tc-box-cell, .tooth-poly, .status-dot {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Force page breaks for long documents */
+  section {
+    page-break-inside: avoid;
+    margin-bottom: 10pt;
+  }
+
+  .thumbnail-grid {
+    page-break-before: auto;
+  }
+
+  /* Add signature line at bottom */
+  .patient-form-card::after {
+    content: "\n\n\n__________________________\nAttending Dentist Signature";
+    display: block;
+    margin-top: 40pt;
+    text-align: right;
+    font-size: 11pt;
+    white-space: pre-wrap;
+  }
+}

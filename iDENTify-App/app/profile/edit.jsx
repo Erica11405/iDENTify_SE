@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { API, fetchPatientByEmail } from "../../constants/Api";
 import DateTimePicker from '@react-native-community/datetimepicker';
+import PHAddressSelector from "../../components/PHAddressSelector";
 
 export default function EditProfile() {
   const { user } = useUser();
@@ -253,14 +254,14 @@ export default function EditProfile() {
         <Text style={styles.label}>Street</Text>
         <TextInput style={styles.input} value={street} onChangeText={setStreet} placeholder="Street" placeholderTextColor="#9CA3AF" />
 
-        <Text style={styles.label}>Barangay</Text>
-        <TextInput style={styles.input} value={barangay} onChangeText={setBarangay} placeholder="Barangay" placeholderTextColor="#9CA3AF" />
-
-        <Text style={styles.label}>City</Text>
-        <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="City" placeholderTextColor="#9CA3AF" />
-
-        <Text style={styles.label}>Province</Text>
-        <TextInput style={styles.input} value={province} onChangeText={setProvince} placeholder="Province" placeholderTextColor="#9CA3AF" />
+        <PHAddressSelector 
+          selectedProvince={province}
+          selectedCity={city}
+          selectedBarangay={barangay}
+          onProvinceChange={setProvince}
+          onCityChange={setCity}
+          onBarangayChange={setBarangay}
+        />
       </View>
 
       <TouchableOpacity style={styles.saveButton} onPress={saveChanges} disabled={loading}>

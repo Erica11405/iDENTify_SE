@@ -264,6 +264,10 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
       body: [
         ['Patients Seen', summary.patientsSeen],
         ['Procedures Done', summary.proceduresDone],
+        ['Follow-up Appointments Completed', dailySummary.followUpsCompleted || 0],
+        ['Rescheduled Appointments', dailySummary.rescheduledAppointments || 0],
+        ['Total Reschedules', dailySummary.totalReschedules || 0],
+        ['Rescheduling Rate', dailySummary.proceduresDone > 0 ? ((dailySummary.rescheduledAppointments / dailySummary.proceduresDone) * 100).toFixed(1) + '%' : '0%'],
         ['New Patients', summary.newPatients],
         ['Avg Treatment Duration', summary.avgTreatmentDuration],
       ],
@@ -411,6 +415,14 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
                 <p className="reports-summary-value">{summary.proceduresDone}</p>
               </div>
               <div className="reports-summary-card">
+                <p className="reports-summary-label">Follow-ups Done</p>
+                <p className="reports-summary-value">{summary.followUpsCompleted || 0}</p>
+              </div>
+              <div className="reports-summary-card">
+                <p className="reports-summary-label">Rescheduled Apps</p>
+                <p className="reports-summary-value">{summary.rescheduledAppointments || 0}</p>
+              </div>
+              <div className="reports-summary-card">
                 <p className="reports-summary-label">New Patients</p>
                 <p className="reports-summary-value">{summary.newPatients}</p>
               </div>
@@ -430,6 +442,10 @@ function Reports({ pageTitle = "Reports", pageSubtitle = "Clinic-wide analytics 
               <tbody>
                 <tr><td>Patients Seen (Done)</td><td>{summary.patientsSeen}</td></tr>
                 <tr><td>Procedures Completed</td><td>{summary.proceduresDone}</td></tr>
+                <tr><td>Follow-up Appointments Completed</td><td>{summary.followUpsCompleted || 0}</td></tr>
+                <tr><td>Rescheduled Appointments</td><td>{summary.rescheduledAppointments || 0}</td></tr>
+                <tr><td>Rescheduling Frequency (Total)</td><td>{summary.totalReschedules || 0}</td></tr>
+                <tr><td>Rescheduling Rate</td><td>{summary.proceduresDone > 0 ? ((summary.rescheduledAppointments / summary.proceduresDone) * 100).toFixed(1) : 0}%</td></tr>
                 <tr><td>New Patients Registered</td><td>{summary.newPatients}</td></tr>
                 <tr><td>Average Treatment Duration</td><td>{summary.avgTreatmentDuration}</td></tr>
               </tbody>

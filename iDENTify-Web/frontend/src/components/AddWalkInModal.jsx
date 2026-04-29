@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import useAppStore from '../store/useAppStore';
 import '../styles/components/AddWalkInModal.css';
 import api from "../api/apiClient"; 
+import PHAddressSelector from './PHAddressSelector';
 
 function computeAgeFromBirthdate(value) {
   if (!value) return "";
@@ -158,6 +159,10 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
       birthdate: birthday,
       sex,
       contact,
+      street,
+      barangay,
+      city,
+      province,
       notes: reasonString,
       assignedDentist: dentistName,
       assignedDentistId: dentistId,
@@ -175,6 +180,10 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
     setCalculatedAge('');
     setSex('');
     setContact('');
+    setStreet('');
+    setBarangay('');
+    setCity('');
+    setProvince('');
     setSelectedServices([]);
     setDentistName('');
     setDentistId('');
@@ -294,6 +303,29 @@ const AddWalkInModal = ({ isOpen, onClose, onAddPatient }) => {
               </div>
             </div>
           </div>
+
+          {activeTab === "new" && (
+            <>
+              <div className="form-group">
+                <label>Street / Building / Unit</label>
+                <input 
+                  type="text" 
+                  placeholder="123 Dental St." 
+                  value={street} 
+                  onChange={(e) => setStreet(e.target.value)} 
+                />
+              </div>
+
+              <PHAddressSelector 
+                selectedProvince={province}
+                selectedCity={city}
+                selectedBarangay={barangay}
+                onProvinceChange={setProvince}
+                onCityChange={setCity}
+                onBarangayChange={setBarangay}
+              />
+            </>
+          )}
 
           <div className="form-group">
             <label>Reason for Visit (Service) *</label>

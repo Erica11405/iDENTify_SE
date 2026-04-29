@@ -666,6 +666,15 @@ export const createClinicBranch = async (clinicId, payload) => {
     return handleResponse(res);
 };
 
+export const updateClinicBranch = async (clinicId, branchId, payload) => {
+    const res = await fetch(`${API_BASE}/clinics/${clinicId}/branches/${branchId}`, {
+        method: 'PUT',
+        headers: jsonHeaders(),
+        body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+};
+
 export const updateClinicStatus = async (clinicId, payload) => {
     const res = await fetch(`${API_BASE}/clinics/${clinicId}/status`, {
         method: 'PATCH',
@@ -865,7 +874,7 @@ const api = {
     getServices, createService, updateService, deleteService,
     getClinicMedications, createClinicMedication, updateClinicMedication, deleteClinicMedication,
     getDentistTypes, createDentistType, updateDentistType, deleteDentistType,
-    getClinics, getClinicSummary, createClinic, getClinicBranches, createClinicBranch,
+    getClinics, getClinicSummary, createClinic, getClinicBranches, createClinicBranch, updateClinicBranch,
     updateClinicStatus, archiveClinic, restoreClinic,
     updateClinicBranchStatus, archiveClinicBranch, restoreClinicBranch,
     getClinicDiscovery,

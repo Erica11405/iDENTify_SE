@@ -1511,7 +1511,37 @@ function PatientForm({ userRole }) {
 				</section>
 
                 <div className="form-actions-bottom" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid #e9ecef', paddingTop: '1rem' }}>
-                    {!isVisitReadOnly ? (
+                    {isVisitReadOnly ? (
+                        <>
+                            <button 
+                                type="button" 
+                                className="export-pdf-btn"
+                                onClick={() => window.print()}
+                                style={{ 
+                                    padding: '10px 20px', 
+                                    background: '#64748b', 
+                                    color: 'white', 
+                                    borderRadius: '8px', 
+                                    border: 'none', 
+                                    cursor: 'pointer', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '8px',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                                    <rect x="6" y="14" width="12" height="8"></rect>
+                                </svg>
+                                Export to PDF / Print
+                            </button>
+                            <div style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {isDentistReviewing && !isHistoryView ? "✓ Read-Only View (Dentist)" : `✓ ${isHistoryView ? "Completed Appointment Record (Read-Only)" : `Year ${selectedYear} is Historical (Read-Only)`}`}
+                            </div>
+                        </>
+                    ) : (
                         <>
                             <button 
                                 className="done-btn" 
@@ -1530,10 +1560,6 @@ function PatientForm({ userRole }) {
                                 </button>
                             )}
                         </>
-                    ) : (
-                        <div style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {isDentistReviewing && !isHistoryView ? "✓ Read-Only View (Dentist)" : `✓ ${isHistoryView ? "Completed Appointment Record (Read-Only)" : `Year ${selectedYear} is Historical (Read-Only)`}`}
-                        </div>
                     )}
                 </div>
 				<div className={`side-panel-backdrop${isPanelOpen ? " side-panel-open" : ""}`} onClick={closePanel}>

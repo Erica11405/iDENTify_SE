@@ -93,6 +93,8 @@ function toFormState(request) {
     };
 }
 
+import PHAddressSelector from '../components/PHAddressSelector';
+
 function SuperAdminRequestGate() {
     const navigate = useNavigate();
     const { user, setUser, resetStore } = useAppStore();
@@ -321,50 +323,26 @@ function SuperAdminRequestGate() {
                         </div>
 
                         <div className="request-section-title">Clinic Address</div>
-                        <div className="request-grid two-col">
-                            <div className="request-field">
-                                <label>Street *</label>
-                                <input 
-                                    type="text" 
-                                    className={errors.street ? 'error' : ''}
-                                    value={form.street} 
-                                    onChange={(e) => handleInputChange('street', e.target.value)} 
-                                />
-                                {errors.street && <span className="error-message">{errors.street}</span>}
-                            </div>
-                            <div className="request-field">
-                                <label>Barangay *</label>
-                                <input 
-                                    type="text" 
-                                    className={errors.barangay ? 'error' : ''}
-                                    value={form.barangay} 
-                                    onChange={(e) => handleInputChange('barangay', e.target.value)} 
-                                />
-                                {errors.barangay && <span className="error-message">{errors.barangay}</span>}
-                            </div>
+                        <div className="request-field">
+                            <label>Street *</label>
+                            <input 
+                                type="text" 
+                                className={errors.street ? 'error' : ''}
+                                value={form.street} 
+                                onChange={(e) => handleInputChange('street', e.target.value)} 
+                            />
+                            {errors.street && <span className="error-message">{errors.street}</span>}
                         </div>
-                        <div className="request-grid two-col">
-                            <div className="request-field">
-                                <label>City *</label>
-                                <input 
-                                    type="text" 
-                                    className={errors.city ? 'error' : ''}
-                                    value={form.city} 
-                                    onChange={(e) => handleInputChange('city', e.target.value)} 
-                                />
-                                {errors.city && <span className="error-message">{errors.city}</span>}
-                            </div>
-                            <div className="request-field">
-                                <label>Province *</label>
-                                <input 
-                                    type="text" 
-                                    className={errors.province ? 'error' : ''}
-                                    value={form.province} 
-                                    onChange={(e) => handleInputChange('province', e.target.value)} 
-                                />
-                                {errors.province && <span className="error-message">{errors.province}</span>}
-                            </div>
-                        </div>
+
+                        <PHAddressSelector 
+                            selectedProvince={form.province}
+                            selectedCity={form.city}
+                            selectedBarangay={form.barangay}
+                            onProvinceChange={(val) => handleInputChange('province', val)}
+                            onCityChange={(val) => handleInputChange('city', val)}
+                            onBarangayChange={(val) => handleInputChange('barangay', val)}
+                            errors={errors}
+                        />
 
                         <div className="request-field">
                             <label>Contact Phone *</label>

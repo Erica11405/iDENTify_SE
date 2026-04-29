@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import api from "../../api/apiClient"; 
 import useAppStore from "../../store/useAppStore";
+import PHAddressSelector from "../../components/PHAddressSelector";
 import "../../styles/pages/dentist/DentistSettings.css";
 
 const COMMON_FREQUENCY_OPTIONS = [
@@ -56,6 +57,10 @@ function DentistSettings({ showAideManagement = true }) {
   const [newService, setNewService] = useState({ name: "", minPrice: "", maxPrice: "", estimatedDuration: "", branchIds: [] });
   const [editingServiceId, setEditingServiceId] = useState(null);
 
+  // --- BRANCHES STATE ---
+  const [newBranch, setNewBranch] = useState({ name: "", code: "", street: "", barangay: "", city: "", province: "" });
+  const [editingBranchId, setEditingBranchId] = useState(null);
+
   // --- MEDICATIONS STATE ---
   const [clinicMedications, setClinicMedications] = useState([]);
     const [newMedication, setNewMedication] = useState({ name: "", defaultDosage: "", defaultFrequency: "" });
@@ -67,39 +72,40 @@ function DentistSettings({ showAideManagement = true }) {
     const [editingDentistTypeId, setEditingDentistTypeId] = useState(null);
 
   // Fetch data when the page loads
+  const loadData = async () => {
+    try {
+              const dentistTypePromise = showAideManagement
+                      ? Promise.resolve([])
+                      : api.getDentistTypes().catch(() => []);
+              
+              const branchesPromise = (user?.clinic_id)
+                      ? api.getClinicBranches(user.clinic_id).catch(() => [])
+                      : Promise.resolve([]);
+
+              const [staffList, servicesList, medsList, dentistTypeList, branchesList] = await Promise.all([
+                      api.getDentists(),
+                      api.getServices(),
+                      api.getClinicMedications(),
+                      dentistTypePromise,
+                      branchesPromise,
+              ]);
+
+      const aidesOnly = staffList.filter(staff => staff.specialization === 'Dental Aide');
+      setAides(aidesOnly);
+      setServices(servicesList);
+      setClinicMedications(medsList);
+      setBranches(branchesList);
+
+              if (!showAideManagement) {
+                  setDentistTypes(sortDentistTypesByName(dentistTypeList));
+              }
+
+    } catch (error) {
+      console.error("Failed to load settings data:", error);
+    }
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-                const dentistTypePromise = showAideManagement
-                        ? Promise.resolve([])
-                        : api.getDentistTypes().catch(() => []);
-                
-                const branchesPromise = (user?.clinic_id)
-                        ? api.getClinicBranches(user.clinic_id).catch(() => [])
-                        : Promise.resolve([]);
-
-                const [staffList, servicesList, medsList, dentistTypeList, branchesList] = await Promise.all([
-                        api.getDentists(),
-                        api.getServices(),
-                        api.getClinicMedications(),
-                        dentistTypePromise,
-                        branchesPromise,
-                ]);
-
-        const aidesOnly = staffList.filter(staff => staff.specialization === 'Dental Aide');
-        setAides(aidesOnly);
-        setServices(servicesList);
-        setClinicMedications(medsList);
-        setBranches(branchesList);
-
-                if (!showAideManagement) {
-                    setDentistTypes(sortDentistTypesByName(dentistTypeList));
-                }
-
-      } catch (error) {
-        console.error("Failed to load settings data:", error);
-      }
-    };
     loadData();
   }, [showAideManagement, user?.clinic_id]);
 
@@ -124,7 +130,7 @@ function DentistSettings({ showAideManagement = true }) {
       const payload = {
         first_name: newAide.firstName, 
         last_name: newAide.lastName, 
-        middle_name: newAide.middleName, 
+        middle_name: newAide.middle_name, 
         email: newAide.email, 
         phone: newAide.phone,
         specialization: "Dental Aide", 
@@ -177,6 +183,64 @@ function DentistSettings({ showAideManagement = true }) {
       toast.success("Dental Aide securely removed.");
     } catch (error) {
       toast.error(error.message);
+    }
+  };
+
+  // --- BRANCH HANDLERS ---
+  const handleSaveBranch = async (e) => {
+    e.preventDefault();
+    if (!newBranch.name || !newBranch.street || !newBranch.barangay || !newBranch.city || !newBranch.province) {
+        return toast.error("Branch name and full address are required.");
+    }
+
+    const finalAddress = `${newBranch.street}, ${newBranch.barangay}, ${newBranch.city}, ${newBranch.province}`;
+    const payload = {
+        name: newBranch.name,
+        code: newBranch.code,
+        address: finalAddress
+    };
+
+    try {
+        if (editingBranchId) {
+            await api.updateClinicBranch(user.clinic_id, editingBranchId, payload);
+            toast.success("Branch updated successfully!");
+        } else {
+            await api.createClinicBranch(user.clinic_id, payload);
+            toast.success("Branch added successfully!");
+        }
+        cancelBranchEdit();
+        loadData();
+    } catch (error) {
+        toast.error(error.message || "Failed to save branch.");
+    }
+  };
+
+  const handleEditBranchClick = (branch) => {
+      setEditingBranchId(branch.id);
+      const addrParts = (branch.address || "").split(", ");
+      setNewBranch({
+          name: branch.name,
+          code: branch.code || "",
+          street: addrParts[0] || "",
+          barangay: addrParts[1] || "",
+          city: addrParts[2] || "",
+          province: addrParts[3] || ""
+      });
+  };
+
+  const cancelBranchEdit = () => {
+      setEditingBranchId(null);
+      setNewBranch({ name: "", code: "", street: "", barangay: "", city: "", province: "" });
+  };
+
+  const handleDeleteBranch = async (id) => {
+    if (!window.confirm("Are you sure you want to archive this branch?")) return;
+    try {
+        await api.archiveClinicBranch(user.clinic_id, id);
+        toast.success("Branch archived.");
+        loadData();
+    } catch (error) {
+        toast.error(error.message || "Failed to archive branch.");
     }
   };
 
@@ -383,6 +447,9 @@ function DentistSettings({ showAideManagement = true }) {
                 {showAideManagement ? (
                     <button className={activeTab === "aides" ? "active" : ""} onClick={() => setActiveTab("aides")}>Dental Aides</button>
                 ) : null}
+        {!showAideManagement && (
+            <button className={activeTab === "branches" ? "active" : ""} onClick={() => setActiveTab("branches")}>Clinic Branches</button>
+        )}
         <button className={activeTab === "services" ? "active" : ""} onClick={() => setActiveTab("services")}>Clinic Services</button>
         <button className={activeTab === "medications" ? "active" : ""} onClick={() => setActiveTab("medications")}>Medications</button>
                 {!showAideManagement ? (
@@ -465,6 +532,69 @@ function DentistSettings({ showAideManagement = true }) {
                 </table>
             </div>
           </div>
+        )}
+
+        {/* --- BRANCHES TAB --- */}
+        {!showAideManagement && activeTab === "branches" && (
+            <div className="animation-fade-in">
+                <div className={`settings-form-card ${editingBranchId ? 'editing' : ''}`}>
+                    <h3>{editingBranchId ? "Edit Branch" : "Add New Clinic Branch"}</h3>
+                    <form onSubmit={handleSaveBranch}>
+                        <div className="form-row">
+                            <div className="form-group flex-2">
+                                <label>Branch Name *</label>
+                                <input type="text" placeholder="Main Branch" value={newBranch.name} onChange={(e) => setNewBranch({ ...newBranch, name: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label>Branch Code</label>
+                                <input type="text" placeholder="MB-01" value={newBranch.code} onChange={(e) => setNewBranch({ ...newBranch, code: e.target.value })} />
+                            </div>
+                        </div>
+                        <div className="form-group" style={{ marginTop: '10px' }}>
+                            <label>Street / Building Info *</label>
+                            <input type="text" placeholder="123 Dental St." value={newBranch.street} onChange={(e) => setNewBranch({ ...newBranch, street: e.target.value })} />
+                        </div>
+                        <div style={{ marginTop: '15px' }}>
+                            <PHAddressSelector 
+                                selectedProvince={newBranch.province}
+                                selectedCity={newBranch.city}
+                                selectedBarangay={newBranch.barangay}
+                                onProvinceChange={(val) => setNewBranch(prev => ({ ...prev, province: val }))}
+                                onCityChange={(val) => setNewBranch(prev => ({ ...prev, city: val }))}
+                                onBarangayChange={(val) => setNewBranch(prev => ({ ...prev, barangay: val }))}
+                            />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '15px' }}>
+                            {editingBranchId && <button type="button" style={cancelBtnStyle} onClick={cancelBranchEdit}>Cancel</button>}
+                            <button type="submit" style={saveBtnStyle}>{editingBranchId ? 'Save Changes' : 'Add Branch'}</button>
+                        </div>
+                    </form>
+                </div>
+
+                <h3 className="table-title">Clinic Branches</h3>
+                <div className="table-container">
+                    <table className="settings-table">
+                        <thead><tr><th>Branch Name</th><th>Code</th><th>Address</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            {branches.length === 0 ? (<tr><td colSpan="4" className="empty-state">No branches registered.</td></tr>) : (
+                                branches.map((branch) => (
+                                    <tr key={branch.id} className={editingBranchId === branch.id ? "row-highlight" : ""}>
+                                        <td className="font-semibold">{branch.name}</td>
+                                        <td>{branch.code || "N/A"}</td>
+                                        <td>{branch.address || "No address"}</td>
+                                        <td>
+                                            <div className="action-buttons">
+                                                <button onClick={() => handleEditBranchClick(branch)} className="btn-edit">Edit</button>
+                                                <button onClick={() => handleDeleteBranch(branch.id)} className="btn-delete">Archive</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         )}
 
         {/* --- SERVICES TAB --- */}

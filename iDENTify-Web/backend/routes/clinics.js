@@ -677,6 +677,71 @@ router.post('/:clinicId/branches', async (req, res) => {
   }
 });
 
+router.put('/:clinicId/branches/:branchId', async (req, res) => {
+  const access = await enforceAdminAccess(req, res, {
+    allowGlobalAdmin: true,
+    allowSuperAdmin: true,
+    requireApprovedSuperAdmin: true,
+  });
+  if (!access.ok) return;
+
+  const clinicId = toOptionalPositiveInt(req.params.clinicId);
+  const branchId = toOptionalPositiveInt(req.params.branchId);
+  const name = cleanText(req.body?.name);
+  const code = cleanText(req.body?.code, 64);
+  const address = cleanText(req.body?.address, 500);
+
+  if (!clinicId || !branchId) {
+    return res.status(400).json({ message: 'Invalid clinic or branch id.' });
+  }
+
+  if (!name) {
+    return res.status(400).json({ message: 'Branch name is required.' });
+  }
+
+  if (access.role === 'superadmin' && access.clinicId !== clinicId) {
+    return res.status(403).json({ message: 'You can only update branches within your own clinic.' });
+  }
+
+  try {
+    const branchSupport = await getBranchColumnSupport();
+
+    const [existingRows] = await db.query(
+      `SELECT id FROM clinic_branches WHERE id = ? AND clinic_id = ? LIMIT 1`,
+      [branchId, clinicId]
+    );
+
+    if (!existingRows.length) {
+      return res.status(404).json({ message: 'Branch not found for this clinic.' });
+    }
+
+    const updates = ['name = ?', 'code = ?'];
+    const params = [name, code || null];
+
+    if (branchSupport.address) {
+      updates.push('address = ?');
+      params.push(address || null);
+    }
+
+    params.push(branchId, clinicId);
+    await db.query(
+      `UPDATE clinic_branches
+       SET ${updates.join(', ')}
+       WHERE id = ? AND clinic_id = ?`,
+      params
+    );
+
+    const row = await selectBranchById(branchId, branchSupport);
+    return res.json(mapLifecycleRow(row, branchSupport.status));
+  } catch (error) {
+    if (error?.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ message: 'A branch with the same name already exists for this clinic.' });
+    }
+    console.error('Error updating branch:', error);
+    return res.status(500).json({ message: 'Failed to update branch.' });
+  }
+});
+
 router.patch('/:clinicId/branches/:branchId/status', async (req, res) => {
   if (!(await requireSystemAdmin(req, res))) return;
 

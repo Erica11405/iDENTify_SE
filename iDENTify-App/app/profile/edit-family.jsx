@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { API } from "../../constants/Api";
 import DateTimePicker from '@react-native-community/datetimepicker';
+import PHAddressSelector from "../../components/PHAddressSelector";
 
 export default function EditFamilyMember() {
   const router = useRouter();
@@ -23,7 +24,10 @@ export default function EditFamilyMember() {
   const [displayAge, setDisplayAge] = useState(""); 
   
   const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [street, setStreet] = useState("");
+  const [barangay, setBarangay] = useState("");
+  const [city, setCity] = useState("");
+  const [province, setProvince] = useState("");
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,7 +47,10 @@ export default function EditFamilyMember() {
         setLastName(data.last_name || "");
         setSex(data.gender || "");
         setPhone(data.contact_number || "");
-        setAddress(data.address || "");
+        setStreet(data.street || "");
+        setBarangay(data.barangay || "");
+        setCity(data.city || "");
+        setProvince(data.province || "");
 
         if (data.birthdate) {
             const parsedDate = new Date(data.birthdate);
@@ -105,7 +112,10 @@ export default function EditFamilyMember() {
       birthdate: bday,
       gender: sex,
       contact_number: phone,
-      address: address,
+      street: street,
+      barangay: barangay,
+      city: city,
+      province: province,
       medicalAlerts: relationshipTag, 
       vitals: { age: calculateAge(dateObject) },
     };
@@ -181,8 +191,17 @@ export default function EditFamilyMember() {
         <Text style={styles.label}>Phone number</Text>
         <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="0917..." placeholderTextColor="#9CA3AF" />
         
-        <Text style={styles.label}>Address</Text>
-        <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="Full Address" placeholderTextColor="#9CA3AF" />
+        <Text style={styles.label}>Street</Text>
+        <TextInput style={styles.input} value={street} onChangeText={setStreet} placeholder="Street / Building Info" placeholderTextColor="#9CA3AF" />
+
+        <PHAddressSelector 
+          selectedProvince={province}
+          selectedCity={city}
+          selectedBarangay={barangay}
+          onProvinceChange={setProvince}
+          onCityChange={setCity}
+          onBarangayChange={setBarangay}
+        />
       </View>
 
       <TouchableOpacity style={styles.saveButton} onPress={updateMember} disabled={saving}>

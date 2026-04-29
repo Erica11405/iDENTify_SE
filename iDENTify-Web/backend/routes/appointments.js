@@ -1463,7 +1463,9 @@ router.post("/", async (req, res) => {
       "reason",
       "notes",
       "status",
+      "is_follow_up"
     ];
+    const isFollowUp = (String(finalReason || "") + " " + String(notes || "")).toLowerCase().includes("follow-up") ? 1 : 0;
     const appointmentValues = [
       patientId,
       primaryDentistId,
@@ -1472,6 +1474,7 @@ router.post("/", async (req, res) => {
       finalReason,
       notes || "",
       status || "Scheduled",
+      isFollowUp
     ];
 
     if (supportsAppointmentClinic) {
@@ -1749,8 +1752,16 @@ router.put("/:id", async (req, res) => {
     }
 
     if (fields.timeStart) {
-      setClauses.push("appointment_datetime = ?");
-      values.push(nextStart);
+      const isActuallyChanged = formatSqlDateTime(currentAppt.appointment_datetime) !== nextStart;
+      if (isActuallyChanged) {
+          setClauses.push("appointment_datetime = ?");
+          values.push(nextStart);
+          setClauses.push("rescheduled_count = rescheduled_count + 1");
+          if (!currentAppt.original_datetime) {
+              setClauses.push("original_datetime = ?");
+              values.push(formatSqlDateTime(currentAppt.appointment_datetime));
+          }
+      }
     }
     if (requestedDentistId) {
       setClauses.push("dentist_id = ?");
@@ -1759,6 +1770,9 @@ router.put("/:id", async (req, res) => {
     if (fields.procedure || fields.services) {
       setClauses.push("reason = ?"); 
       values.push(nextReason);
+      const isFollowUp = nextReason.toLowerCase().includes("follow-up") ? 1 : 0;
+      setClauses.push("is_follow_up = ?");
+      values.push(isFollowUp);
     }
     if (fields.timeStart || fields.procedure || fields.services) {
       setClauses.push("end_datetime = ?");

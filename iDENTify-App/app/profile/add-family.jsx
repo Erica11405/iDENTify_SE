@@ -7,6 +7,7 @@ import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import { API, fetchPatientByEmail } from "../../constants/Api";
 import DateTimePicker from '@react-native-community/datetimepicker';
+import PHAddressSelector from "../../components/PHAddressSelector";
 
 export default function AddFamilyMember() {
   const router = useRouter();
@@ -23,7 +24,10 @@ export default function AddFamilyMember() {
   const [displayAge, setDisplayAge] = useState("0 years old"); 
   
   const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [street, setStreet] = useState("");
+  const [barangay, setBarangay] = useState("");
+  const [city, setCity] = useState("");
+  const [province, setProvince] = useState("");
   const [parentPatient, setParentPatient] = useState(null);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -79,7 +83,10 @@ export default function AddFamilyMember() {
       birthdate: bday,
       gender: sex,
       contact_number: phone,
-      address: address,
+      street: street,
+      barangay: barangay,
+      city: city,
+      province: province,
       medicalAlerts: relationshipTag,
       vitals: { age: calculateAge(dateObject) },
     };
@@ -151,8 +158,17 @@ export default function AddFamilyMember() {
         <Text style={styles.label}>Phone number</Text>
         <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="0917..." placeholderTextColor="#9CA3AF" />
         
-        <Text style={styles.label}>Address</Text>
-        <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="Full Address" placeholderTextColor="#9CA3AF" />
+        <Text style={styles.label}>Street</Text>
+        <TextInput style={styles.input} value={street} onChangeText={setStreet} placeholder="Street / Building Info" placeholderTextColor="#9CA3AF" />
+
+        <PHAddressSelector 
+          selectedProvince={province}
+          selectedCity={city}
+          selectedBarangay={barangay}
+          onProvinceChange={setProvince}
+          onCityChange={setCity}
+          onBarangayChange={setBarangay}
+        />
       </View>
 
       <TouchableOpacity style={styles.saveButton} onPress={saveMember} disabled={loading}>

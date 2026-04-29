@@ -1069,6 +1069,30 @@ router.get("/", async (req, res) => {
       [start, end, ...appointmentTenantScope.params]
     );
 
+    // E. Retention Tracking (Follow-ups Completed)
+    const [retentionRes] = await db.query(
+      `SELECT COUNT(*) as count 
+       FROM appointments a
+       ${appointmentTenantScope.joinSql}
+       WHERE DATE(a.appointment_datetime) BETWEEN ? AND ?
+         AND a.status IN ('Done', 'Completed')
+         AND a.is_follow_up = 1
+         ${appointmentTenantSql}`,
+      [start, end, ...appointmentTenantScope.params]
+    );
+
+    // F. Scheduling Efficiency (Rescheduled Appointments)
+    const [efficiencyRes] = await db.query(
+      `SELECT 
+        COUNT(CASE WHEN rescheduled_count > 0 THEN 1 END) as rescheduled_appointments,
+        SUM(rescheduled_count) as total_reschedules
+       FROM appointments a
+       ${appointmentTenantScope.joinSql}
+       WHERE DATE(a.appointment_datetime) BETWEEN ? AND ?
+         ${appointmentTenantSql}`,
+      [start, end, ...appointmentTenantScope.params]
+    );
+
     // 2. Dentist Performance
     const [dentistPerformance] = await db.query(`
       SELECT
@@ -1223,6 +1247,9 @@ router.get("/", async (req, res) => {
         proceduresDone: proceduresRes[0].count || 0,
         newPatients: newPatients,
         avgTreatmentDuration: durationRes[0].avg_min ? `${Math.round(durationRes[0].avg_min)} min` : "0 min",
+        followUpsCompleted: retentionRes[0].count || 0,
+        rescheduledAppointments: efficiencyRes[0].rescheduled_appointments || 0,
+        totalReschedules: efficiencyRes[0].total_reschedules || 0,
       },
       dentistPerformance: dentistPerformance,
       clinicPerformance: actorContext.role === 'globaladmin' ? clinicPerformance : [],

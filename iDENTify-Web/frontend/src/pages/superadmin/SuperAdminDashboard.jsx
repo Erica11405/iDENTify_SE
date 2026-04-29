@@ -3,6 +3,7 @@ import api from '../../api/apiClient';
 import WeeklyBarChart from '../../components/WeeklyBarChart';
 import ServicePopularityChartCard from '../../components/ServicePopularityChartCard';
 import ConfirmationModal from '../../components/ConfirmationModal';
+import PHAddressSelector from '../../components/PHAddressSelector';
 import useAppStore from '../../store/useAppStore';
 import '../../styles/pages/dentist/DentistSettings.css';
 
@@ -507,41 +508,18 @@ function SuperAdminDashboard() {
                                         placeholder="Street"
                                     />
                                 </div>
-                                <div className="form-group flex-2">
-                                    <label htmlFor="branch-barangay">Barangay *</label>
-                                    <input
-                                        id="branch-barangay"
-                                        type="text"
-                                        value={branchForm.barangay}
-                                        onChange={(event) => setBranchForm((prev) => ({ ...prev, barangay: event.target.value }))}
-                                        placeholder="Barangay"
-                                    />
-                                </div>
                             </div>
-                            <div className="form-row">
-                                <div className="form-group flex-2">
-                                    <label htmlFor="branch-city">City *</label>
-                                    <input
-                                        id="branch-city"
-                                        type="text"
-                                        value={branchForm.city}
-                                        onChange={(event) => setBranchForm((prev) => ({ ...prev, city: event.target.value }))}
-                                        placeholder="City"
-                                    />
-                                </div>
-                                <div className="form-group flex-2">
-                                    <label htmlFor="branch-province">Province *</label>
-                                    <input
-                                        id="branch-province"
-                                        type="text"
-                                        value={branchForm.province}
-                                        onChange={(event) => setBranchForm((prev) => ({ ...prev, province: event.target.value }))}
-                                        placeholder="Province"
-                                    />
-                                </div>
-                            </div>
+                            
+                            <PHAddressSelector 
+                                selectedProvince={branchForm.province}
+                                selectedCity={branchForm.city}
+                                selectedBarangay={branchForm.barangay}
+                                onProvinceChange={(val) => setBranchForm(prev => ({ ...prev, province: val }))}
+                                onCityChange={(val) => setBranchForm(prev => ({ ...prev, city: val }))}
+                                onBarangayChange={(val) => setBranchForm(prev => ({ ...prev, barangay: val }))}
+                            />
 
-                            <div className="settings-inline-actions">
+                            <div className="settings-inline-actions" style={{ marginTop: '15px' }}>
                                 <button className="btn-primary-action" type="submit" disabled={creatingBranch || clinics.length === 0}>
                                     {creatingBranch ? 'Creating Branch...' : 'Create Branch'}
                                 </button>
