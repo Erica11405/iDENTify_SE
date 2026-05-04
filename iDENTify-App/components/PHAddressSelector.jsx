@@ -91,7 +91,7 @@ const PHAddressSelector = ({
             }}
             enabled={!loading.provinces}
           >
-            <option label="Select Province" value="" />
+            <Picker.Item label="Select Province" value="" />
             {provinces.map(p => (
               <Picker.Item key={p.code} label={p.name} value={p.name} />
             ))}
