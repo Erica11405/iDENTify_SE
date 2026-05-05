@@ -61,7 +61,10 @@ export default function SelectServiceScreen() {
   useEffect(() => {
     const fetchDynamicServices = async () => {
       try {
-        const url = branchId ? `${API.services}?branch_id=${branchId}` : API.services;
+        const url = branchId 
+          ? `${API.services}?branch_id=${branchId}` 
+          : `${API.services}?clinic_id=${clinicId}`;
+          
         const response = await fetch(url);
         if (!response.ok) throw new Error("Failed to fetch services");
         
@@ -76,7 +79,7 @@ export default function SelectServiceScreen() {
     };
 
     fetchDynamicServices();
-  }, [branchId]);
+  }, [branchId, clinicId]);
 
   const selectedCount = selectedServices.length;
 

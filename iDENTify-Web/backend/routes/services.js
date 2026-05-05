@@ -6,10 +6,11 @@ const { getActorTenantScope } = require('../utils/accessControl');
 // GET all services (Isolated)
 router.get('/', async (req, res) => {
     try {
-        const { branch_id } = req.query;
+        const { branch_id, clinic_id } = req.query;
         const scope = await getActorTenantScope(req);
         
         const bId = Number(branch_id);
+        const cId = Number(clinic_id);
 
         // Using a join to get branch associations. 
         let query = `
@@ -27,6 +28,10 @@ router.get('/', async (req, res) => {
             params.push(scope.clinicId);
         } else if (scope.scoped) {
              return res.json([]); // Scoped but no clinic ID? Return empty.
+        } else if (cId) {
+            // Unscoped but clinic_id provided (e.g. Patient booking)
+            whereClauses.push('s.clinic_id = ?');
+            params.push(cId);
         }
 
         if (whereClauses.length > 0) {
