@@ -130,7 +130,9 @@ export default function HomeScreen() {
 
 	useFocusEffect(
 		useCallback(() => {
+			console.log("[Home] Focused, refreshing data...");
 			loadData();
+			loadClinics();
 		}, [loadData])
 	);
 

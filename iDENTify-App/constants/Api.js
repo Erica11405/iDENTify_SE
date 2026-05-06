@@ -21,7 +21,9 @@
 // };
 
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "https://identify-app-hth8t.ondigitalocean.app"; 
+const API_BASE_URL = "https://identify-app-hth8t.ondigitalocean.app"; 
+
+console.log("[API] Using Base URL:", API_BASE_URL);
 
 export const API = {
   patients: `${API_BASE_URL}/api/patients`,
@@ -48,14 +50,18 @@ export const fetchPatientByEmail = async (email) => {
 };
 
 export const fetchClinicDiscovery = async () => {
+  console.log("[API] Fetching clinics from:", API.clinicsDiscover);
   try {
     const response = await fetch(API.clinicsDiscover);
+    console.log("[API] Discovery response status:", response.status);
     if (!response.ok) {
       throw new Error(`Clinic discovery failed (${response.status})`);
     }
-    return await response.json();
+    const data = await response.json();
+    console.log("[API] Discovery data received, count:", data?.length);
+    return data;
   } catch (error) {
-    console.error("Error fetching clinic discovery:", error);
+    console.error("[API] Error fetching clinic discovery:", error);
     return [];
   }
 };
