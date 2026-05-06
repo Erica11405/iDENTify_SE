@@ -195,7 +195,7 @@ async function selectBranchById(branchId, support) {
   return rows[0] || null;
 }
 
-router.get('/discover', async (_req, res) => {
+router.get('/discover', async (req, res) => {
   try {
     const clinicSupport = await getClinicColumnSupport();
     const branchSupport = await getBranchColumnSupport();
@@ -203,19 +203,23 @@ router.get('/discover', async (_req, res) => {
     const clinicStatusExpr = buildStatusExpr('', clinicSupport.status);
     const branchStatusExpr = buildStatusExpr('', branchSupport.status);
 
+    console.log('Clinic Discovery: Fetching active clinics and branches...');
+
     const [clinicRows] = await db.query(
       `SELECT id, name
        FROM clinics
-       WHERE ${clinicStatusExpr} = 'Active'
+       WHERE LOWER(${clinicStatusExpr}) = 'active'
        ORDER BY name ASC`
     );
 
     const [branchRows] = await db.query(
       `SELECT id, clinic_id, name${branchSupport.address ? ', address' : ''}
        FROM clinic_branches
-       WHERE ${branchStatusExpr} = 'Active'
+       WHERE LOWER(${branchStatusExpr}) = 'active'
        ORDER BY name ASC`
     );
+
+    console.log(`Clinic Discovery: Found ${clinicRows.length} clinics and ${branchRows.length} branches.`);
 
     const branchesByClinic = new Map();
     branchRows.forEach((branch) => {
