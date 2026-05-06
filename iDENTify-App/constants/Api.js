@@ -56,6 +56,6 @@ export const fetchClinicDiscovery = async () => {
     return await response.json();
   } catch (error) {
     console.error("Error fetching clinic discovery:", error);
-    throw error;
+    return [];
   }
 };
