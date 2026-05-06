@@ -109,10 +109,21 @@ export default function HomeScreen() {
 	const loadClinics = async () => {
 		setClinicsLoading(true);
 		try {
+			console.log("[Home] Calling fetchClinicDiscovery...");
 			const data = await fetchClinicDiscovery();
-			setClinics(Array.isArray(data) ? data : []);
+			console.log("[Home] Clinics received:", data?.length);
+			
+			// ADD HARDCODED TEST CLINIC TO VERIFY UPDATE
+			const testClinic = {
+				id: 999,
+				name: "✨ UPDATE VERIFIED ✨",
+				branches: [{ id: 999, name: "Test Branch" }]
+			};
+			
+			setClinics(Array.isArray(data) ? [testClinic, ...data] : [testClinic]);
 		} catch (error) {
-			console.error("Error loading clinics:", error);
+			console.error("[Home] Error loading clinics:", error);
+			setClinics([{ id: 999, name: "✨ UPDATE VERIFIED (Fetch Error) ✨", branches: [] }]);
 		} finally {
 			setClinicsLoading(false);
 		}
