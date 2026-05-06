@@ -181,6 +181,29 @@ function SystemAdminClinicManagement() {
 						<StatCard label="Archived" value={summary.archived} />
 					</div>
 
+					{/* ADD CLINIC FORM */}
+					<div className="systemadmin-card">
+						<h3>Add New Clinic</h3>
+						<form onSubmit={handleCreateClinic} className="systemadmin-form-inline">
+							<div className="form-group" style={{ flex: 1 }}>
+								<input 
+									type="text" 
+									placeholder="Clinic Name (e.g. iDENTify Zamboanga)" 
+									value={newClinic.name} 
+									onChange={(e) => setNewClinic({ name: e.target.value })} 
+									disabled={busyAction === 'create-clinic'}
+								/>
+							</div>
+							<button 
+								type="submit" 
+								className="primary" 
+								disabled={busyAction === 'create-clinic'}
+							>
+								{busyAction === 'create-clinic' ? 'Creating...' : 'Create Clinic'}
+							</button>
+						</form>
+					</div>
+
 					<div className="systemadmin-card">
 						<h3>Clinics</h3>
 						{visibleClinics.length === 0 ? (
