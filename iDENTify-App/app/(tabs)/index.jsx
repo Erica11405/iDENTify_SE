@@ -112,18 +112,9 @@ export default function HomeScreen() {
 			console.log("[Home] Calling fetchClinicDiscovery...");
 			const data = await fetchClinicDiscovery();
 			console.log("[Home] Clinics received:", data?.length);
-			
-			// ADD HARDCODED TEST CLINIC TO VERIFY UPDATE
-			const testClinic = {
-				id: 999,
-				name: "✨ UPDATE VERIFIED ✨",
-				branches: [{ id: 999, name: "Test Branch" }]
-			};
-			
-			setClinics(Array.isArray(data) ? [testClinic, ...data] : [testClinic]);
+			setClinics(Array.isArray(data) ? data : []);
 		} catch (error) {
 			console.error("[Home] Error loading clinics:", error);
-			setClinics([{ id: 999, name: "✨ UPDATE VERIFIED (Fetch Error) ✨", branches: [] }]);
 		} finally {
 			setClinicsLoading(false);
 		}
